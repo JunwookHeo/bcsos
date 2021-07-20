@@ -1,6 +1,8 @@
 package wallet
 
 import (
+	"encoding/binary"
+	"fmt"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -9,14 +11,27 @@ import (
 )
 
 func TestNewWallet(t *testing.T) {
+	log.Info("TestNewWallet ==>")
 	w := NewWallet()
-	log.Infof("Private Key : 0x%X\n", w.PrivateKey.D)
-	log.Infof("Public Key (0x%X, 0x%X)\n", w.PrivateKey.X, w.PrivateKey.Y)
+	log.Infof("Private Key : 0x%X", w.PrivateKey.D)
+	log.Infof("Public Key (0x%X, 0x%X)", w.PrivateKey.X, w.PrivateKey.Y)
 
 	address := w.getAddress()
-	log.Infof("Address : %s\n", address)
+	log.Infof("Address : %s", address)
 
 	assert.True(t, ValidateAddress(address))
 
-	ValidateAddress([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
+}
+
+func TestValidateAddress(t *testing.T) {
+	log.Info("TestValidateAddress ==>")
+	version, payload, checksum := getPayload([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
+	assert.Equal(t, byte(128), version)
+	assert.Equal(t, "1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd", fmt.Sprintf("%x", payload))
+	assert.Equal(t, uint32(4286807748), binary.LittleEndian.Uint32(checksum))
+
+	version, payload, checksum = getPayload([]byte("KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ"))
+	assert.Equal(t, byte(128), version)
+	assert.Equal(t, "1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd01", fmt.Sprintf("%x", payload))
+	assert.Equal(t, uint32(2339607926), binary.LittleEndian.Uint32(checksum))
 }

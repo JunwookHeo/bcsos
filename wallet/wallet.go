@@ -39,32 +39,25 @@ import (
 
 const (
 	checksumLength = 4
-	version        = byte(0x80)
+	version        = byte(0x00)
 )
 
 type Wallet struct {
-	PrivateKey ecdsa.PrivateKey
+	PrivateKey *ecdsa.PrivateKey
 	PublicKey  []byte
 }
 
-func generateKeyPair() (ecdsa.PrivateKey, []byte) {
+func NewWallet() *Wallet {
 	curve := elliptic.P256()
 
-	priK, err := ecdsa.GenerateKey(curve, rand.Reader)
+	priKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	pubK := append(priK.PublicKey.X.Bytes(), priK.PublicKey.Y.Bytes()...)
+	pubK := append(priKey.PublicKey.X.Bytes(), priKey.PublicKey.Y.Bytes()...)
 
-	return *priK, pubK
-}
-
-func NewWallet() *Wallet {
-	priK, pubK := generateKeyPair()
-	wallet := Wallet{priK, pubK}
-
-	return &wallet
+	return &Wallet{priKey, pubK}
 }
 
 func getChecksum(payload []byte) []byte {
@@ -74,16 +67,19 @@ func getChecksum(payload []byte) []byte {
 	return h2[:checksumLength]
 }
 
-func (w *Wallet) getAddress() []byte {
-	pubHash := sha256.Sum256(w.PublicKey)
-	ripemd := ripemd160.New()
-
-	_, err := ripemd.Write(pubHash[:])
+func HashPubKey(pubKey []byte) []byte {
+	publicSha256 := sha256.Sum256(pubKey)
+	ripemd160Hasher := ripemd160.New()
+	_, err := ripemd160Hasher.Write(publicSha256[:])
 	if err != nil {
 		log.Panic(err)
 	}
 
-	payload := ripemd.Sum(nil)
+	return ripemd160Hasher.Sum(nil)
+}
+
+func (w *Wallet) getAddress() []byte {
+	payload := HashPubKey(w.PublicKey)
 
 	verPayload := append([]byte{version}, payload...)
 	checksum := getChecksum(verPayload)
@@ -92,24 +88,30 @@ func (w *Wallet) getAddress() []byte {
 	address := Base58Encode(fullPayload)
 
 	ich := binary.LittleEndian.Uint32(checksum)
-	log.Infof("checksum : %v\n", ich)
-	log.Infof("payload  : %x\n", payload)
-	log.Infof("version  : %d\n", version)
+	log.Infof("checksum : %v", ich)
+	log.Infof("payload  : %x", payload)
+	log.Infof("version  : %d", version)
 
 	return address
 }
 
-func ValidateAddress(addr []byte) bool {
+func getPayload(addr []byte) (byte, []byte, []byte) {
 	fullPayload := Base58Decode(addr)
 	checksum := fullPayload[len(fullPayload)-checksumLength:]
 	version := fullPayload[0]
 	payload := fullPayload[1 : len(fullPayload)-checksumLength]
+
+	return version, payload, checksum
+}
+
+func ValidateAddress(addr []byte) bool {
+	version, payload, checksum := getPayload(addr)
 	targetChecksum := getChecksum(append([]byte{version}, payload...))
 
 	ich := binary.LittleEndian.Uint32(checksum)
-	log.Infof("checksum : %d\n", ich)
-	log.Infof("payload  : %x\n", payload)
-	log.Infof("version  : %d\n", version)
+	log.Infof("checksum : %d", ich)
+	log.Infof("payload  : %x", payload)
+	log.Infof("version  : %d", version)
 
 	return bytes.Equal(checksum, targetChecksum)
 }
