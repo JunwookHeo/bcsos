@@ -1,7 +1,9 @@
 import numpy as np
 
+MAXNODES = 16
+
 def genNodes():
-    nodes = np.random.choice(range(16), 8, replace=False)
+    nodes = np.random.choice(range(MAXNODES), 8, replace=False)
     return nodes
 
 def calNeighbours(nodes):
@@ -39,13 +41,37 @@ def checkContentsAddressing(neighbours, cid, r):
         orderedNodes = n[didx[::]]
         print(f'distrance : {distance} - Nodes : {orderedNodes}')
     
+def contentsAddressing(nodes, r):
+    contnodes = []
+    for c in range(MAXNODES):
+        dist = nodes^c
+        distidx = np.array(dist).argsort()
+        orderedNodes = nodes[distidx[::]]
+        contnodes.append(orderedNodes)
+    return contnodes
+            
+def printStatus(nodes, contnodes):
+    for n in range(MAXNODES):
+        if n in nodes:
+            print(n, end='\t')
+
+        else:
+            print('_', end='\t')
+    print()
+    print()
+
+    for i, cns in enumerate( contnodes):
+        for n in range(MAXNODES):
+            if n in cns[:4]:
+                print(i, end='\t')
+            else:
+                print('_', end='\t')
+        print()
+
 
 nodes = genNodes()
-#nodes = np.array([0, 2, 5, 6, 8, 9, 13, 15])
 nodes.sort()
-print(nodes)
-neighbours = calNeighbours(nodes)
-printNeighbours(neighbours)
-checkClosestNodes(nodes, np.random.randint(16), 3)
+contnodes = contentsAddressing(nodes, 2)
+printStatus(nodes, contnodes)
 
 
