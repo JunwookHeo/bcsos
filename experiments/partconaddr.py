@@ -2,54 +2,55 @@ import numpy as np
 
 MAXNODES = 16
 
-def genNodes():
-    nodes = np.random.choice(range(MAXNODES), 8, replace=False)
+def genSoredNodes(num):
+    nodes = np.random.choice(range(MAXNODES), num, replace=False)
+    nodes.sort()
     return nodes
 
-def calNeighbours(nodes):
-    neighbours = []
-    for i, n in enumerate(nodes):
-        distance = np.array([])
-        for t in nodes:
-            distance = np.append(distance, n^t)
-            #print(f'{n:04b} xor {t:04b} : {n ^ t}')
-        #print(f'distance {n} : {distance}')
-        didx = np.array(distance).argsort()
-        #print(f'sorted index {n} : {didx}')
-        orderedNodes = nodes[didx[::]]
-        #print(f'ordered list : {orderedNodes}')
-        neighbours.append(orderedNodes)
-    return neighbours
-
-def printNeighbours(neighbours):
-    print('=======Neighbour list========')
-    for n in neighbours:
-        print(n)
-
-def checkClosestNodes(nodes, cid, r):
-    print(f'CID = {cid}, nodes = {nodes}')
-    distance = nodes^cid
-    didx = np.array(distance).argsort()
-    orderedNodes = nodes[didx[::]]
-    print(f'distance : {distance} - ordered nodes : {orderedNodes}')
-
-def checkContentsAddressing(neighbours, cid, r):
-    print(f'CID = {cid}, Replication Factor = {r}')
-    for n in neighbours:
-        distance = n^cid
-        didx = np.array(distance).argsort()
-        orderedNodes = n[didx[::]]
-        print(f'distrance : {distance} - Nodes : {orderedNodes}')
+def _getSubLists(nodes, rf):
+    subgroups = []
     
-def contentsAddressing(nodes, r):
+    numgroups = 0x1<<rf
+    maxsubnodes = MAXNODES>>rf
+    mask = (MAXNODES-1)^(maxsubnodes-1)
+    
+    for g in range(numgroups):
+        subnodes = [n for n in nodes if(n&mask == g*maxsubnodes)]
+        subnodes = np.array(subnodes)
+        subgroups.append(subnodes)
+    return subgroups
+
+def _getOrderedNodesFromContent(nodes, cid):
+    dist = nodes^cid
+    distidx = np.array(dist).argsort()
+    orderedNodes = nodes[distidx[::]]
+
+    return orderedNodes
+
+def contentsAddressingbyGroup(nodes, rf):
     contnodes = []
+    
+    subgroups = _getSubLists(nodes, rf)
+        
     for c in range(MAXNODES):
-        dist = nodes^c
-        distidx = np.array(dist).argsort()
-        orderedNodes = nodes[distidx[::]]
-        contnodes.append(orderedNodes)
+        tmpnodes = []
+        for g in subgroups:
+            orderedNodes = _getOrderedNodesFromContent(g, c)            
+            tmpnodes.append(orderedNodes[0:1])
+
+        contnodes.append(tmpnodes)
+        
     return contnodes
+
+def contensAddressing(nodes, r):
+    contnodes = []
             
+    for c in range(MAXNODES):
+        orderedNodes = _getOrderedNodesFromContent(nodes, c)            
+        contnodes.append(orderedNodes[0:r])
+        
+    return contnodes
+
 def printStatus(nodes, contnodes):
     for n in range(MAXNODES):
         if n in nodes:
@@ -69,9 +70,13 @@ def printStatus(nodes, contnodes):
         print()
 
 
-nodes = genNodes()
-nodes.sort()
-contnodes = contentsAddressing(nodes, 2)
+nodes = genSoredNodes(8)
+
+contnodes = contensAddressing(nodes, 4)
+printStatus(nodes, contnodes)
+print()
+
+contnodes = contentsAddressingbyGroup(nodes, 2)
 printStatus(nodes, contnodes)
 
 
