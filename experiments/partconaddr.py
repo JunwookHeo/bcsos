@@ -4,6 +4,7 @@ MAXNODES = 16
 
 def genSoredNodes(num):
     nodes = np.random.choice(range(MAXNODES), num, replace=False)
+    nodes = np.array([0, 2, 5, 6, 8, 9, 11, 13, 15])
     nodes.sort()
     return nodes
 
@@ -51,7 +52,7 @@ def contensAddressing(nodes, r):
         
     return contnodes
 
-def printStatus(nodes, contnodes):
+def printStatus(nodes, contnodes, r):
     for n in range(MAXNODES):
         if n in nodes:
             print(n, end='\t')
@@ -63,7 +64,7 @@ def printStatus(nodes, contnodes):
 
     for i, cns in enumerate( contnodes):
         for n in range(MAXNODES):
-            if n in cns[:4]:
+            if n in cns[:r]:
                 print(i, end='\t')
             else:
                 print('_', end='\t')
@@ -72,11 +73,11 @@ def printStatus(nodes, contnodes):
 
 nodes = genSoredNodes(8)
 
-contnodes = contensAddressing(nodes, 4)
-printStatus(nodes, contnodes)
+contnodes = contensAddressing(nodes, 5)
+printStatus(nodes, contnodes, 5)
 print()
 
 contnodes = contentsAddressingbyGroup(nodes, 2)
-printStatus(nodes, contnodes)
+printStatus(nodes, contnodes, 4)
 
 
