@@ -3,14 +3,12 @@ package storage
 type Service struct {
 }
 
-func ServiceNew() *Service {
-	return &Service{}
+func Start() {
+	for {
+
+	}
 }
 
-func (s *Service) Start() {
-
-}
-
-func (s *Service) Stop() {
+func Stop() {
 
 }

@@ -1,12 +1,10 @@
-package monitor
+package testclient
 
 type moitor struct {
 }
 
-func Start() bool {
-	return false
+func Start() {
 }
 
-func Stop() bool {
-	return false
+func Stop() {
 }

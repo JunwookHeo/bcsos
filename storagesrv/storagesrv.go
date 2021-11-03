@@ -1,7 +1,18 @@
 package main
 
-import "github.com/junwookheo/bcsos/storagesrv/storage"
+import (
+	"log"
+
+	"github.com/junwookheo/bcsos/storagesrv/network"
+	"github.com/junwookheo/bcsos/storagesrv/storage"
+)
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func main() {
-	storage.ServiceNew()
+	log.Println("Start Storage Service")
+	network.Start()
+	storage.Start()
 }
