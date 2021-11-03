@@ -4,7 +4,8 @@ MAXNODES = 16
 
 def genSoredNodes(num):
     nodes = np.random.choice(range(MAXNODES), num, replace=False)
-    nodes = np.array([0, 2, 5, 6, 8, 9, 11, 13, 15])
+    nodes = np.array([0, 1, 2, 3, 6, 7, 12, 15])
+    #nodes = np.array([2, 4, 6, 7, 8, 11, 15])
     nodes.sort()
     return nodes
 
@@ -21,14 +22,29 @@ def _getSubLists(nodes, rf):
         subgroups.append(subnodes)
     return subgroups
 
-def _getOrderedNodesFromContent(nodes, cid):
+def _getOrderedNodesFromContentbyScalar(nodes, cid):
+    if len(nodes) == 0: return []
+    
+    print(nodes)
+    dist = cid - nodes
+    print(dist)
+    dist = [d if(d > 0) else -d + 0.5 for d in dist]
+    print(dist)
+    distidx = np.array(dist).argsort()
+    orderedNodes = nodes[distidx[::]]
+
+    return orderedNodes
+
+def _getOrderedNodesFromContentbyXOR(nodes, cid):
+    if len(nodes) == 0: return []
+    
     dist = nodes^cid
     distidx = np.array(dist).argsort()
     orderedNodes = nodes[distidx[::]]
 
     return orderedNodes
 
-def contentsAddressingbyGroup(nodes, rf):
+def contentsAddressingbyGroup(nodes, rf, xor=True):
     contnodes = []
     
     subgroups = _getSubLists(nodes, rf)
@@ -36,48 +52,77 @@ def contentsAddressingbyGroup(nodes, rf):
     for c in range(MAXNODES):
         tmpnodes = []
         for g in subgroups:
-            orderedNodes = _getOrderedNodesFromContent(g, c)            
+            if(xor):
+                orderedNodes = _getOrderedNodesFromContentbyXOR(g, c)
+            else:
+                orderedNodes = _getOrderedNodesFromContentbyScalar(g, c)
             tmpnodes.append(orderedNodes[0:1])
 
         contnodes.append(tmpnodes)
         
     return contnodes
 
-def contensAddressing(nodes, r):
+def contensAddressing(nodes, r, xor=True):
     contnodes = []
             
     for c in range(MAXNODES):
-        orderedNodes = _getOrderedNodesFromContent(nodes, c)            
+        if(xor):
+            orderedNodes = _getOrderedNodesFromContentbyXOR(nodes, c)
+        else:
+            orderedNodes = _getOrderedNodesFromContentbyScalar(nodes, c)
         contnodes.append(orderedNodes[0:r])
         
     return contnodes
 
-def printStatus(nodes, contnodes, r):
+def _getMaxDigitofNID(maxnode):
+    cnt = 0
+    while(maxnode > 1):
+        maxnode >>= 1
+        cnt += 1
+    
+    return cnt
+
+def _printEmptyNode():
+    numdigit = _getMaxDigitofNID(MAXNODES)
+    for _ in range(numdigit):
+        print('_', end='')
+    print(' ', end='')
+
+def _printSeperator():
+    numdigit = _getMaxDigitofNID(MAXNODES)
+    for _ in range(MAXNODES):
+        for _ in range(numdigit):
+            print('-', end='')
+        print('-', end='')
+    print()
+
+def printStatus(nodes, contnodes, r):        
     for n in range(MAXNODES):
         if n in nodes:
-            print(n, end='\t')
+            print(f'{n:04b}', end=' ')
 
         else:
-            print('_', end='\t')
+            #print('_', end=' ')
+            _printEmptyNode()
     print()
-    print()
+    _printSeperator()
 
     for i, cns in enumerate( contnodes):
         for n in range(MAXNODES):
             if n in cns[:r]:
-                print(i, end='\t')
+                print(f'{i:04b}', end=' ')
             else:
-                print('_', end='\t')
+                #print('_', end=' ')
+                _printEmptyNode()
         print()
 
 
 nodes = genSoredNodes(8)
 
-contnodes = contensAddressing(nodes, 5)
-printStatus(nodes, contnodes, 5)
+contnodes = contensAddressing(nodes, 4)
+printStatus(nodes, contnodes, 4)
 print()
 
-contnodes = contentsAddressingbyGroup(nodes, 2)
-printStatus(nodes, contnodes, 4)
-
+# contnodes = contentsAddressingbyGroup(nodes, 2)
+# printStatus(nodes, contnodes, 4)
 
