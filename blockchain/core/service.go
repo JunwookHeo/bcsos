@@ -1,4 +1,4 @@
-package blockchain
+package core
 
 type Service struct {
 }
