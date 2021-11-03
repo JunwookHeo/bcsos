@@ -3,28 +3,27 @@ package wallet
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"testing"
-
-	log "github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewWallet(t *testing.T) {
-	log.Info("TestNewWallet ==>")
+	log.Println("TestNewWallet ==>")
 	w := NewWallet()
-	log.Infof("Private Key : 0x%X", w.PrivateKey.D)
-	log.Infof("Public Key (0x%X, 0x%X)", w.PrivateKey.X, w.PrivateKey.Y)
+	log.Printf("Private Key : 0x%X", w.PrivateKey.D)
+	log.Printf("Public Key (0x%X, 0x%X)", w.PrivateKey.X, w.PrivateKey.Y)
 
 	address := w.getAddress()
-	log.Infof("Address : %s", address)
+	log.Printf("Address : %s", address)
 
 	assert.True(t, ValidateAddress(address))
 
 }
 
 func TestValidateAddress(t *testing.T) {
-	log.Info("TestValidateAddress ==>")
+	log.Println("TestValidateAddress ==>")
 	version, payload, checksum := getPayload([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
 	assert.Equal(t, byte(128), version)
 	assert.Equal(t, "1e99423a4ed27608a15a2616a2b0e9e52ced330ac530edcc32c8ffc6a526aedd", fmt.Sprintf("%x", payload))

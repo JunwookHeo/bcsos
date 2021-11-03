@@ -24,6 +24,6 @@ func Deserialize(data []byte) []byte {
 
 func handle(err error) {
 	if err != nil {
-		log.Fatalf("Failed to serialize/deserialize data : %v", err)
+		log.Panicf("Failed to serialize/deserialize data : %v", err)
 	}
 }

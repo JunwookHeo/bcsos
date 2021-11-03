@@ -30,8 +30,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
-
-	log "github.com/sirupsen/logrus"
+	"log"
 
 	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/ripemd160"
@@ -88,9 +87,9 @@ func (w *Wallet) getAddress() []byte {
 	address := Base58Encode(fullPayload)
 
 	ich := binary.LittleEndian.Uint32(checksum)
-	log.Infof("checksum : %v", ich)
-	log.Infof("payload  : %x", payload)
-	log.Infof("version  : %d", version)
+	log.Printf("checksum : %v", ich)
+	log.Printf("payload  : %x", payload)
+	log.Printf("version  : %d", version)
 
 	return address
 }
@@ -109,9 +108,9 @@ func ValidateAddress(addr []byte) bool {
 	targetChecksum := getChecksum(append([]byte{version}, payload...))
 
 	ich := binary.LittleEndian.Uint32(checksum)
-	log.Infof("checksum : %d", ich)
-	log.Infof("payload  : %x", payload)
-	log.Infof("version  : %d", version)
+	log.Printf("checksum : %d", ich)
+	log.Printf("payload  : %x", payload)
+	log.Printf("version  : %d", version)
 
 	return bytes.Equal(checksum, targetChecksum)
 }

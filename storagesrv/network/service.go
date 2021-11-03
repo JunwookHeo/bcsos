@@ -2,7 +2,6 @@ package network
 
 import (
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 
@@ -39,9 +38,9 @@ func start() {
 }
 
 func connHandler(conn net.Conn) {
+	rxbuf := make([]byte, 4096)
 	for {
-		rxbuf, err := ioutil.ReadAll(conn)
-		n := len(rxbuf)
+		n, err := conn.Read(rxbuf)
 		if nil != err {
 			if io.EOF == err {
 				log.Printf("connection closed : %v", conn.RemoteAddr().String())
@@ -54,8 +53,9 @@ func connHandler(conn net.Conn) {
 		if n > 0 {
 			brx := serial.Deserialize(rxbuf[:n])
 			rx := string(brx)
-			log.Printf("Received data length : %s", rx)
-			if _, err := conn.Write(brx); err != nil {
+			log.Printf("<==%s", rx)
+			send := serial.Serialize([]byte(rx))
+			if _, err := conn.Write(send); err != nil {
 				log.Printf("Write data error : %v", err)
 				return
 			}
