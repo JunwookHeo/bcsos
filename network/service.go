@@ -3,8 +3,12 @@ package network
 type Network struct {
 }
 
-func New() *Network {
-	return &Network{}
+func Start() bool{
+	return false
+}
+
+func Stop() bool{
+	return false
 }
 
 func Send(dst []byte, data []byte) int {

@@ -3,6 +3,6 @@ package network
 type NodeMgr struct {
 }
 
-func NodeMgrNew() *NodeMgr {
-	return &NodeMgr{}
+func Synbc() bool {
+	return false
 }
