@@ -15,11 +15,10 @@ func Serialize(v interface{}) []byte {
 	return res.Bytes()
 }
 
-func Deserialize(d []byte, v interface{}) interface{} {
+func Deserialize(d []byte, v interface{}) {
 	decoder := gob.NewDecoder(bytes.NewReader(d))
 	err := decoder.Decode(v)
 	ErrorHanlder(err)
-	return v
 }
 
 func ErrorHanlder(e error) {

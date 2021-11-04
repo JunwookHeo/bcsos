@@ -1,24 +1,23 @@
 package blockchain
 
 import (
-	"log"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestTransaction(t *testing.T) {
-	tx := Transaction{Id: []byte("1234"), Data: []byte("Test serialize")}
-	b := Serialize(tx)
-	log.Printf("==>%v", tx)
-	var rx Transaction
-	Deserialize(b, &rx)
-	log.Printf("<==%v", rx)
+func TestCreateTransaction(t *testing.T) {
+	s := "test creating transaction"
+	tr := CreateTransaction([]byte(s))
+	assert.Equal(t, []byte(s), tr.Data)
+	assert.NotEmpty(t, tr.Id)
 }
 
-func TestTransaction2(t *testing.T) {
-	tx := Transaction{Id: []byte("5647"), Data: []byte("Test serialize")}
-	b := SerializeTransaction(tx)
-	log.Printf("==>%s", tx)
-
-	rx := DeserializeTransaction(b)
-	log.Printf("<==%s", rx)
+func TestSerializeTransaction(t *testing.T) {
+	s := "test creating transaction"
+	tr := CreateTransaction([]byte(s))
+	b := tr.Serialize()
+	tr2 := Transaction{}
+	tr2.Deserialize(b)
+	assert.Equal(t, *tr, tr2)
 }

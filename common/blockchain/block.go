@@ -1,5 +1,7 @@
 package blockchain
 
+import "time"
+
 type BlockHeader struct {
 	Timestamp int64
 	Hash      []byte
@@ -11,18 +13,22 @@ type Block struct {
 	Transactions []*Transaction
 }
 
-func CreateBlock(ts []*Transaction, prevhash []byte) *Block {
-	return nil
+func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
+	h := BlockHeader{time.Now().Unix(), prevhash, 0}
+	// TODO : create hash
+	block := &Block{h, trs}
+
+	return block
 }
 
 func Genesis() *Block {
 	return nil
 }
 
-func SerializeBlock(b *Block) []byte {
-	return nil
+func (b *Block) Serialize() []byte {
+	return Serialize(*b)
 }
 
-func DeserializeBlock(d []byte) *Block {
-	return nil
+func (b *Block) Deserialize(d []byte) {
+	Deserialize(d, b)
 }
