@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/junwookheo/bcsos/blockchain/core"
+	"github.com/junwookheo/bcsos/blockchainsrv/core"
 )
 
 func init() {
