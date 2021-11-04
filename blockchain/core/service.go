@@ -9,8 +9,11 @@ import (
 	"github.com/junwookheo/bcsos/common/serial"
 )
 
-type Service struct {
+type bcsrv struct {
+	done chan bool
 }
+
+var gbcsrv bcsrv = bcsrv{make(chan bool)}
 
 func sendHandler(conn net.Conn) {
 	for {
@@ -54,11 +57,10 @@ func Start() {
 	defer conn.Close()
 	go sendHandler(conn)
 	go receiveHandler(conn)
-	for {
-		time.Sleep(1 * time.Second)
-	}
+
+	<-gbcsrv.done
 }
 
 func Stop() {
-
+	gbcsrv.done <- true
 }

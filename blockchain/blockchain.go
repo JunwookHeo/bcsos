@@ -12,5 +12,5 @@ func init() {
 
 func main() {
 	log.Println("Start blockchain service")
-	core.Start()
+	go core.Start()
 }
