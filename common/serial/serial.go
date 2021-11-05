@@ -6,20 +6,18 @@ import (
 	"log"
 )
 
-func Serialize(data []byte) []byte {
+func Serialize(v interface{}) []byte {
 	var buffer bytes.Buffer
 	encode := gob.NewEncoder(&buffer)
-	err := encode.Encode(data)
+	err := encode.Encode(v)
 	handle(err)
 	return buffer.Bytes()
 }
 
-func Deserialize(data []byte) []byte {
-	var outputs []byte
+func Deserialize(data []byte, out interface{}) {
 	decode := gob.NewDecoder(bytes.NewReader(data))
-	err := decode.Decode(&outputs)
+	err := decode.Decode(out)
 	handle(err)
-	return outputs
 }
 
 func handle(err error) {

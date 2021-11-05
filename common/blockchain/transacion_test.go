@@ -3,6 +3,7 @@ package blockchain
 import (
 	"testing"
 
+	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,8 +17,8 @@ func TestCreateTransaction(t *testing.T) {
 func TestSerializeTransaction(t *testing.T) {
 	s := "test creating transaction"
 	tr := CreateTransaction([]byte(s))
-	b := tr.Serialize()
+	b := serial.Serialize(tr)
 	tr2 := Transaction{}
-	tr2.Deserialize(b)
+	serial.Deserialize(b, &tr2)
 	assert.Equal(t, *tr, tr2)
 }

@@ -2,6 +2,8 @@ package blockchain
 
 import (
 	"time"
+
+	"github.com/junwookheo/bcsos/common/serial"
 )
 
 type BlockHeader struct {
@@ -39,19 +41,11 @@ func (b *Block) MerkleRoot() []byte {
 	var hashes [][]byte
 
 	for _, tr := range b.Transactions {
-		hashes = append(hashes, tr.Serialize())
+		hashes = append(hashes, serial.Serialize(tr))
 	}
 	root := CalMerkleRootHash(hashes)
 
 	return root
-}
-
-func (b *Block) Serialize() []byte {
-	return Serialize(*b)
-}
-
-func (b *Block) Deserialize(d []byte) {
-	Deserialize(d, b)
 }
 
 func (b *Block) PoW() {

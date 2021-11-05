@@ -1,6 +1,10 @@
 package blockchain
 
-import "crypto/sha256"
+import (
+	"crypto/sha256"
+
+	"github.com/junwookheo/bcsos/common/serial"
+)
 
 type Transaction struct {
 	Id   []byte
@@ -8,16 +12,8 @@ type Transaction struct {
 }
 
 func (t *Transaction) Hash() []byte {
-	hash := sha256.Sum256(t.Serialize())
+	hash := sha256.Sum256(serial.Serialize(t))
 	return hash[:]
-}
-
-func (t *Transaction) Serialize() []byte {
-	return Serialize(*t)
-}
-
-func (t *Transaction) Deserialize(d []byte) {
-	Deserialize(d, t)
 }
 
 func CreateTransaction(d []byte) *Transaction {

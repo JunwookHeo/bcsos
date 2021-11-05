@@ -1,12 +1,12 @@
 package network
 
 import (
-	"encoding/hex"
 	"io"
 	"log"
 	"net"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/serial"
 )
 
 type Network struct {
@@ -50,15 +50,16 @@ func connHandler(conn net.Conn) {
 		}
 
 		if n > 0 {
-			//brx := serial.Deserialize(rxbuf[:n])
 			b := blockchain.Block{}
-			b.Deserialize(rxbuf[:n])
-			//rx := string(brx)
-			log.Printf("<==%s", hex.EncodeToString(b.Header.Hash))
-			//send := serial.Serialize([]byte(rx))
-			if _, err := conn.Write(b.Serialize()); err != nil {
+			serial.Deserialize(rxbuf[:n], &b)
+
+			if _, err := conn.Write(serial.Serialize(b)); err != nil {
 				log.Printf("Write data error : %v", err)
 				return
+			}
+
+			for _, tr := range b.Transactions {
+				log.Printf("<===%s", tr.Data)
 			}
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/serial"
 )
 
 type bcsrv struct {
@@ -28,13 +29,14 @@ func sendHandler(conn net.Conn) {
 		var trs []*blockchain.Transaction
 		for i := 0; i < num; i++ {
 			d := <-msg
-			log.Println(d)
+			log.Printf("==>%s", d)
 			tr := blockchain.CreateTransaction([]byte(d))
 			trs = append(trs, tr)
 		}
 		b := blockchain.CreateBlock(trs, blockchain.GetLatestHash())
 		blockchain.AddBlock(b)
-		if _, err := conn.Write(b.Serialize()); err != nil {
+		btx := serial.Serialize(b)
+		if _, err := conn.Write(btx); err != nil {
 			log.Printf("Send block error : %v", err)
 			return
 		}
@@ -56,8 +58,7 @@ func receiveHandler(conn net.Conn) {
 		}
 		if n > 0 {
 			b := blockchain.Block{}
-			b.Deserialize(rxbuf[:n])
-			//brx := serial.Deserialize(rxbuf[:n])
+			serial.Deserialize(rxbuf[:n], &b)
 			rx := string(hex.EncodeToString(b.Header.Hash))
 			log.Printf("<=%s", rx)
 		}

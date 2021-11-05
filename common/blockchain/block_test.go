@@ -3,6 +3,7 @@ package blockchain
 import (
 	"testing"
 
+	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,9 +44,9 @@ func TestSeializeBlock(t *testing.T) {
 		assert.Equal(t, *trs[i], *b1.Transactions[i])
 	}
 
-	bx := b1.Serialize()
+	bx := serial.Serialize(b1)
 	b2 := Block{}
-	b2.Deserialize(bx)
+	serial.Deserialize(bx, &b2)
 	assert.Equal(t, b1.Header, b2.Header)
 	for i := 0; i < len(trs); i++ {
 		assert.Equal(t, *b1.Transactions[i], *b2.Transactions[i])
