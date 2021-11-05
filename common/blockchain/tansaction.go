@@ -8,8 +8,7 @@ type Transaction struct {
 }
 
 func (t *Transaction) Hash() []byte {
-	var hash [32]byte
-	hash = sha256.Sum256(t.Serialize())
+	hash := sha256.Sum256(t.Serialize())
 	return hash[:]
 }
 

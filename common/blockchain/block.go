@@ -1,11 +1,16 @@
 package blockchain
 
-import "time"
+import (
+	"time"
+)
 
 type BlockHeader struct {
-	Timestamp int64
-	Hash      []byte
-	Nonce     int
+	Hash       []byte
+	PrvHash    []byte
+	MerkleRoot []byte
+	Timestamp  int64
+	Difficulty int
+	Nonce      int
 }
 
 type Block struct {
@@ -14,15 +19,31 @@ type Block struct {
 }
 
 func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
-	h := BlockHeader{time.Now().Unix(), prevhash, 0}
-	// TODO : create hash
+	h := BlockHeader{nil, prevhash, nil, time.Now().Unix(), 0, 0}
 	block := &Block{h, trs}
+	block.Header.MerkleRoot = block.MerkleRoot()
+
+	nonce, hash := ProofWork(block)
+
+	block.Header.Hash = hash[:]
+	block.Header.Nonce = nonce
 
 	return block
 }
 
-func Genesis() *Block {
-	return nil
+func Genesis(t *Transaction) *Block {
+	return CreateBlock([]*Transaction{t}, []byte{})
+}
+
+func (b *Block) MerkleRoot() []byte {
+	var hashes [][]byte
+
+	for _, tr := range b.Transactions {
+		hashes = append(hashes, tr.Serialize())
+	}
+	root := CalMerkleRootHash(hashes)
+
+	return root
 }
 
 func (b *Block) Serialize() []byte {
@@ -31,4 +52,8 @@ func (b *Block) Serialize() []byte {
 
 func (b *Block) Deserialize(d []byte) {
 	Deserialize(d, b)
+}
+
+func (b *Block) PoW() {
+
 }

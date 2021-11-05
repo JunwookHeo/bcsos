@@ -28,7 +28,7 @@ func TestCreateBlock(t *testing.T) {
 func TestSeializeBlock(t *testing.T) {
 	var trs []*Transaction
 	for i := 0; i < 3; i++ {
-		s := "Test create block"
+		s := "Test Seialize Block"
 		tr := CreateTransaction([]byte(s))
 		assert.Equal(t, []byte(s), tr.Data)
 		trs = append(trs, tr)
@@ -50,4 +50,22 @@ func TestSeializeBlock(t *testing.T) {
 	for i := 0; i < len(trs); i++ {
 		assert.Equal(t, *b1.Transactions[i], *b2.Transactions[i])
 	}
+}
+
+func TestHashBlock(t *testing.T) {
+	var trs []*Transaction
+	sss := []string{"1111111111111111", "2222222222222222", "333333333333333333"}
+	for i := 0; i < 3; i++ {
+		s := sss[i]
+		tr := CreateTransaction([]byte(s))
+		assert.Equal(t, []byte(s), tr.Data)
+		trs = append(trs, tr)
+	}
+
+	b1 := CreateBlock(trs, nil)
+	nonce, hash := ProofWork(b1)
+	assert.Equal(t, nonce, b1.Header.Nonce)
+	assert.Equal(t, hash, b1.Header.Hash)
+	ret := Validate(b1)
+	assert.Equal(t, ret, true)
 }
