@@ -2,7 +2,6 @@ package core
 
 import (
 	"bufio"
-	"encoding/json"
 	"log"
 	"os"
 )
@@ -18,8 +17,8 @@ func CreateBlock() bool {
 	return false
 }
 
-func LoadRawdata() {
-	file, err := os.Open("../iotdata/IoT_normal_fridge_1.log")
+func LoadRawdata(path string, msg chan string) {
+	file, err := os.Open(path)
 	if err != nil {
 		log.Printf("Load Raw data from file error : %v", err)
 		return
@@ -29,21 +28,8 @@ func LoadRawdata() {
 
 	scanner := bufio.NewScanner(file)
 	scanner.Split(bufio.ScanLines)
-	i := 0
 
 	for scanner.Scan() {
-		var sensordata SensorData
-		json.Unmarshal([]byte(scanner.Text()), &sensordata)
-
-		// log.Printf("ID : %v", sensordata.Id)
-		// log.Printf("Timestamp : %v", sensordata.Timestamp)
-		// log.Printf("Temperature : %v", sensordata.Temperature)
-		// log.Printf("Condition : %v", sensordata.Condition)
-		// if i > 10 {
-		// 	break
-		// }
-		i += 1
+		msg <- scanner.Text()
 	}
-	log.Printf("leng : %v", i)
-
 }
