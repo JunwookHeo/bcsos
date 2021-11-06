@@ -23,6 +23,26 @@ func (a *dbagent) Close() {
 	a.db.Close()
 }
 
+func (a *dbagent) GetLatestBlockHash() string {
+	var id int = 0
+	var dtype, hash string = "", ""
+	rows, err := a.db.Query(`SELECT id, type, hash FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
+
+	if err != nil {
+		log.Printf("Show latest objects Error : %v", err)
+		return hash
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		rows.Scan(&id, &dtype, &hash)
+		log.Printf("latest block : %d, %s, %s", id, dtype, hash)
+	}
+
+	return hash
+}
+
 func (a *dbagent) RemoveObject(hash string) bool {
 	// Before removing data, update status first.
 	a.updateRemoveDBStatus(hash)
@@ -70,6 +90,7 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 
 	id, _ := rst.LastInsertId()
 
+	// Update db status after adding object
 	a.updateAddDBStatus(id)
 	return id
 }
@@ -156,7 +177,7 @@ func (a *dbagent) GetDBSize() uint64 {
 	var size uint64 = 0
 	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects")
 	if err != nil {
-		log.Printf("Show all objects Error : %v", err)
+		log.Printf("Show db size Error : %v", err)
 		return 0
 	}
 
@@ -170,10 +191,10 @@ func (a *dbagent) GetDBSize() uint64 {
 	return size
 }
 
-func (a *dbagent) getLastestDBStatus(status *DBStatus) bool {
+func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	rows, err := a.db.Query("SELECT id, headers, blocks, transactions, size, timestamp FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus)")
 	if err != nil {
-		log.Printf("Show all objects Error : %v", err)
+		log.Printf("Show latest db status Error : %v", err)
 		return false
 	}
 
@@ -197,7 +218,7 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 
 	defer rows.Close()
 	status := DBStatus{}
-	a.getLastestDBStatus(&status)
+	a.getLatestDBStatus(&status)
 	update := false
 
 	for rows.Next() {
@@ -236,7 +257,7 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 
 	defer rows.Close()
 	status := DBStatus{}
-	a.getLastestDBStatus(&status)
+	a.getLatestDBStatus(&status)
 	update := false
 
 	for rows.Next() {
@@ -283,7 +304,7 @@ func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
 }
 
 func (a *dbagent) GetDBStatus(status *DBStatus) bool {
-	return a.getLastestDBStatus(status)
+	return a.getLatestDBStatus(status)
 }
 
 func newDBSqlite(path string) DBAgent {

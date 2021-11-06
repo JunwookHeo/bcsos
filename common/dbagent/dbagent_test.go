@@ -23,21 +23,26 @@ func TestDBSqliteAdd(t *testing.T) {
 	dba := NewDBAgent(path)
 	assert.FileExists(t, path)
 
-	var trs []*blockchain.Transaction
-	sss := []string{"11111111111111111111", "22222222222222222222222", "333333333333333333"}
-	for i := 0; i < 3; i++ {
-		s := sss[i]
-		tr := blockchain.CreateTransaction([]byte(s))
-		assert.Equal(t, []byte(s), tr.Data)
-		trs = append(trs, tr)
-	}
+	crbl := func(pre string) *blockchain.Block {
+		var trs []*blockchain.Transaction
+		sss := []string{pre + "11111111111111111111", pre + "22222222222222222222222", pre + "333333333333333333"}
+		for i := 0; i < 3; i++ {
+			s := sss[i]
+			tr := blockchain.CreateTransaction([]byte(s))
+			assert.Equal(t, []byte(s), tr.Data)
+			trs = append(trs, tr)
+		}
 
-	b1 := blockchain.CreateBlock(trs, nil)
+		return blockchain.CreateBlock(trs, nil)
+	}
 
 	status := DBStatus{}
 
+	dba.GetLatestBlockHash()
+	b1 := crbl("aaaaa-")
 	dba.AddBlock(b1)
 	dba.GetDBStatus(&status)
+	dba.GetLatestBlockHash()
 
 	hash := hex.EncodeToString(b1.Header.Hash)
 	b2 := blockchain.Block{}
@@ -47,8 +52,10 @@ func TestDBSqliteAdd(t *testing.T) {
 		assert.Equal(t, b1.Transactions[i], b2.Transactions[i])
 	}
 
-	dba.AddBlock(&b2)
+	b1 = crbl("bbbbb-")
+	dba.AddBlock(b1)
 	dba.GetDBStatus(&status)
+	dba.GetLatestBlockHash()
 	//dba.ShowAllObjets()
 
 	log.Println(dba.GetDBSize())
