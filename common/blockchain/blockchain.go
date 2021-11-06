@@ -22,13 +22,6 @@ func AddBlock(b *Block) {
 	key := hex.EncodeToString(b.Header.Hash)
 	BC.Chain[key] = b
 	BC.Hash = b.Header.Hash[:]
-
-	// i := 0
-	// for k, v := range BC.Chain {
-	// 	log.Printf("%04d : %s", i, k)
-	// 	log.Printf("prev : %s", hex.EncodeToString(v.Header.PrvHash))
-	// 	i++
-	// }
 }
 
 func GetLatestHash() []byte {

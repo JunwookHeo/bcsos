@@ -18,8 +18,7 @@ func TestCreateBlock(t *testing.T) {
 
 	b := CreateBlock(trs, nil)
 	assert.Greater(t, b.Header.Timestamp, int64(0))
-	// TODO:
-	//assert.NotEmpty(t, b.Header.Hash)
+	assert.NotEmpty(t, b.Header.Hash)
 	assert.Equal(t, trs, b.Transactions)
 	for i := 0; i < len(trs); i++ {
 		assert.Equal(t, *trs[i], *b.Transactions[i])
@@ -37,8 +36,7 @@ func TestSeializeBlock(t *testing.T) {
 
 	b1 := CreateBlock(trs, nil)
 	assert.Greater(t, b1.Header.Timestamp, int64(0))
-	// TODO:
-	//assert.NotEmpty(t, b1.Header.Hash)
+	assert.NotEmpty(t, b1.Header.Hash)
 	assert.Equal(t, trs, b1.Transactions)
 	for i := 0; i < len(trs); i++ {
 		assert.Equal(t, *trs[i], *b1.Transactions[i])

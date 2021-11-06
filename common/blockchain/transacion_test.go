@@ -11,7 +11,7 @@ func TestCreateTransaction(t *testing.T) {
 	s := "test creating transaction"
 	tr := CreateTransaction([]byte(s))
 	assert.Equal(t, []byte(s), tr.Data)
-	assert.NotEmpty(t, tr.Id)
+	assert.NotEmpty(t, tr.Hash)
 }
 
 func TestSerializeTransaction(t *testing.T) {

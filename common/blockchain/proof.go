@@ -31,7 +31,7 @@ func initData(b *Block, nonce int) []byte {
 	)
 	var bs []byte
 	for _, t := range b.Transactions {
-		bs = append(bs, t.Id...)
+		bs = append(bs, t.Hash...)
 		bs = append(bs, t.Data...)
 	}
 
