@@ -40,7 +40,7 @@ func initData(b *Block, nonce int) []byte {
 	return data
 }
 
-func ProofWork(b *Block) (int, []byte) {
+func ProofWork(b *Block) (int, int, []byte) {
 	var intHash big.Int
 	var hash [32]byte
 
@@ -59,7 +59,7 @@ func ProofWork(b *Block) (int, []byte) {
 		}
 	}
 
-	return nonce, hash[:]
+	return DIFFICULTY, nonce, hash[:]
 }
 
 func Validate(b *Block) bool {

@@ -1,6 +1,7 @@
 package dbagent
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"log"
@@ -73,19 +74,44 @@ func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
 }
 
 func (a *dbagent) GetBlock(hash string, b *blockchain.Block) bool {
-	obj := StorageObj{"block", hash, b}
+	hashes := []string{}
+	obj := StorageObj{"block", hash, &hashes}
+	a.GetObject(&obj)
+
+	h := blockchain.BlockHeader{}
+	a.GetBlockHeader(hashes[0], &h)
+	b.Header = h
+
+	for i := 1; i < len(hashes); i++ {
+		tr := blockchain.Transaction{}
+		a.GetTransaction(hashes[i], &tr)
+		b.Transactions = append(b.Transactions, &tr)
+	}
+
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
-	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b}
+	var hashes []string
+	hash := sha256.Sum256(serial.Serialize(b.Header))
+	shash := hex.EncodeToString(hash[:])
+	a.AddBlockHeader(shash, &b.Header)
+
+	hashes = append(hashes, shash)
+	for _, t := range b.Transactions {
+		if a.AddTransaction(t) > 0 {
+			hashes = append(hashes, hex.EncodeToString(t.Hash))
+		}
+	}
+
+	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), hashes}
 	return a.AddObject(&obj)
 }
 
-func (a *dbagent) GetAllObjet() bool {
+func (a *dbagent) ShowAllObjets() bool {
 	rows, err := a.db.Query("SELECT * FROM bcobjects")
 	if err != nil {
-		log.Printf("Get all object Error : %v", err)
+		log.Printf("Show all objects Error : %v", err)
 		return false
 	}
 
@@ -95,6 +121,11 @@ func (a *dbagent) GetAllObjet() bool {
 		var id int
 		rows.Scan(&id, &obj.Type, &obj.Hash, &obj.Data)
 		log.Printf("id=%d : %s %s", id, obj.Type, obj.Hash)
+		if obj.Type == "transaction" {
+			tr := blockchain.Transaction{}
+			a.GetTransaction(obj.Hash, &tr)
+			log.Printf("Transaction : %s", tr.Data)
+		}
 	}
 
 	return false

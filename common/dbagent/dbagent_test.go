@@ -2,7 +2,6 @@ package dbagent
 
 import (
 	"encoding/hex"
-	"log"
 	"os"
 	"testing"
 
@@ -24,7 +23,7 @@ func TestDBSqliteAdd(t *testing.T) {
 	assert.FileExists(t, path)
 
 	var trs []*blockchain.Transaction
-	sss := []string{"3333333333333333", "22222222222222222222222", "333333333333333333"}
+	sss := []string{"11111111111111111111", "22222222222222222222222", "333333333333333333"}
 	for i := 0; i < 3; i++ {
 		s := sss[i]
 		tr := blockchain.CreateTransaction([]byte(s))
@@ -41,11 +40,10 @@ func TestDBSqliteAdd(t *testing.T) {
 	assert.Equal(t, b1.Header, b2.Header)
 	for i := 0; i < len(b2.Transactions); i++ {
 		assert.Equal(t, b1.Transactions[i], b2.Transactions[i])
-		log.Printf("%s", b1.Transactions[i].Data)
 	}
 
-	dba.AddBlock(b1)
-	dba.GetAllObjet()
+	dba.AddBlock(&b2)
+	dba.ShowAllObjets()
 
 	dba.Close()
 	os.Remove(path)

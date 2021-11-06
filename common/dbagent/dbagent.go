@@ -7,7 +7,7 @@ type DBAgent interface {
 	Close()
 	AddBlock(b *blockchain.Block) int64
 	GetBlock(hash string, b *blockchain.Block) bool
-	GetAllObjet() bool
+	ShowAllObjets() bool
 }
 
 type StorageObj struct {

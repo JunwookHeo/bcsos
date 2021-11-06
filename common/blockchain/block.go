@@ -25,9 +25,10 @@ func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
 	block := &Block{h, trs}
 	block.Header.MerkleRoot = block.MerkleRoot()
 
-	nonce, hash := ProofWork(block)
+	difficulty, nonce, hash := ProofWork(block)
 
 	block.Header.Hash = hash[:]
+	block.Header.Difficulty = difficulty
 	block.Header.Nonce = nonce
 
 	return block

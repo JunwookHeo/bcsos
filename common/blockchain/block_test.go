@@ -62,7 +62,8 @@ func TestHashBlock(t *testing.T) {
 	}
 
 	b1 := CreateBlock(trs, nil)
-	nonce, hash := ProofWork(b1)
+	difficulty, nonce, hash := ProofWork(b1)
+	assert.Equal(t, difficulty, b1.Header.Difficulty)
 	assert.Equal(t, nonce, b1.Header.Nonce)
 	assert.Equal(t, hash, b1.Header.Hash)
 	ret := Validate(b1)
