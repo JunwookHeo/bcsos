@@ -52,6 +52,26 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	return id
 }
 
+func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) bool {
+	obj := StorageObj{"blockheader", hash, h}
+	return a.GetObject(&obj)
+}
+
+func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
+	obj := StorageObj{"blockheader", hash, h}
+	return a.AddObject(&obj)
+}
+
+func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) bool {
+	obj := StorageObj{"transaction", hash, t}
+	return a.GetObject(&obj)
+}
+
+func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
+	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t}
+	return a.AddObject(&obj)
+}
+
 func (a *dbagent) GetBlock(hash string, b *blockchain.Block) bool {
 	obj := StorageObj{"block", hash, b}
 	return a.GetObject(&obj)
