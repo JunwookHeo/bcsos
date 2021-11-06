@@ -2,6 +2,7 @@ package dbagent
 
 import (
 	"encoding/hex"
+	"log"
 	"os"
 	"testing"
 
@@ -33,7 +34,11 @@ func TestDBSqliteAdd(t *testing.T) {
 
 	b1 := blockchain.CreateBlock(trs, nil)
 
+	status := DBStatus{}
+
 	dba.AddBlock(b1)
+	dba.GetDBStatus(&status)
+
 	hash := hex.EncodeToString(b1.Header.Hash)
 	b2 := blockchain.Block{}
 	dba.GetBlock(hash, &b2)
@@ -43,8 +48,22 @@ func TestDBSqliteAdd(t *testing.T) {
 	}
 
 	dba.AddBlock(&b2)
-	dba.ShowAllObjets()
+	dba.GetDBStatus(&status)
+	//dba.ShowAllObjets()
 
+	log.Println(dba.GetDBSize())
+	dba.RemoveObject(hex.EncodeToString(b2.Transactions[0].Hash))
+	dba.GetDBStatus(&status)
+	log.Println(dba.GetDBSize())
+	dba.RemoveObject(hex.EncodeToString(b2.Transactions[1].Hash))
+	dba.GetDBStatus(&status)
+	log.Println(dba.GetDBSize())
+	dba.RemoveObject(hex.EncodeToString(b2.Transactions[2].Hash))
+	dba.GetDBStatus(&status)
+	log.Println(dba.GetDBSize())
+	log.Println(status)
+
+	//dba.ShowAllObjets()
 	dba.Close()
 	os.Remove(path)
 }

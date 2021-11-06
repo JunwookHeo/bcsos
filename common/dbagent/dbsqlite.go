@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"log"
+	"unsafe"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/serial"
@@ -22,19 +23,37 @@ func (a *dbagent) Close() {
 	a.db.Close()
 }
 
-func (a *dbagent) GetObject(obj *StorageObj) bool {
+func (a *dbagent) RemoveObject(hash string) bool {
+	// Before removing data, update status first.
+	a.updateRemoveDBStatus(hash)
+
+	st, err := a.db.Prepare("DELETE FROM bcobjects WHERE hash=?")
+	if err != nil {
+		log.Printf("Preparing removig object error : %v", err)
+		return false
+	}
+	rst, err := st.Exec(hash)
+	if err != nil {
+		log.Printf("Exec removing object error : %v", err)
+	}
+	cnt, _ := rst.RowsAffected()
+	return cnt > 0
+}
+
+func (a *dbagent) GetObject(obj *StorageObj) int64 {
 	var data []byte
-	switch err := a.db.QueryRow("SELECT type, hash, data FROM bcobjects WHERE hash=?", obj.Hash).Scan(&obj.Type, &obj.Hash, &data); err {
+	var id int64 = 0
+	switch err := a.db.QueryRow("SELECT id, type, hash, data FROM bcobjects WHERE hash=?", obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &data); err {
 	case sql.ErrNoRows:
 		log.Printf("Object Not found : %v", err)
 	case nil:
 		serial.Deserialize(data, obj.Data)
-		return true
+		return id
 	default:
 		log.Printf("Get object error : %v", err)
 	}
 
-	return false
+	return id
 }
 func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, data) VALUES (?, ?, ?)")
@@ -50,10 +69,12 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	}
 
 	id, _ := rst.LastInsertId()
+
+	a.updateAddDBStatus(id)
 	return id
 }
 
-func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) bool {
+func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
 	obj := StorageObj{"blockheader", hash, h}
 	return a.GetObject(&obj)
 }
@@ -63,7 +84,7 @@ func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
 	return a.AddObject(&obj)
 }
 
-func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) bool {
+func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
 	obj := StorageObj{"transaction", hash, t}
 	return a.GetObject(&obj)
 }
@@ -73,7 +94,7 @@ func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
 	return a.AddObject(&obj)
 }
 
-func (a *dbagent) GetBlock(hash string, b *blockchain.Block) bool {
+func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 	hashes := []string{}
 	obj := StorageObj{"block", hash, &hashes}
 	a.GetObject(&obj)
@@ -131,21 +152,167 @@ func (a *dbagent) ShowAllObjets() bool {
 	return false
 }
 
+func (a *dbagent) GetDBSize() uint64 {
+	var size uint64 = 0
+	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects")
+	if err != nil {
+		log.Printf("Show all objects Error : %v", err)
+		return 0
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var obj StorageObj
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Data)
+		size += uint64(unsafe.Sizeof(obj.Type)) + uint64(unsafe.Sizeof(obj.Hash)) + uint64(len(obj.Data.([]byte)))
+		//log.Printf("size : %d %d %d", unsafe.Sizeof(obj.Type), unsafe.Sizeof(obj.Hash), len(obj.Data.([]byte)))
+	}
+	return size
+}
+
+func (a *dbagent) getLastestDBStatus(status *DBStatus) bool {
+	rows, err := a.db.Query("SELECT id, headers, blocks, transactions, size, timestamp FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus)")
+	if err != nil {
+		log.Printf("Show all objects Error : %v", err)
+		return false
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		rows.Scan(&status.ID, &status.Headers, &status.Blocks, &status.Transactions, &status.Size, &status.Timestamp)
+		//log.Printf("DB Status : %v", status)
+		return true
+	}
+
+	return false
+}
+
+func (a *dbagent) updateRemoveDBStatus(hash string) {
+	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects WHERE hash=?", hash)
+	if err != nil {
+		log.Printf("update remove db status error : %v", err)
+		return
+	}
+
+	defer rows.Close()
+	status := DBStatus{}
+	a.getLastestDBStatus(&status)
+	update := false
+
+	for rows.Next() {
+		var obj StorageObj
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Data)
+		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(len(obj.Data.([]byte)))
+		switch obj.Type {
+		case "block":
+			status.Blocks -= 1
+			status.Size -= size
+			update = true
+		case "transaction":
+			status.Transactions -= 1
+			status.Size -= size
+			update = true
+		case "blockheader":
+			status.Headers -= 1
+			status.Size -= size
+			update = true
+		default:
+			log.Printf("Type error %s", obj.Type)
+		}
+	}
+
+	if update == true {
+		a.updateDBStatus(&status)
+	}
+}
+
+func (a *dbagent) updateAddDBStatus(id int64) {
+	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects WHERE id=?", id)
+	if err != nil {
+		log.Printf("update remove db status error : %v", err)
+		return
+	}
+
+	defer rows.Close()
+	status := DBStatus{}
+	a.getLastestDBStatus(&status)
+	update := false
+
+	for rows.Next() {
+		var obj StorageObj
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Data)
+		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(len(obj.Data.([]byte)))
+		switch obj.Type {
+		case "block":
+			status.Blocks += 1
+			status.Size += size
+			update = true
+		case "transaction":
+			status.Transactions += 1
+			status.Size += size
+			update = true
+		case "blockheader":
+			status.Headers += 1
+			status.Size += size
+			update = true
+		default:
+			log.Printf("Type error %s", obj.Type)
+		}
+	}
+
+	if update == true {
+		a.updateDBStatus(&status)
+	}
+}
+
+func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
+	st, err := a.db.Prepare("INSERT INTO dbstatus (headers, blocks, transactions, size, timestamp) VALUES (?, ?, ?, ?,  datetime('now'))")
+	if err != nil {
+		log.Printf("Prepare adding dbstatus error : %v", err)
+		return -1
+	}
+	rst, err := st.Exec(status.Headers, status.Blocks, status.Transactions, status.Size)
+	if err != nil {
+		log.Panicf("Exec adding dbstatus error : %v", err)
+		return -1
+	}
+
+	id, _ := rst.LastInsertId()
+	return id
+}
+
+func (a *dbagent) GetDBStatus(status *DBStatus) bool {
+	return a.getLastestDBStatus(status)
+}
+
 func newDBSqlite(path string) DBAgent {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		log.Panicf("Open sqlite db error : %v", err)
 	}
 
-	create_tbl := `CREATE TABLE IF NOT EXISTS bcobjects (
+	create_objtlb := `CREATE TABLE IF NOT EXISTS bcobjects (
 		id      INTEGER  PRIMARY KEY AUTOINCREMENT,
 		type 	TEXT,
 		hash    TEXT,
 		data	BLOB
 	);`
 
-	st, _ := db.Prepare(create_tbl)
-
+	st, _ := db.Prepare(create_objtlb)
 	st.Exec()
+
+	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
+		id      		INTEGER  PRIMARY KEY AUTOINCREMENT,
+		headers			INTEGER,
+		blocks 			INTEGER,
+		transactions    INTEGER,
+		size			INTEGER,
+		timestamp		DATETIME
+	);`
+
+	st, _ = db.Prepare(create_statustlb)
+	st.Exec()
+
 	return &dbagent{db: db}
 }
