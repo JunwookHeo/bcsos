@@ -2,8 +2,11 @@ package core
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/json"
 	"log"
 	"os"
+	"time"
 )
 
 type SensorData struct {
@@ -30,6 +33,14 @@ func LoadRawdata(path string, msg chan string) {
 	scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
-		msg <- scanner.Text()
+		jsonstr := scanner.Text()
+		var sensordata SensorData
+		json.Unmarshal([]byte(jsonstr), &sensordata)
+		sensordata.Timestamp = time.Now().String()
+		var buffer bytes.Buffer
+		json.NewEncoder(&buffer).Encode(&sensordata)
+
+		msg <- buffer.String()
+
 	}
 }

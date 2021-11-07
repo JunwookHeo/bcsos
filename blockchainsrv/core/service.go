@@ -103,10 +103,14 @@ func broadcastBlock(b *blockchain.Block) {
 func Start() {
 	bcapi.InitBC(DB_PATH)
 	// Send Genesis Block
-	b := bcapi.CreateGenesis()
-	bcapi.AddBlock(b)
-	broadcastBlock(b)
-	time.Sleep(3 * time.Second)
+	hash := bcapi.GetLatestHash()
+	if len(hash) == 0 {
+		log.Printf("Create Genesis due to hash : %v", hash)
+		b := bcapi.CreateGenesis()
+		bcapi.AddBlock(b)
+		broadcastBlock(b)
+		time.Sleep(3 * time.Second)
+	}
 
 	msg := make(chan string)
 	go LoadRawdata(PATH, msg)
@@ -120,7 +124,7 @@ func Start() {
 			tr := blockchain.CreateTransaction([]byte(d))
 			trs = append(trs, tr)
 		}
-		b = blockchain.CreateBlock(trs, bcapi.GetLatestHash())
+		b := blockchain.CreateBlock(trs, bcapi.GetLatestHash())
 		bcapi.AddBlock(b)
 		broadcastBlock(b)
 		time.Sleep(3 * time.Second)
