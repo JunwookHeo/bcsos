@@ -12,6 +12,7 @@ var dba dbagent.DBAgent
 
 func InitBC(path string) {
 	dba = dbagent.NewDBAgent(path)
+	//log.Printf("InitBC : %v", dba)
 }
 
 func CreateGenesis() *blockchain.Block {

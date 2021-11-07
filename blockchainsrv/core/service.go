@@ -124,6 +124,7 @@ func Start() {
 		bcapi.AddBlock(b)
 		broadcastBlock(b)
 		time.Sleep(3 * time.Second)
+		break
 	}
 
 	//<-gbcsrv.done
