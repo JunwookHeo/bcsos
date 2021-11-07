@@ -65,15 +65,6 @@ func readConn(conn net.Conn) (*config.TcpPacket, []byte) {
 
 func HandleNewBlock(d []byte) {
 	storage.AddBlock(d)
-
-	// b := blockchain.Block{}
-	// serial.Deserialize(d, &b)
-	// log.Printf("%v", b)
-	// bcapi.AddBlock(&b)
-
-	// for _, tr := range b.Transactions {
-	// 	log.Printf("<===%s", tr.Data)
-	// }
 }
 
 func connHandler(conn net.Conn) {
