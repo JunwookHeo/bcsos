@@ -12,7 +12,6 @@ var dba dbagent.DBAgent
 
 func InitBC(path string) {
 	dba = dbagent.NewDBAgent(path)
-	//log.Printf("InitBC : %v", dba)
 }
 
 func CreateGenesis() *blockchain.Block {
@@ -37,6 +36,10 @@ func GetLatestHash() []byte {
 
 func ShowBlockChain() {
 	dba.ShowAllObjets()
+}
+
+func GetDBStatus(status *dbagent.DBStatus) {
+	dba.GetDBStatus(status)
 }
 
 func Close() {

@@ -1,4 +1,4 @@
-package core
+package storage
 
 import (
 	"log"
@@ -8,10 +8,10 @@ import (
 	"github.com/junwookheo/bcsos/common/dbagent"
 )
 
-const DB_PAT_TEST = "../bc_dummy.db"
+const DB_PATH_TEST = "../bc_storagesrv.db"
 
 func TestDBAgent(t *testing.T) {
-	bcapi.InitBC(DB_PAT_TEST)
+	bcapi.InitBC(DB_PATH_TEST)
 	bcapi.ShowBlockChain()
 	bcapi.GetLatestHash()
 	status := dbagent.DBStatus{}
