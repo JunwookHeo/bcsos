@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/serial"
 )
 
@@ -36,8 +37,58 @@ func start() {
 	}
 }
 
+func readConn(conn net.Conn) (*config.TcpPacket, []byte) {
+	var body []byte
+	rxbuf := make([]byte, config.TCPSIZE)
+	n, err := conn.Read(rxbuf)
+	if nil != err {
+		if io.EOF == err {
+			log.Printf("connection closed : %v", conn.RemoteAddr().String())
+			return nil, nil
+		}
+		log.Printf("Fail to receive data with err : %v", err)
+		return nil, nil
+	}
+
+	if n > 0 {
+		head := config.BytesToTcpHeader(rxbuf[:12])
+		if head.LastFlag == 0 {
+			head, body = readConn(conn)
+			body = append(rxbuf[12:], body...)
+			return head, body
+		} else {
+			body = rxbuf[12:]
+			return head, body
+		}
+	}
+	return nil, nil
+}
+
+func HandleNewBlock(d []byte) {
+	b := blockchain.Block{}
+	serial.Deserialize(d, &b)
+
+	for _, tr := range b.Transactions {
+		log.Printf("<===%s", tr.Data)
+	}
+}
 func connHandler(conn net.Conn) {
-	rxbuf := make([]byte, 4096)
+	for {
+		head, body := readConn(conn)
+		if head != nil {
+			switch head.MsgType {
+			case uint32(config.NEWBLOCK):
+				HandleNewBlock(body)
+			}
+
+		} else {
+			break
+		}
+	}
+}
+
+func connHandler2(conn net.Conn) {
+	rxbuf := make([]byte, config.TCPSIZE)
 	for {
 		n, err := conn.Read(rxbuf)
 		if nil != err {
@@ -51,12 +102,15 @@ func connHandler(conn net.Conn) {
 
 		if n > 0 {
 			b := blockchain.Block{}
-			serial.Deserialize(rxbuf[:n], &b)
-
-			if _, err := conn.Write(serial.Serialize(b)); err != nil {
-				log.Printf("Write data error : %v", err)
-				return
+			pkt := config.BytesToTcpHeader(rxbuf[:12])
+			if pkt.LastFlag == 1 {
+				serial.Deserialize(rxbuf[12:n], &b)
 			}
+
+			// if _, err := conn.Write(serial.Serialize(b)); err != nil {
+			// 	log.Printf("Write data error : %v", err)
+			// 	return
+			// }
 
 			for _, tr := range b.Transactions {
 				log.Printf("<===%s", tr.Data)
