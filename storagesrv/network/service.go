@@ -5,8 +5,10 @@ import (
 	"log"
 	"net"
 
+	"github.com/junwookheo/bcsos/common/bcapi"
+	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
-	"github.com/junwookheo/bcsos/storagesrv/storage"
+	"github.com/junwookheo/bcsos/common/serial"
 )
 
 type Network struct {
@@ -64,7 +66,13 @@ func readConn(conn net.Conn) (*config.TcpPacket, []byte) {
 }
 
 func HandleNewBlock(d []byte) {
-	storage.AddBlock(d)
+	// storage.AddBlock(d)
+	b := blockchain.Block{}
+	serial.Deserialize(d, &b)
+	bcapi.AddBlock(&b)
+	for _, tr := range b.Transactions {
+		log.Printf("<===%s", tr.Data)
+	}
 }
 
 func connHandler(conn net.Conn) {

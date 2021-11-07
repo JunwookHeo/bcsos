@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 
-	"github.com/junwookheo/bcsos/storagesrv/network"
 	"github.com/junwookheo/bcsos/storagesrv/storage"
 )
 
@@ -13,6 +12,5 @@ func init() {
 
 func main() {
 	log.Println("Start Storage Service")
-	network.Start()
 	storage.Start()
 }

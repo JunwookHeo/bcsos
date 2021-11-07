@@ -1,12 +1,10 @@
 package storage
 
 import (
-	"log"
+	"time"
 
 	"github.com/junwookheo/bcsos/common/bcapi"
-	"github.com/junwookheo/bcsos/common/blockchain"
-	"github.com/junwookheo/bcsos/common/config"
-	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/junwookheo/bcsos/storagesrv/network"
 )
 
 const DB_PATH = "./bc_storagesrv.db"
@@ -16,43 +14,45 @@ type STGMSG struct {
 	data []byte
 }
 
-type StorageSrv struct {
-	rxmsg chan STGMSG
-	txmsg chan STGMSG
-}
+// type StorageSrv struct {
+// 	rxmsg chan STGMSG
+// 	txmsg chan STGMSG
+// }
 
-var storagesrv StorageSrv = StorageSrv{make(chan STGMSG), make(chan STGMSG)}
+// var storagesrv StorageSrv = StorageSrv{make(chan STGMSG), make(chan STGMSG)}
 
 func Start() {
 	bcapi.InitBC(DB_PATH)
+	network.Start()
 	for {
-		msg := <-storagesrv.rxmsg
-		msgHandler(msg)
+		time.Sleep(10 * time.Second)
+		// msg := <-storagesrv.rxmsg
+		// msgHandler(msg)
 	}
 }
 
-func msgHandler(sm STGMSG) {
-	switch sm.cmd {
-	case int32(config.NEWBLOCK):
-		HandleAddBlock(sm.data)
-	}
-}
+// func msgHandler(sm STGMSG) {
+// 	switch sm.cmd {
+// 	case int32(config.NEWBLOCK):
+// 		HandleAddBlock(sm.data)
+// 	}
+// }
 
-func HandleAddBlock(d []byte) {
-	b := blockchain.Block{}
-	serial.Deserialize(d, &b)
-	log.Printf("%v", b)
-	bcapi.AddBlock(&b)
+// func HandleAddBlock(d []byte) {
+// 	b := blockchain.Block{}
+// 	serial.Deserialize(d, &b)
+// 	log.Printf("%v", b)
+// 	bcapi.AddBlock(&b)
 
-	for _, tr := range b.Transactions {
-		log.Printf("<===%s", tr.Data)
-	}
-}
+// 	for _, tr := range b.Transactions {
+// 		log.Printf("<===%s", tr.Data)
+// 	}
+// }
 
-func AddBlock(d []byte) {
-	var sm STGMSG = STGMSG{int32(config.NEWBLOCK), d}
-	storagesrv.rxmsg <- sm
-}
+// func AddBlock(d []byte) {
+// 	var sm STGMSG = STGMSG{int32(config.NEWBLOCK), d}
+// 	storagesrv.rxmsg <- sm
+// }
 
 func Stop() {
 	bcapi.Close()
