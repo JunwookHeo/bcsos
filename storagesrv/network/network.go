@@ -33,8 +33,8 @@ func start() {
 			log.Printf("Accept error : %v", err)
 			continue
 		}
-		defer conn.Close()
-		go connHandler(conn)
+		//defer conn.Close()
+		go connectionHandler(conn)
 	}
 }
 
@@ -65,17 +65,7 @@ func readConn(conn net.Conn) (*config.TcpPacket, []byte) {
 	return nil, nil
 }
 
-func HandleNewBlock(d []byte) {
-	// storage.AddBlock(d)
-	b := blockchain.Block{}
-	serial.Deserialize(d, &b)
-	bcapi.AddBlock(&b)
-	for _, tr := range b.Transactions {
-		log.Printf("<===%s", tr.Data)
-	}
-}
-
-func connHandler(conn net.Conn) {
+func connectionHandler(conn net.Conn) {
 	for {
 		head, body := readConn(conn)
 		if head != nil {
@@ -87,6 +77,15 @@ func connHandler(conn net.Conn) {
 		} else {
 			break
 		}
+	}
+}
+
+func HandleNewBlock(d []byte) {
+	b := blockchain.Block{}
+	serial.Deserialize(d, &b)
+	bcapi.AddBlock(&b)
+	for _, tr := range b.Transactions {
+		log.Printf("<===%s", tr.Data)
 	}
 }
 

@@ -1,4 +1,4 @@
-package core
+package bcdummy
 
 import (
 	"testing"

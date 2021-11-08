@@ -15,8 +15,9 @@ func InitBC(path string) {
 }
 
 func CreateGenesis() *blockchain.Block {
-	tr := blockchain.Transaction{Hash: nil, Data: []byte("This is Genesis Block")}
-	return blockchain.Genesis(&tr)
+	//tr := blockchain.Transaction{Hash: nil, Data: []byte("This is Genesis Block")}
+	tr := blockchain.CreateTransaction([]byte("This is Genesis Block"))
+	return blockchain.Genesis(tr)
 }
 
 func AddBlock(b *blockchain.Block) {
