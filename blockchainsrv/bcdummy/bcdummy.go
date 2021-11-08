@@ -18,7 +18,6 @@ type bcsrv struct {
 	done chan bool
 }
 
-const DB_PATH = "./bc_dummy.db"
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
 
 var gbcsrv bcsrv = bcsrv{make(chan bool)}
@@ -101,7 +100,6 @@ func broadcastBlock(b *blockchain.Block) {
 }
 
 func Start() {
-	bcapi.InitBC(DB_PATH)
 	// Send Genesis Block
 	hash := bcapi.GetLatestHash()
 	if len(hash) == 0 {

@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
 )
 
 type Network struct {
@@ -19,7 +21,12 @@ func Start() {
 }
 
 func start() {
-	l, err := net.Listen("tcp", ":8080")
+	port, _ := GetFreePort()
+	addr := fmt.Sprintf(":%v", port)
+	testmgrcli.TestMgrCli.Local.port = port
+	l, err := net.Listen("tcp", addr)
+
+	log.Printf("address : %v", l.Addr())
 	if err != nil {
 		log.Printf("Start network error : %v", err)
 		return
@@ -87,6 +94,20 @@ func HandleNewBlock(d []byte) {
 	for _, tr := range b.Transactions {
 		log.Printf("<===%s", tr.Data)
 	}
+}
+
+// GetFreePort asks the kernel for a free open port that is ready to use.
+func GetFreePort() (port int, err error) {
+	getLocalIP()
+	var a *net.TCPAddr
+	if a, err = net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
+		var l *net.TCPListener
+		if l, err = net.ListenTCP("tcp", a); err == nil {
+			defer l.Close()
+			return l.Addr().(*net.TCPAddr).Port, nil
+		}
+	}
+	return
 }
 
 func Stop() bool {

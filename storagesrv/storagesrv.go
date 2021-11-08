@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/junwookheo/bcsos/storagesrv/storage"
+	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
 )
 
 func init() {
@@ -13,4 +14,7 @@ func init() {
 func main() {
 	log.Println("Start Storage Service")
 	storage.Start()
+	testmgrcli.StartTMC()
+
+	select {}
 }

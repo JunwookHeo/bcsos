@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/junwookheo/bcsos/blockchainsrv/bcdummy"
+	"github.com/junwookheo/bcsos/blockchainsrv/testmgrsrv"
 )
 
 func init() {
@@ -12,5 +12,8 @@ func init() {
 
 func main() {
 	log.Println("Start blockchain service")
-	bcdummy.Start()
+	testmgrsrv.StartTMS()
+
+	// Sleep forever
+	select {}
 }
