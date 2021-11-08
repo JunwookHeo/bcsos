@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/junwookheo/bcsos/blockchainsrv/core"
+	"github.com/junwookheo/bcsos/blockchainsrv/bcdummy"
 )
 
 func init() {
@@ -12,5 +12,5 @@ func init() {
 
 func main() {
 	log.Println("Start blockchain service")
-	core.Start()
+	bcdummy.Start()
 }
