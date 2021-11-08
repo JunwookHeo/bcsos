@@ -4,7 +4,10 @@ import (
 	"log"
 
 	"github.com/junwookheo/bcsos/blockchainsrv/testmgrsrv"
+	"github.com/junwookheo/bcsos/common/bcapi"
 )
+
+const DB_PATH = "./bc_dummy.db"
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
@@ -12,8 +15,9 @@ func init() {
 
 func main() {
 	log.Println("Start blockchain service")
-	testmgrsrv.StartTMS()
+	bcapi.InitBC(DB_PATH)
+	go testmgrsrv.StartTMS()
+	//go bcdummy.Start()
 
-	// Sleep forever
 	select {}
 }

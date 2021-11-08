@@ -1,17 +1,20 @@
 package testmgrsrv
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
 	"github.com/grandcat/zeroconf"
-	"github.com/junwookheo/bcsos/common/bcapi"
+	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/junwookheo/bcsos/common/shareddata"
 )
 
-const DB_PATH = "./bc_dummy.db"
-const PORT = 8081
+const PORT = 8082
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -49,12 +52,23 @@ func reader(conn *websocket.Conn) {
 	}
 }
 
+func clientNotifyHandler(w http.ResponseWriter, r *http.Request) {
+	var node shareddata.TestNodeInfo
+
+	json.NewDecoder(r.Body).Decode(&node)
+	log.Printf("From client : %v", node)
+
+	enc := json.NewEncoder(w)
+	w.Header().Set("Content-Type", "application/json")
+	hash := sha256.Sum256(serial.Serialize(node))
+	node.AddrHash = hex.EncodeToString(hash[:])
+	enc.Encode(node)
+}
+
 // Our fake service.
 // This could be a HTTP/TCP service or whatever you want.
 func startService() {
-	http.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(rw, "Hello world!")
-	})
+	http.HandleFunc("/clientNotify", clientNotifyHandler)
 
 	http.HandleFunc("/ws", wsEndpoint)
 
@@ -65,19 +79,17 @@ func startService() {
 }
 
 func StartTMS() {
-	bcapi.InitBC(DB_PATH)
 	// Start out http service
 	go startService()
-	//go bcdummy.Start()
 
 	// Extra information about our service
 	meta := []string{
 		"version=0.1.0",
-		"hello=world",
+		"bctestmgr",
 	}
 
 	service, err := zeroconf.Register(
-		"awesome-sauce",   // service instance name
+		"bcsos-tms",       // service instance name
 		"_omxremote._tcp", // service type and protocl
 		"local.",          // service domain
 		PORT,              // service port
@@ -90,4 +102,6 @@ func StartTMS() {
 	}
 
 	defer service.Shutdown()
+	// Sleep forever
+	select {}
 }

@@ -10,20 +10,14 @@ import (
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/serial"
-	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
+	"github.com/junwookheo/bcsos/common/shareddata"
 )
 
 type Network struct {
 }
 
 func Start() {
-	go start()
-}
-
-func start() {
-	port, _ := GetFreePort()
-	addr := fmt.Sprintf(":%v", port)
-	testmgrcli.TestMgrCli.Local.port = port
+	addr := fmt.Sprintf(":%v", shareddata.TestMgrInfo.Local.Port)
 	l, err := net.Listen("tcp", addr)
 
 	log.Printf("address : %v", l.Addr())
@@ -94,20 +88,6 @@ func HandleNewBlock(d []byte) {
 	for _, tr := range b.Transactions {
 		log.Printf("<===%s", tr.Data)
 	}
-}
-
-// GetFreePort asks the kernel for a free open port that is ready to use.
-func GetFreePort() (port int, err error) {
-	getLocalIP()
-	var a *net.TCPAddr
-	if a, err = net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
-		var l *net.TCPListener
-		if l, err = net.ListenTCP("tcp", a); err == nil {
-			defer l.Close()
-			return l.Addr().(*net.TCPAddr).Port, nil
-		}
-	}
-	return
 }
 
 func Stop() bool {

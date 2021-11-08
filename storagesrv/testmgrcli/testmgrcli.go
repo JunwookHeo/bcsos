@@ -1,60 +1,31 @@
 package testmgrcli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/grandcat/zeroconf"
+	"github.com/junwookheo/bcsos/common/shareddata"
 )
 
-type TestNodeInfo struct {
-	IP       string
-	Port     int
-	AddrHash string
-}
-
-type TestMgrCli struct {
-	Server TestNodeInfo
-	Local  TestNodeInfo
-}
-
-var testmgrcli TestMgrCli = TestMgrCli{}
-
-func init() {
-	testmgrcli.Local.IP = getLocalIP()
-	testmgrcli.Local.Port = 0
-	testmgrcli.Local.AddrHash = "Test Manager Server"
-}
-
-func getLocalIP() string {
-	addrs, _ := net.InterfaceAddrs()
-	fmt.Printf("%v\n", addrs)
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String()
-			}
-		}
-	}
-}
-
-func serviceCall(ip string, port int) {
-	testmgrcli.Server.IP = ip
-	testmgrcli.Server.Port = port
-	testmgrcli.Server.AddrHash = "Test Manager Server"
-
-	url := fmt.Sprintf("http://%v:%v/", ip, port)
-
+func postTestClientInfo(ip string, port int) {
+	url := fmt.Sprintf("http://%v:%v/clientNotify", ip, port)
 	log.Println("Making call to", url)
-	resp, err := http.Get(url)
+
+	pbytes, _ := json.Marshal(shareddata.TestMgrInfo.Local)
+	buff := bytes.NewBuffer(pbytes)
+
+	resp, err := http.Post(url, "application/json", buff)
 	if err != nil {
 		log.Printf("Connecting test server error : %v", err)
 		return
@@ -62,12 +33,15 @@ func serviceCall(ip string, port int) {
 	defer resp.Body.Close()
 
 	data, _ := ioutil.ReadAll(resp.Body)
-	log.Printf("Got response: %s\n", data)
+	var local shareddata.TestNodeInfo
+	json.Unmarshal(data, &local)
+	shareddata.TestMgrInfo.Local.AddrHash = local.AddrHash
+	log.Printf("Got response: %v\n", shareddata.TestMgrInfo.Local)
 }
 
 // Example of websocket
 // https://github.com/gorilla/websocket/blob/master/examples/echo/client.go
-func serviceCall2(ip string, port int) {
+func wsTestMgrHandler(ip string, port int) {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Reset()
@@ -127,12 +101,10 @@ func serviceCall2(ip string, port int) {
 	}
 }
 
-func connectionHandler() {
-	for {
-		log.Printf("Server Info : %v", testmgrcli)
-		serviceCall(testmgrcli.Server.IP, testmgrcli.Server.Port)
-		time.Sleep(3 * time.Second)
-	}
+func setServerInfo(ip string, port int, addhash string) {
+	shareddata.TestMgrInfo.Server.IP = ip
+	shareddata.TestMgrInfo.Server.Port = port
+	shareddata.TestMgrInfo.Server.AddrHash = ""
 }
 
 func startResolver() {
@@ -141,13 +113,19 @@ func startResolver() {
 		log.Fatal(err)
 	}
 
+	log.Printf("TestMgr Info : %v", shareddata.TestMgrInfo)
+
 	// Channel to receive discovered service entries
 	entries := make(chan *zeroconf.ServiceEntry)
 
 	go func(results <-chan *zeroconf.ServiceEntry) {
 		for entry := range results {
 			log.Println("Found service:", entry.ServiceInstanceName(), entry.Text)
-			serviceCall(entry.AddrIPv4[0].String(), entry.Port)
+			names := strings.Split(entry.ServiceInstanceName(), ".")
+			if names[0] == "bcsos-tms" {
+				setServerInfo(entry.AddrIPv4[0].String(), entry.Port, entry.Text[0])
+				postTestClientInfo(entry.AddrIPv4[0].String(), entry.Port)
+			}
 		}
 	}(entries)
 
@@ -162,6 +140,6 @@ func startResolver() {
 }
 
 func StartTMC() {
-	go startResolver()
-	//connectionHandler()
+	log.Println("start Testmgr Client")
+	startResolver()
 }
