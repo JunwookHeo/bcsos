@@ -1,24 +1,18 @@
 package network
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
 
-	"github.com/junwookheo/bcsos/common/bcapi"
-	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
-	"github.com/junwookheo/bcsos/common/serial"
-	"github.com/junwookheo/bcsos/common/shareddata"
 )
 
 type Network struct {
 }
 
 func Start() {
-	addr := fmt.Sprintf(":%v", shareddata.TestMgrInfo.Local.Port)
-	l, err := net.Listen("tcp", addr)
+	l, err := net.Listen("tcp", ":8080")
 
 	log.Printf("address : %v", l.Addr())
 	if err != nil {
@@ -82,12 +76,12 @@ func connectionHandler(conn net.Conn) {
 }
 
 func HandleNewBlock(d []byte) {
-	b := blockchain.Block{}
-	serial.Deserialize(d, &b)
-	bcapi.AddBlock(&b)
-	for _, tr := range b.Transactions {
-		log.Printf("<===%s", tr.Data)
-	}
+	// 	b := blockchain.Block{}
+	// 	serial.Deserialize(d, &b)
+	// 	bcapi.AddBlock(&b)
+	// 	for _, tr := range b.Transactions {
+	// 		log.Printf("<===%s", tr.Data)
+	// 	}
 }
 
 func Stop() bool {

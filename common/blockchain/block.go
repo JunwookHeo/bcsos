@@ -34,8 +34,13 @@ func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
 	return block
 }
 
-func Genesis(t *Transaction) *Block {
+func genesis(t *Transaction) *Block {
 	return CreateBlock([]*Transaction{t}, []byte{})
+}
+
+func CreateGenesis() *Block {
+	tr := CreateTransaction([]byte("This is Genesis Block"))
+	return genesis(tr)
 }
 
 func (b *Block) MerkleRoot() []byte {

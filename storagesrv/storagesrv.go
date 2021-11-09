@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
 
-	"github.com/junwookheo/bcsos/common/bcapi"
 	"github.com/junwookheo/bcsos/storagesrv/storage"
-	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
 )
 
 const DB_PATH = "./bc_storagesrv.db"
@@ -14,12 +17,47 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
 
+// GetFreePort asks the kernel for a free open port that is ready to use.
+func getFreePort() (port int, err error) {
+	var a *net.TCPAddr
+	if a, err = net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
+		var l *net.TCPListener
+		if l, err = net.ListenTCP("tcp", a); err == nil {
+			defer l.Close()
+			return l.Addr().(*net.TCPAddr).Port, nil
+		}
+	}
+	return
+}
+
 func main() {
 	log.Println("Start Storage Service")
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	defer signal.Reset()
 
-	bcapi.InitBC(DB_PATH)
-	go storage.Start()
-	go testmgrcli.StartTMC()
+	port, err := getFreePort()
+	if err != nil {
+		log.Panicf("Get free port error : %v", err)
+	}
 
-	select {}
+	s := storage.NewHandler(DB_PATH, port)
+
+	go http.ListenAndServe(fmt.Sprintf(":%v", port), s.Handler)
+	//go http.ListenAndServe(":8080", s.Handler)
+	log.Printf("Server start : %v", port)
+
+	// bcapi.InitBC(DB_PATH)
+	// go storage.Start()
+	// go testmgrcli.StartTMC()
+
+	// select {
+	// case <-done:
+	// 	return
+	// case <-interrupt:
+	// 	log.Println("interrupt")
+	// }
+
+	<-interrupt
+	log.Println("interrupt")
 }
