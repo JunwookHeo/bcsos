@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
@@ -68,27 +69,38 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer ws.Close()
-
-	for _, n := range h.Nodes {
-		if err := ws.WriteJSON(n); err != nil {
-			log.Printf("Write json error : %v", err)
-			return
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			var test Test
+			if err := ws.ReadJSON(&test); err != nil {
+				log.Printf("Read json error : %v", err)
+				return
+			}
+			log.Printf("receive : %v", test)
+			if test.Start == true {
+				h.Ready <- true
+				return
+			}
 		}
-	}
+	}()
 
-	log.Printf("Send nodes info %v", h.Nodes)
-
-	var test Test
-	if err := ws.ReadJSON(&test); err != nil {
-		log.Printf("Read json error : %v", err)
-		return
-	}
-
-	log.Printf("receive : %v", test)
-	if test.Start == true {
-
-		h.Ready <- true
-	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if err := ws.WriteJSON(h.Nodes); err != nil {
+					log.Printf("Write json error : %v", err)
+					return
+				}
+			}
+		}
+	}()
 }
 
 func (h *Handler) StartService(port int) {

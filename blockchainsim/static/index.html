@@ -11,7 +11,7 @@
     
     <button id="btn_start">Start Test</button>
 
-    <div id="nodes"></dev>
+    <div id="item_nodes"></dev>
 
     <script>
         let socket = new WebSocket("ws://localhost:8082/nodes");
@@ -19,7 +19,9 @@
 
         socket.onopen = () => {
             console.log("Successfully Connected");
-            //socket.send("Hi From the Client!")
+            socket.send(JSON.stringify({
+                    start:false
+                }));
         };
         
         socket.onclose = event => {
@@ -28,21 +30,24 @@
         };
 
         socket.onmessage = event => {
-            console.log("Socket message: ", JSON.parse(event.data));
-            writeToScreen('<span style="color: blue;">' + event.data + '</span>')
-            //socket.send("Client Closed!")
-            //socket.close();
+            nodes = JSON.parse(event.data);
+            console.log("Socket message: ", nodes);
+            writeToScreen(nodes)
         };
 
         socket.onerror = error => {
             console.log("Socket Error: ", error);
         };
 
-        function writeToScreen(message){
-            var pre = document.createElement("p");
-            pre.style.wordWrap = "break-word";
-            pre.innerHTML = message;
-            nodes.appendChild(pre);
+        function writeToScreen(nodes){
+            item_nodes.innerHTML = ''
+            nodes.forEach((e) => {
+                var pre = document.createElement("p");
+                pre.style.wordWrap = "break-word";
+                let msg = '<span style="color: blue;">' + JSON.stringify(e) + '</span>';
+                pre.innerHTML = msg;
+                item_nodes.appendChild(pre);
+            });
         }
 
         document.getElementById("btn_start").onclick = function(){ 
