@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Test Simulator</title>
+  </head>
+  <body>
+    <h2>Test Simulator</h2>
+    
+    <button id="btn_start">Start Test</button>
+
+    <div id="nodes"></dev>
+
+    <script>
+        let socket = new WebSocket("ws://localhost:8082/nodes");
+        console.log("Attempting Connection...");
+
+        socket.onopen = () => {
+            console.log("Successfully Connected");
+            //socket.send("Hi From the Client!")
+        };
+        
+        socket.onclose = event => {
+            console.log("Socket Closed Connection: ", event);
+            //socket.send("Client Closed!")
+        };
+
+        socket.onmessage = event => {
+            console.log("Socket message: ", event.data);
+            writeToScreen('<span style="color: blue;">' + event.data + '</span>')
+            //socket.send("Client Closed!")
+            //socket.close();
+        };
+
+        socket.onerror = error => {
+            console.log("Socket Error: ", error);
+        };
+
+        function writeToScreen(message){
+            var pre = document.createElement("p");
+            pre.style.wordWrap = "break-word";
+            pre.innerHTML = message;
+            nodes.appendChild(pre);
+        }
+
+        let count = 1;
+        document.getElementById("btn_start").onclick = function(){ 
+            if(socket.readyState === socket.OPEN){ 
+                socket.send(JSON.stringify({
+                    start:"true"
+                }));
+                count++;
+            }else{ 
+                alert("no socket"); 
+            } 
+        }
+
+    </script>
+  </body>
+</html>

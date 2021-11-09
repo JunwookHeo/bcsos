@@ -53,12 +53,38 @@ func (h *Handler) resisterHandler(w http.ResponseWriter, r *http.Request) {
 	ws.WriteJSON(node)
 	log.Printf("From client : %v", node)
 	//TODO: n node connection
+	//h.Ready <- true
+}
+
+type Test struct {
+	start bool
+}
+
+func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("nodesHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	if err := ws.WriteJSON(h.Nodes); err != nil {
+		log.Printf("Write json error : %v", err)
+	}
+
+	log.Printf("Send nodes info %v", h.Nodes)
+
+	var test Test
+	if err := ws.ReadJSON(&test); err != nil {
+		log.Printf("Read json error : %v", err)
+	}
+
+	log.Printf("receive : %v", test)
 	h.Ready <- true
 }
 
 func (h *Handler) StartService(port int) {
-	http.HandleFunc("/resister", h.resisterHandler)
-
 	log.Println("starting http service...")
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), h.Handler); err != nil {
 		log.Fatal(err)
@@ -87,7 +113,9 @@ func NewHandler(path string) *Handler {
 		Ready:   make(chan bool),
 	}
 
+	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/resister", h.resisterHandler)
+	m.HandleFunc("/nodes", h.nodesHandler)
 
 	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
 	go h.StartDummy()
