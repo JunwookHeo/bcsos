@@ -21,6 +21,10 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 4096,
 }
 
+type Test struct {
+	Start bool `json:"start"`
+}
+
 type Handler struct {
 	http.Handler
 	db      dbagent.DBAgent
@@ -56,10 +60,6 @@ func (h *Handler) resisterHandler(w http.ResponseWriter, r *http.Request) {
 	//h.Ready <- true
 }
 
-type Test struct {
-	start bool
-}
-
 func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
@@ -69,8 +69,11 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	if err := ws.WriteJSON(h.Nodes); err != nil {
-		log.Printf("Write json error : %v", err)
+	for _, n := range h.Nodes {
+		if err := ws.WriteJSON(n); err != nil {
+			log.Printf("Write json error : %v", err)
+			return
+		}
 	}
 
 	log.Printf("Send nodes info %v", h.Nodes)
@@ -78,10 +81,14 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	var test Test
 	if err := ws.ReadJSON(&test); err != nil {
 		log.Printf("Read json error : %v", err)
+		return
 	}
 
 	log.Printf("receive : %v", test)
-	h.Ready <- true
+	if test.Start == true {
+
+		h.Ready <- true
+	}
 }
 
 func (h *Handler) StartService(port int) {
