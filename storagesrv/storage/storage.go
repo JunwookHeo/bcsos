@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/dbagent"
-	"github.com/junwookheo/bcsos/storagesrv/network"
 	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
 )
 
@@ -21,10 +20,6 @@ type Handler struct {
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  4096,
 	WriteBufferSize: 4096,
-}
-
-func Start() {
-	network.Start()
 }
 
 func (h *Handler) Stop() {
