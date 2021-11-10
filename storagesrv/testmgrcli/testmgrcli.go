@@ -14,14 +14,9 @@ import (
 	"github.com/junwookheo/bcsos/common/dtype"
 )
 
-type Simulator struct {
-	IP   string
-	Port int
-}
-
 type TestMgrCli struct {
-	Sim   Simulator
-	Local dtype.NodeInfo
+	sim   *dtype.Simulator
+	local *dtype.NodeInfo
 	db    dbagent.DBAgent
 }
 
@@ -35,7 +30,7 @@ func (t *TestMgrCli) registerNode(ip string, port int) {
 	}
 	defer ws.Close()
 
-	if err := ws.WriteJSON(t.Local); err != nil {
+	if err := ws.WriteJSON(t.local); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
@@ -46,9 +41,9 @@ func (t *TestMgrCli) registerNode(ip string, port int) {
 		return
 	}
 
-	t.Local.IP = node.IP
-	t.Local.Hash = node.Hash
-	log.Printf("Got response: %v\n", t.Local)
+	t.local.IP = node.IP
+	t.local.Hash = node.Hash
+	log.Printf("Got response: %v\n", t.local)
 	log.Printf("Recevied node : %v", node)
 }
 
@@ -90,8 +85,8 @@ func (t *TestMgrCli) NodeInfoHandler(ws *websocket.Conn, w http.ResponseWriter, 
 }
 
 func (t *TestMgrCli) setServerInfo(ip string, port int) {
-	t.Sim.IP = ip
-	t.Sim.Port = port
+	t.sim.IP = ip
+	t.sim.Port = port
 }
 
 func (t *TestMgrCli) startResolver() {
@@ -100,7 +95,7 @@ func (t *TestMgrCli) startResolver() {
 		log.Fatal(err)
 	}
 
-	log.Printf("TestMgr Info : %v", t.Local)
+	log.Printf("TestMgr Info : %v", t.local)
 
 	// Channel to receive discovered service entries
 	entries := make(chan *zeroconf.ServiceEntry)
@@ -123,12 +118,11 @@ func (t *TestMgrCli) startResolver() {
 	}
 
 	<-ctx.Done()
-	log.Println("==========Found service: done")
 }
 
-func NewTMC(db dbagent.DBAgent, port int) *TestMgrCli {
+func NewTMC(db dbagent.DBAgent, sim *dtype.Simulator, local *dtype.NodeInfo) *TestMgrCli {
 	log.Println("start Testmgr Client")
-	tmc := TestMgrCli{Sim: Simulator{}, Local: dtype.NodeInfo{Type: "", IP: "", Port: port, Hash: ""}, db: db}
+	tmc := TestMgrCli{sim: sim, local: local, db: db}
 	go tmc.startResolver()
 	return &tmc
 }

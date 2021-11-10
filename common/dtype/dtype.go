@@ -6,3 +6,12 @@ type NodeInfo struct {
 	Port int    `json:"port"`
 	Hash string `json:"hash"`
 }
+
+type Simulator struct {
+	IP   string
+	Port int
+}
+
+type Version struct {
+	Ver int
+}

@@ -42,6 +42,7 @@ func main() {
 	}
 
 	s := storage.NewHandler(DB_PATH, port)
+	s.UpdateNeighbourNodes()
 
 	go http.ListenAndServe(fmt.Sprintf(":%v", port), s.Handler)
 	//go http.ListenAndServe(":8080", s.Handler)

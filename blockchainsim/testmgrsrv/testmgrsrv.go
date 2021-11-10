@@ -112,6 +112,32 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("nodesHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	var version dtype.Version
+	if err := ws.ReadJSON(&version); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+	log.Printf("receive version : %v", version)
+
+	var nodes []dtype.NodeInfo
+	for _, n := range h.Nodes {
+		nodes = append(nodes, n)
+	}
+	if err := ws.WriteJSON(nodes); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+}
+
 func (h *Handler) StartService(port int) {
 	log.Println("starting http service...")
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), h.Handler); err != nil {
@@ -148,6 +174,7 @@ func NewHandler(path string) *Handler {
 	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/register", h.registerHandler)
 	m.HandleFunc("/nodes", h.nodesHandler)
+	m.HandleFunc("/version", h.versionHandler)
 
 	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
 	go h.StartDummy()
