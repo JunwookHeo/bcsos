@@ -1,8 +1,6 @@
 package testmgrsrv
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,12 +13,11 @@ import (
 	"github.com/junwookheo/bcsos/blockchainsim/bcdummy"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
-	"github.com/junwookheo/bcsos/common/serial"
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 }
 
 type Test struct {
@@ -32,6 +29,7 @@ type Handler struct {
 	db      dbagent.DBAgent
 	Nodes   map[string](dtype.NodeInfo)
 	BCDummy *bcdummy.Handler
+	TC      *TestConfig
 	Ready   bool
 }
 
@@ -51,9 +49,6 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	ip := strings.Split(ws.RemoteAddr().String(), ":")
 	node.IP = ip[0]
-	hash := sha256.Sum256(serial.Serialize(node))
-	node.Hash = hex.EncodeToString(hash[:])
-
 	h.Nodes[node.Hash] = node
 
 	ws.WriteJSON(node)
@@ -147,12 +142,16 @@ func (h *Handler) StartService(port int) {
 
 func (h *Handler) StartDummy() {
 	// Wait until clients join
-	for {
-		if h.Ready {
-			break
+	func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
+			if h.Ready {
+				return
+			}
 		}
-		time.Sleep(1 * time.Second)
-	}
+	}()
 
 	for _, n := range h.Nodes {
 		log.Printf("Test Start : %v", n)
@@ -168,6 +167,7 @@ func NewHandler(path string) *Handler {
 		db:      dbagent.NewDBAgent(path),
 		Nodes:   make(map[string]dtype.NodeInfo),
 		BCDummy: nil,
+		TC:      nil,
 		Ready:   false,
 	}
 
@@ -177,6 +177,8 @@ func NewHandler(path string) *Handler {
 	m.HandleFunc("/version", h.versionHandler)
 
 	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
+	h.TC = NewTestConfig(h.db, &h.Nodes)
+
 	go h.StartDummy()
 
 	return h

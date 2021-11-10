@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"log"
+	"math/rand"
 	"unsafe"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
@@ -75,6 +76,7 @@ func (a *dbagent) GetObject(obj *StorageObj) int64 {
 
 	return id
 }
+
 func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, data) VALUES (?, ?, ?)")
 	if err != nil {
@@ -93,6 +95,62 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	// Update db status after adding object
 	a.updateAddDBStatus(id)
 	return id
+}
+
+func (a *dbagent) GetTransactionwithRandom() []string {
+	selhashes := []string{}
+	// Randomly select 10 blocks in the ledger
+	rows, err := a.db.Query(`SELECT type, hash, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	if err != nil {
+		log.Printf("Object Not found : %v", err)
+		return selhashes
+	}
+
+	defer rows.Close()
+
+	// Select a transaction in each block
+	for rows.Next() {
+		var dtype, hash string
+		var data []byte
+		hashes := []string{}
+		obj := StorageObj{"block", hash, &hashes}
+		rows.Scan(&dtype, &hash, &data)
+		serial.Deserialize(data, obj.Data)
+		//log.Printf("selected item : %s, %s", dtype, hash)
+		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
+		selhashes = append(selhashes, hashes[num])
+	}
+
+	//log.Printf("hash : %v", selhashes)
+	return selhashes
+}
+
+func (a *dbagent) GetTransactionwithTimeWeight() []string {
+	selhashes := []string{}
+	// Randomly select 10 blocks in the ledger
+	rows, err := a.db.Query(`SELECT type, hash, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	if err != nil {
+		log.Printf("Object Not found : %v", err)
+		return selhashes
+	}
+
+	defer rows.Close()
+
+	// Select a transaction in each block
+	for rows.Next() {
+		var dtype, hash string
+		var data []byte
+		hashes := []string{}
+		obj := StorageObj{"block", hash, &hashes}
+		rows.Scan(&dtype, &hash, &data)
+		serial.Deserialize(data, obj.Data)
+		//log.Printf("selected item : %s, %s", dtype, hash)
+		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
+		selhashes = append(selhashes, hashes[num])
+	}
+
+	//log.Printf("hash : %v", selhashes)
+	return selhashes
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
@@ -320,7 +378,10 @@ func newDBSqlite(path string) DBAgent {
 		data	BLOB
 	);`
 
-	st, _ := db.Prepare(create_objtlb)
+	st, err := db.Prepare(create_objtlb)
+	if err != nil {
+		log.Panicf("create_objtlb error %v", err)
+	}
 	st.Exec()
 
 	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
@@ -332,7 +393,10 @@ func newDBSqlite(path string) DBAgent {
 		timestamp		DATETIME
 	);`
 
-	st, _ = db.Prepare(create_statustlb)
+	st, err = db.Prepare(create_statustlb)
+	if err != nil {
+		log.Panicf("create_statustlb error %v", err)
+	}
 	st.Exec()
 
 	return &dbagent{db: db}

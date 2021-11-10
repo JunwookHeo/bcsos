@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net"
@@ -8,6 +10,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/junwookheo/bcsos/common/dtype"
+	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/junwookheo/bcsos/storagesrv/storage"
 )
 
@@ -30,23 +34,33 @@ func getFreePort() (port int, err error) {
 	return
 }
 
+func SetAddress() dtype.NodeInfo {
+	local := dtype.NodeInfo{Type: "", IP: "", Port: 0, Hash: ""}
+	port, err := getFreePort()
+	if err != nil {
+		log.Panicf("Get free port error : %v", err)
+		return local
+	}
+
+	local.Port = port
+	hash := sha256.Sum256(serial.Serialize(local))
+	local.Hash = hex.EncodeToString(hash[:])
+	return local
+}
+
 func main() {
 	log.Println("Start Storage Service")
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Reset()
 
-	port, err := getFreePort()
-	if err != nil {
-		log.Panicf("Get free port error : %v", err)
-	}
-
-	s := storage.NewHandler(DB_PATH, port)
+	local := SetAddress()
+	s := storage.NewHandler(DB_PATH, local)
 	s.UpdateNeighbourNodes()
 
-	go http.ListenAndServe(fmt.Sprintf(":%v", port), s.Handler)
+	go http.ListenAndServe(fmt.Sprintf(":%v", local.Port), s.Handler)
 	//go http.ListenAndServe(":8080", s.Handler)
-	log.Printf("Server start : %v", port)
+	log.Printf("Server start : %v", local.Port)
 
 	<-interrupt
 	log.Println("interrupt")

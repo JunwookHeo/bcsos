@@ -3,6 +3,7 @@ package dbagent
 import (
 	"encoding/hex"
 	"log"
+	"math/rand"
 	"os"
 	"testing"
 
@@ -73,4 +74,18 @@ func TestDBSqliteAdd(t *testing.T) {
 	//dba.ShowAllObjets()
 	dba.Close()
 	os.Remove(path)
+}
+
+func TestDBSqliteRandom(t *testing.T) {
+	dba := NewDBAgent("../../storagesrv/bc_storagesrv.db")
+	hashes := dba.GetTransactionwithRandom()
+	for _, h := range hashes {
+		var tr blockchain.Transaction
+		dba.GetTransaction(h, &tr)
+		assert.Equal(t, hex.EncodeToString(tr.Hash), h)
+	}
+	for i := 0; i < 100; i++ {
+		expdist := rand.ExpFloat64() / 0.5
+		log.Printf(", %v", expdist)
+	}
 }

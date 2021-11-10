@@ -88,13 +88,13 @@ func (h *Handler) UpdateNeighbourNodes() {
 	}()
 }
 
-func NewHandler(path string, port int) *Handler {
+func NewHandler(path string, local dtype.NodeInfo) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
 		db:      dbagent.NewDBAgent(path),
 		sim:     dtype.Simulator{IP: "", Port: 0},
-		local:   dtype.NodeInfo{Type: "", IP: "", Port: port, Hash: ""},
+		local:   local,
 		tmc:     nil,
 		nm:      nil,
 	}
