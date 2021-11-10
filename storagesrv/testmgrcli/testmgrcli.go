@@ -25,8 +25,8 @@ type TestMgrCli struct {
 	db    dbagent.DBAgent
 }
 
-func (t *TestMgrCli) resisterNode(ip string, port int) {
-	url := fmt.Sprintf("ws://%v:%v/resister", ip, port)
+func (t *TestMgrCli) registerNode(ip string, port int) {
+	url := fmt.Sprintf("ws://%v:%v/register", ip, port)
 	log.Println("Making call to", url)
 
 	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -111,7 +111,7 @@ func (t *TestMgrCli) startResolver() {
 			names := strings.Split(entry.ServiceInstanceName(), ".")
 			if names[0] == "bcsos-tms" {
 				t.setServerInfo(entry.AddrIPv4[0].String(), entry.Port)
-				t.resisterNode(entry.AddrIPv4[0].String(), entry.Port)
+				t.registerNode(entry.AddrIPv4[0].String(), entry.Port)
 			}
 		}
 	}(entries)

@@ -35,11 +35,11 @@ type Handler struct {
 	Ready   bool
 }
 
-func (h *Handler) resisterHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("resisterHandler", err)
+		log.Println("registerHandler", err)
 		return
 	}
 	defer ws.Close()
@@ -146,7 +146,7 @@ func NewHandler(path string) *Handler {
 	}
 
 	m.Handle("/", http.FileServer(http.Dir("static")))
-	m.HandleFunc("/resister", h.resisterHandler)
+	m.HandleFunc("/register", h.registerHandler)
 	m.HandleFunc("/nodes", h.nodesHandler)
 
 	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
