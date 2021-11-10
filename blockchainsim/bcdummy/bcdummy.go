@@ -60,7 +60,7 @@ func (h *Handler) Start() {
 	if len(hash) == 0 {
 		log.Printf("Create Genesis due to hash : %v", hash)
 		b := blockchain.CreateGenesis()
-		h.db.AddBlock(b)
+		h.db.AddNewBlock(b)
 		h.broadcastNewBlock(b)
 		time.Sleep(5 * time.Second)
 	}
@@ -78,7 +78,7 @@ func (h *Handler) Start() {
 			trs = append(trs, tr)
 		}
 		b := blockchain.CreateBlock(trs, []byte(h.db.GetLatestBlockHash()))
-		h.db.AddBlock(b)
+		h.db.AddNewBlock(b)
 		h.broadcastNewBlock(b)
 		time.Sleep(5 * time.Second)
 	}
