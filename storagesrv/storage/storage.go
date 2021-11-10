@@ -47,10 +47,24 @@ func (h *Handler) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *Handler) nodeInfoHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("newBlockHandler", err)
+		return
+	}
+	defer ws.Close()
+	h.tmc.NodeInfoHandler(ws, w, r)
+}
+
 func NewHandler(path string, port int) *Handler {
 	m := mux.NewRouter()
-	h := &Handler{Handler: m, db: dbagent.NewDBAgent(path), tmc: testmgrcli.NewTMC(port)}
+	h := &Handler{Handler: m, db: dbagent.NewDBAgent(path), tmc: nil}
+	h.tmc = testmgrcli.NewTMC(h.db, port)
 
+	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/newblock", h.newBlockHandler)
+	m.HandleFunc("/nodeinfo", h.nodeInfoHandler)
 	return h
 }

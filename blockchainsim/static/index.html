@@ -14,7 +14,7 @@
     <div id="item_nodes"></dev>
 
     <script>
-        let socket = new WebSocket("ws://localhost:8082/nodes");
+        let ws = socket = new WebSocket("ws://" + window.location.host +"/nodes");
         console.log("Attempting Connection...");
 
         socket.onopen = () => {
@@ -32,7 +32,7 @@
         socket.onmessage = event => {
             nodes = JSON.parse(event.data);
             console.log("Socket message: ", nodes);
-            writeToScreen(nodes)
+            writeToScreen(nodes);
         };
 
         socket.onerror = error => {
@@ -41,12 +41,18 @@
 
         function writeToScreen(nodes){
             item_nodes.innerHTML = ''
+            if(nodes === null) return
+
             nodes.forEach((e) => {
-                var pre = document.createElement("p");
-                pre.style.wordWrap = "break-word";
-                let msg = '<span style="color: blue;">' + JSON.stringify(e) + '</span>';
-                pre.innerHTML = msg;
-                item_nodes.appendChild(pre);
+                var a = document.createElement("a");
+                var newItem = document.createElement("li");
+                a.textContent = JSON.stringify(e);
+                //pre.style.wordWrap = "break-word";
+                //let msg = '<span style="color: blue;">' + JSON.stringify(e) + '</span>';
+                //pre.innerHTML = msg;
+                a.setAttribute('href', "http://"+ e.ip + ":"+ e.port)
+                newItem.appendChild(a);
+                item_nodes.appendChild(newItem);
             });
         }
 

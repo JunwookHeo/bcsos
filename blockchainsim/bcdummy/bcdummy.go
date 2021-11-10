@@ -14,7 +14,7 @@ import (
 
 type Handler struct {
 	db    dbagent.DBAgent
-	Nodes *[]dtype.NodeInfo
+	Nodes *map[string]dtype.NodeInfo
 }
 
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
@@ -25,7 +25,8 @@ func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
 
 	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
-		log.Panicf("dial: %v", err)
+		log.Printf("dial: %v", err)
+		return
 	}
 	defer ws.Close()
 
@@ -87,7 +88,7 @@ func Stop() {
 
 }
 
-func NewBCDummy(db dbagent.DBAgent, nodes *[]dtype.NodeInfo) *Handler {
+func NewBCDummy(db dbagent.DBAgent, nodes *map[string]dtype.NodeInfo) *Handler {
 	h := Handler{db, nodes}
 	log.Printf("start : %v", nodes)
 	return &h

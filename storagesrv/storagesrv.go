@@ -47,17 +47,6 @@ func main() {
 	//go http.ListenAndServe(":8080", s.Handler)
 	log.Printf("Server start : %v", port)
 
-	// bcapi.InitBC(DB_PATH)
-	// go storage.Start()
-	// go testmgrcli.StartTMC()
-
-	// select {
-	// case <-done:
-	// 	return
-	// case <-interrupt:
-	// 	log.Println("interrupt")
-	// }
-
 	<-interrupt
 	log.Println("interrupt")
 }

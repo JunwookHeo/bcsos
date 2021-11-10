@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,9 +30,9 @@ type Test struct {
 type Handler struct {
 	http.Handler
 	db      dbagent.DBAgent
-	Nodes   []dtype.NodeInfo
+	Nodes   map[string](dtype.NodeInfo)
 	BCDummy *bcdummy.Handler
-	Ready   chan bool
+	Ready   bool
 }
 
 func (h *Handler) resisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +54,7 @@ func (h *Handler) resisterHandler(w http.ResponseWriter, r *http.Request) {
 	hash := sha256.Sum256(serial.Serialize(node))
 	node.Hash = hex.EncodeToString(hash[:])
 
-	h.Nodes = append(h.Nodes, node)
+	h.Nodes[node.Hash] = node
 
 	ws.WriteJSON(node)
 	log.Printf("From client : %v", node)
@@ -79,9 +80,9 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			log.Printf("receive : %v", test)
-			if test.Start == true {
-				h.Ready <- true
-				return
+			if test.Start {
+				h.Ready = true
+				log.Printf("send ready : %v", h.Ready)
 			}
 		}
 	}()
@@ -94,7 +95,15 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 			case <-done:
 				return
 			case <-ticker.C:
-				if err := ws.WriteJSON(h.Nodes); err != nil {
+				var nodes []dtype.NodeInfo
+				for _, n := range h.Nodes {
+					nodes = append(nodes, n)
+				}
+				sort.Slice(nodes, func(i, j int) bool {
+					return nodes[i].Hash < nodes[j].Hash
+				})
+
+				if err := ws.WriteJSON(nodes); err != nil {
 					log.Printf("Write json error : %v", err)
 					return
 				}
@@ -112,13 +121,17 @@ func (h *Handler) StartService(port int) {
 
 func (h *Handler) StartDummy() {
 	// Wait until clients join
-	for i := 0; i < 1; i++ {
-		<-h.Ready
+	for {
+		if h.Ready {
+			break
+		}
+		time.Sleep(1 * time.Second)
 	}
 
 	for _, n := range h.Nodes {
 		log.Printf("Test Start : %v", n)
 	}
+
 	h.BCDummy.Start()
 }
 
@@ -127,9 +140,9 @@ func NewHandler(path string) *Handler {
 	h := &Handler{
 		Handler: m,
 		db:      dbagent.NewDBAgent(path),
-		Nodes:   nil,
+		Nodes:   make(map[string]dtype.NodeInfo),
 		BCDummy: nil,
-		Ready:   make(chan bool),
+		Ready:   false,
 	}
 
 	m.Handle("/", http.FileServer(http.Dir("static")))
