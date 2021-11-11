@@ -96,6 +96,11 @@ func (t *TestMgrCli) startResolver() {
 	}
 
 	log.Printf("TestMgr Info : %v", t.local)
+	log.Printf("Simulator Info : %v", t.sim)
+	if t.local.Mode == "docker" {
+		t.registerNode(t.sim.IP, t.sim.Port)
+		log.Printf("Docker mode - simulator: %v", t.sim)
+	}
 
 	// Channel to receive discovered service entries
 	entries := make(chan *zeroconf.ServiceEntry)

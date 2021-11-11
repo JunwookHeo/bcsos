@@ -1,6 +1,7 @@
 package dtype
 
 type NodeInfo struct {
+	Mode string `json:"mode"`
 	Type string `json:"type"`
 	IP   string `json:"ip"`
 	Port int    `json:"port"`

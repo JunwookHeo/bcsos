@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/serial"
@@ -34,9 +35,21 @@ func getFreePort() (port int, err error) {
 	return
 }
 
-func SetAddress() dtype.NodeInfo {
-	local := dtype.NodeInfo{Type: "", IP: "", Port: 0, Hash: ""}
-	port, err := getFreePort()
+func GetLocalAddress() dtype.NodeInfo {
+	var port int
+	var err error
+	local := dtype.NodeInfo{Mode: "normal", Type: "", IP: "", Port: 0, Hash: ""}
+	sport := os.Getenv("BCPORT")
+	mode := os.Getenv("BCMODE")
+	if mode != "" {
+		local.Mode = mode
+	}
+
+	if sport == "" {
+		port, err = getFreePort()
+	} else {
+		port, err = strconv.Atoi(sport)
+	}
 	if err != nil {
 		log.Panicf("Get free port error : %v", err)
 		return local
@@ -54,13 +67,13 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Reset()
 
-	local := SetAddress()
+	local := GetLocalAddress()
 	s := storage.NewHandler(DB_PATH, local)
 	s.UpdateNeighbourNodes()
 
+	log.Printf("Server start : %v", local.Port)
 	go http.ListenAndServe(fmt.Sprintf(":%v", local.Port), s.Handler)
 	//go http.ListenAndServe(":8080", s.Handler)
-	log.Printf("Server start : %v", local.Port)
 
 	<-interrupt
 	log.Println("interrupt")

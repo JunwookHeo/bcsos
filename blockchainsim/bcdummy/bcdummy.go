@@ -29,6 +29,7 @@ func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
 		return
 	}
 	defer ws.Close()
+	log.Printf("DefaultDialer Send new block to %v", url)
 
 	if err := ws.WriteJSON(b); err != nil {
 		log.Printf("Write json error : %v", err)
@@ -50,7 +51,11 @@ func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
 func (h *Handler) broadcastNewBlock(b *blockchain.Block) {
 	log.Printf("broadcast : %v", *h.Nodes)
 	for _, node := range *h.Nodes {
-		go h.sendNewBlock(b, node.IP, node.Port)
+		ip := node.IP
+		if node.Mode == "docker" {
+			ip = "localhost"
+		}
+		go h.sendNewBlock(b, ip, node.Port)
 	}
 }
 

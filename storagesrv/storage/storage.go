@@ -98,6 +98,11 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 		tmc:     nil,
 		nm:      nil,
 	}
+	if h.local.Mode == "docker" {
+		h.sim.IP = "172.30.87.100"
+		h.sim.Port = 8082
+	}
+
 	h.tmc = testmgrcli.NewTMC(h.db, &h.sim, &h.local)
 	h.nm = network.NewNodeMgr()
 
