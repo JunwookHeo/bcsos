@@ -3,20 +3,20 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/junwookheo/bcsos/storagesrv/storage"
 )
 
-const DB_PATH = "./bc_storagesrv.db"
+var db_path string = "./bc_dev.db"
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
@@ -35,24 +35,30 @@ func getFreePort() (port int, err error) {
 	return
 }
 
+func flagParse() (string, string, int) {
+	pmode := flag.String("mode", "dev", "Operation mode : dev or pan")
+	ptype := flag.String("type", "0", "Storage class : 0 to 4")
+	pport := flag.Int("port", 0, "Port number of local if 0, it will use a free port")
+	flag.Parse()
+	if *pmode == "pan" && *pport == 0 {
+		log.Panicf("This is not allowed : %v, %v", *pmode, *pport)
+	}
+	return *pmode, *ptype, *pport
+}
+
 func GetLocalAddress() dtype.NodeInfo {
-	var port int
 	var err error
 	local := dtype.NodeInfo{Mode: "normal", Type: "", IP: "", Port: 0, Hash: ""}
-	sport := os.Getenv("BCPORT")
-	mode := os.Getenv("BCMODE")
-	if mode != "" {
-		local.Mode = mode
-	}
-
-	if sport == "" {
+	mode, stype, port := flagParse()
+	local.Mode = mode
+	local.Type = stype
+	if mode == "dev" && port == 0 {
 		port, err = getFreePort()
+		if err != nil {
+			log.Panicf("Get free port error : %v", err)
+		}
 	} else {
-		port, err = strconv.Atoi(sport)
-	}
-	if err != nil {
-		log.Panicf("Get free port error : %v", err)
-		return local
+		db_path = fmt.Sprintf("./db_nodes/%v.db", port)
 	}
 
 	local.Port = port
@@ -68,7 +74,7 @@ func main() {
 	defer signal.Reset()
 
 	local := GetLocalAddress()
-	s := storage.NewHandler(DB_PATH, local)
+	s := storage.NewHandler(db_path, local)
 	s.UpdateNeighbourNodes()
 
 	log.Printf("Server start : %v", local.Port)

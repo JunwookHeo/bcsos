@@ -51,11 +51,7 @@ func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
 func (h *Handler) broadcastNewBlock(b *blockchain.Block) {
 	log.Printf("broadcast : %v", *h.Nodes)
 	for _, node := range *h.Nodes {
-		ip := node.IP
-		if node.Mode == "docker" {
-			ip = "localhost"
-		}
-		go h.sendNewBlock(b, ip, node.Port)
+		go h.sendNewBlock(b, node.IP, node.Port)
 	}
 }
 
