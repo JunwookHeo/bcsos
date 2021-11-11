@@ -3,7 +3,6 @@ package dbagent
 import (
 	"encoding/hex"
 	"log"
-	"math/rand"
 	"os"
 	"testing"
 
@@ -76,16 +75,35 @@ func TestDBSqliteAdd(t *testing.T) {
 	os.Remove(path)
 }
 
-func TestDBSqliteRandom(t *testing.T) {
-	dba := NewDBAgent("../../storagesrv/bc_storagesrv.db")
-	hashes := dba.GetTransactionwithRandom()
-	for _, h := range hashes {
-		var tr blockchain.Transaction
-		dba.GetTransaction(h, &tr)
-		assert.Equal(t, hex.EncodeToString(tr.Hash), h)
-	}
-	for i := 0; i < 100; i++ {
-		expdist := rand.ExpFloat64() / 0.5
-		log.Printf(", %v", expdist)
-	}
+// func TestDBSqliteRandom(t *testing.T) {
+// 	dba := NewDBAgent("../../storagesrv/bc_storagesrv.db")
+// 	hashes := dba.GetTransactionwithRandom()
+// 	for _, h := range hashes {
+// 		var tr blockchain.Transaction
+// 		dba.GetTransaction(h, &tr)
+// 		assert.Equal(t, hex.EncodeToString(tr.Hash), h)
+// 	}
+// 	for i := 0; i < 100; i++ {
+// 		expdist := rand.ExpFloat64() / 0.5
+// 		log.Printf(", %v", expdist)
+// 	}
+// }
+
+func TestDBAgentReplicatoin(t *testing.T) {
+	dba := NewDBAgent("../../storagesrv/bc_dev.db")
+	dba.ShowAllObjets()
+	dba.GetLatestBlockHash()
+	status := DBStatus{}
+	dba.GetDBStatus(&status)
+	log.Printf("DB Status : %v", status)
+
+	// hash1, _ := hex.DecodeString("0007c6e53cff577e2b87ea385541acb3872d10874eb3f2cc438b37c5f0683f93")
+	// obj1 := blockchain.Block{}
+	// obj1.Header.Hash = hash1
+	// dba.AddBlock(&obj1)
+
+	// hash2, _ := hex.DecodeString("10fdff4e973df14173d6ebb66605717cd5fa46f2f78861b590de549a1ffefcd5")
+	// obj2 := blockchain.Transaction{}
+	// obj2.Hash = hash2
+	// dba.AddTransaction(&obj2)
 }

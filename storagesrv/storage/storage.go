@@ -37,15 +37,15 @@ func (h *Handler) Stop() {
 func (h *Handler) sortbyTypeNeighbourMap() *[]dtype.NodeInfo {
 	var nodes []dtype.NodeInfo
 	for _, n := range h.nm.Neighbours {
-		if h.local.Type < n.Type {
+		if h.local.SC < n.SC {
 			nodes = append(nodes, n)
 		}
 	}
 	sort.Slice(nodes, func(i, j int) bool {
-		return nodes[i].Type < nodes[j].Type
+		return nodes[i].SC < nodes[j].SC
 	})
 
-	log.Printf("Sorted Heighbours %v, %v", h.local.Type, nodes)
+	log.Printf("Sorted Heighbours %v, %v", h.local.SC, nodes)
 	return &nodes
 }
 
@@ -96,14 +96,18 @@ func (h *Handler) getTransactionHandler(w http.ResponseWriter, r *http.Request) 
 	if h.db.GetTransaction(hash, &transaction) == 0 {
 		// TODO:
 		log.Printf("Not having it, so request the transaction to other node")
+		transaction = *h.getTransactionQuery(hash)
 	}
 
 	ws.WriteJSON(transaction)
 }
 
+// getTransactionQuery queries a transaction ot other nodes with highr Storage Class
+// Request : hash of transaction
+// Response : transaction
 func (h *Handler) getTransactionQuery(hash string) *blockchain.Transaction {
 	queryTransaction := func(ip string, port int, hash string) *blockchain.Transaction {
-		url := fmt.Sprintf("ws://%v:%v/version", ip, port)
+		url := fmt.Sprintf("ws://%v:%v/gettransaction", ip, port)
 		log.Printf("getTransactionQuery : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -132,6 +136,74 @@ func (h *Handler) getTransactionQuery(hash string) *blockchain.Transaction {
 		transaction := queryTransaction(node.IP, node.Port, hash)
 		if transaction != nil {
 			return transaction
+		}
+	}
+
+	return nil
+}
+
+// getBlockHeaderHandler is called when block header query from other nodes is received
+// if the node does not have the block header, the node will query it to other nodes with highr SC
+// Request : hash of block header
+// Response : block header
+func (h *Handler) getBlockHeaderHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("getBlockHeaderHandler transaction error : ", err)
+		return
+	}
+	defer ws.Close()
+
+	var hash string
+	if err := ws.ReadJSON(&hash); err != nil {
+		log.Printf("Read json error : %v", err)
+	}
+
+	var bh blockchain.BlockHeader
+	if h.db.GetBlockHeader(hash, &bh) == 0 {
+		// TODO:
+		log.Printf("Not having it, so request the transaction to other node")
+		bh = *h.getBlockHeaderQuery(hash)
+	}
+
+	ws.WriteJSON(bh)
+}
+
+// getBlockHeaderQuery queries a block header ot other nodes with highr Storage Class
+// Request : hash of block header
+// Response : block header
+func (h *Handler) getBlockHeaderQuery(hash string) *blockchain.BlockHeader {
+	queryBlockHeader := func(ip string, port int, hash string) *blockchain.BlockHeader {
+		url := fmt.Sprintf("ws://%v:%v/getblockheader", ip, port)
+		log.Printf("getBlockHeaderQuery : %v", url)
+
+		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			log.Printf("getBlockHeaderQuery Dial error : %v", err)
+			return nil
+		}
+		defer ws.Close()
+
+		if err := ws.WriteJSON(hash); err != nil {
+			log.Printf("Write json error : %v", err)
+			return nil
+		}
+
+		var bh blockchain.BlockHeader
+		if err := ws.ReadJSON(&bh); err != nil {
+			log.Printf("Read json error : %v", err)
+			return nil
+		}
+
+		return &bh
+	}
+
+	neighs := h.sortbyTypeNeighbourMap()
+	for _, node := range *neighs {
+		bh := queryBlockHeader(node.IP, node.Port, hash)
+		if bh != nil {
+			return bh
 		}
 	}
 
@@ -173,7 +245,6 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Write json error : %v", err)
 		return
 	}
-
 }
 
 func (h *Handler) UpdateNeighbourNodes() {
@@ -206,6 +277,7 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/newblock", h.newBlockHandler)
 	m.HandleFunc("/gettransaction", h.getTransactionHandler)
+	m.HandleFunc("/getblockheader", h.getBlockHeaderHandler)
 	m.HandleFunc("/nodeinfo", h.nodeInfoHandler)
 	m.HandleFunc("/version", h.versionHandler)
 	return h

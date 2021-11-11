@@ -78,6 +78,11 @@ func (a *dbagent) GetObject(obj *StorageObj) int64 {
 }
 
 func (a *dbagent) AddObject(obj *StorageObj) int64 {
+	if a.getObjectCount(obj.Hash) > 0 {
+		log.Panicf("Replicatoin exists : %v", obj)
+		return -1
+	}
+
 	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, data) VALUES (?, ?, ?)")
 	if err != nil {
 		log.Printf("Prepare adding object error : %v", err)
@@ -153,6 +158,19 @@ func (a *dbagent) GetTransactionwithTimeWeight() []string {
 	return selhashes
 }
 
+func (a *dbagent) getObjectCount(hash string) int {
+	var count int = 0
+
+	err := a.db.QueryRow("SELECT COUNT(*) FROM bcobjects WHERE hash=?", hash).Scan(&count)
+	switch {
+	case err != nil:
+		log.Fatal(err)
+	default:
+		log.Printf("Number of rows are %d", count)
+	}
+	return count
+}
+
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
 	obj := StorageObj{"blockheader", hash, h}
 	return a.GetObject(&obj)
@@ -192,11 +210,19 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 }
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
-	var hashes []string
+	if a.getObjectCount(hex.EncodeToString(b.Header.Hash)) > 0 {
+		log.Panicf("Replicatoin exists : %v", hex.EncodeToString(b.Header.Hash))
+		return 0
+	}
+
 	hash := sha256.Sum256(serial.Serialize(b.Header))
+	log.Printf("Check Replicatoin exists : %v", b)
+
+	log.Printf("end Replicatoin exists : %v", b)
 	shash := hex.EncodeToString(hash[:])
 	a.AddBlockHeader(shash, &b.Header)
 
+	var hashes []string
 	hashes = append(hashes, shash)
 	for _, t := range b.Transactions {
 		if a.AddTransaction(t) > 0 {

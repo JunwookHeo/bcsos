@@ -35,9 +35,9 @@ func getFreePort() (port int, err error) {
 	return
 }
 
-func flagParse() (string, string, int) {
+func flagParse() (string, int, int) {
 	pmode := flag.String("mode", "dev", "Operation mode : dev or pan")
-	ptype := flag.String("type", "0", "Storage class : 0 to 4")
+	ptype := flag.Int("type", 0, "Storage class : 0 to 4")
 	pport := flag.Int("port", 0, "Port number of local if 0, it will use a free port")
 	flag.Parse()
 	if *pmode == "pan" && *pport == 0 {
@@ -48,10 +48,10 @@ func flagParse() (string, string, int) {
 
 func GetLocalAddress() dtype.NodeInfo {
 	var err error
-	local := dtype.NodeInfo{Mode: "normal", Type: "", IP: "", Port: 0, Hash: ""}
+	local := dtype.NodeInfo{Mode: "normal", SC: 0, IP: "", Port: 0, Hash: ""}
 	mode, stype, port := flagParse()
 	local.Mode = mode
-	local.Type = stype
+	local.SC = stype
 	if mode == "dev" && port == 0 {
 		port, err = getFreePort()
 		if err != nil {
