@@ -2,11 +2,8 @@ package bcdummy
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/json"
 	"log"
 	"os"
-	"time"
 )
 
 type SensorData struct {
@@ -33,14 +30,15 @@ func LoadRawdata(path string, msg chan string) {
 	scanner.Split(bufio.ScanLines)
 
 	for scanner.Scan() {
-		jsonstr := scanner.Text()
-		var sensordata SensorData
-		json.Unmarshal([]byte(jsonstr), &sensordata)
-		sensordata.Timestamp = time.Now().String()
-		var buffer bytes.Buffer
-		json.NewEncoder(&buffer).Encode(&sensordata)
+		// jsonstr := scanner.Text()
+		// var sensordata SensorData
+		// json.Unmarshal([]byte(jsonstr), &sensordata)
+		// sensordata.Timestamp = time.Now().String()
+		// var buffer bytes.Buffer
+		// json.NewEncoder(&buffer).Encode(&sensordata)
 
-		msg <- buffer.String()
+		// msg <- buffer.String()
+		msg <- scanner.Text()
 
 	}
 }

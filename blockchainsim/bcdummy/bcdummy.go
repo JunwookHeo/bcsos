@@ -63,7 +63,7 @@ func (h *Handler) Start() {
 		b := blockchain.CreateGenesis()
 		h.db.AddBlock(b)
 		h.broadcastNewBlock(b)
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 	}
 
 	msg := make(chan string)
@@ -81,7 +81,7 @@ func (h *Handler) Start() {
 		b := blockchain.CreateBlock(trs, []byte(h.db.GetLatestBlockHash()))
 		h.db.AddBlock(b)
 		h.broadcastNewBlock(b)
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 	}
 }
 

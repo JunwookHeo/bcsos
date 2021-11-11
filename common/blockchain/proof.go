@@ -7,6 +7,8 @@ import (
 	"log"
 	"math"
 	"math/big"
+
+	"github.com/junwookheo/bcsos/common/serial"
 )
 
 const DIFFICULTY = 12
@@ -32,6 +34,7 @@ func initData(b *Block, nonce int) []byte {
 	var bs []byte
 	for _, t := range b.Transactions {
 		bs = append(bs, t.Hash...)
+		bs = append(bs, serial.Serialize(t.Timestamp)...)
 		bs = append(bs, t.Data...)
 	}
 

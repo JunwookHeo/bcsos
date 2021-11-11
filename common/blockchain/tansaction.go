@@ -1,23 +1,32 @@
 package blockchain
 
 import (
+	"bytes"
 	"crypto/sha256"
-
-	"github.com/junwookheo/bcsos/common/serial"
+	"time"
 )
 
 type Transaction struct {
-	Hash []byte
-	Data []byte
+	Hash      []byte
+	Timestamp int64
+	Data      []byte
 }
 
 func (t *Transaction) GetHash() []byte {
-	hash := sha256.Sum256(serial.Serialize(t))
+	data := bytes.Join(
+		[][]byte{
+			toHex(t.Timestamp),
+			t.Data,
+		},
+		[]byte{},
+	)
+
+	hash := sha256.Sum256(data)
 	return hash[:]
 }
 
 func CreateTransaction(d []byte) *Transaction {
-	t := Transaction{nil, d[:]}
+	t := Transaction{nil, time.Now().Unix(), d[:]}
 	t.Hash = t.GetHash()
 	return &t
 }

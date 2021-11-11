@@ -7,7 +7,6 @@ import (
 )
 
 type DBAgent interface {
-	Init()
 	Close()
 	GetLatestBlockHash() string
 	RemoveObject(hash string) bool
@@ -24,9 +23,10 @@ type DBAgent interface {
 }
 
 type StorageObj struct {
-	Type string
-	Hash string
-	Data interface{}
+	Type      string
+	Hash      string
+	Timestamp int64
+	Data      interface{}
 }
 
 type DBStatus struct {

@@ -1,6 +1,8 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"time"
 
 	"github.com/junwookheo/bcsos/common/serial"
@@ -41,6 +43,23 @@ func genesis(t *Transaction) *Block {
 func CreateGenesis() *Block {
 	tr := CreateTransaction([]byte("This is Genesis Block"))
 	return genesis(tr)
+}
+
+func (bh *BlockHeader) GetHash() []byte {
+	data := bytes.Join(
+		[][]byte{
+			bh.Hash,
+			bh.PrvHash,
+			bh.MerkleRoot,
+			toHex(bh.Timestamp),
+			toHex(int64(bh.Difficulty)),
+			toHex(int64(bh.Nonce)),
+		},
+		[]byte{},
+	)
+
+	hash := sha256.Sum256(data)
+	return hash[:]
 }
 
 func (b *Block) MerkleRoot() []byte {

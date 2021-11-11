@@ -1,11 +1,11 @@
 package dbagent
 
 import (
-	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"log"
 	"math/rand"
+	"time"
 	"unsafe"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
@@ -17,9 +17,6 @@ type dbagent struct {
 	db *sql.DB
 }
 
-func (a *dbagent) Init() {
-
-}
 func (a *dbagent) Close() {
 	a.db.Close()
 }
@@ -27,7 +24,8 @@ func (a *dbagent) Close() {
 func (a *dbagent) GetLatestBlockHash() string {
 	var id int = 0
 	var dtype, hash string = "", ""
-	rows, err := a.db.Query(`SELECT id, type, hash FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
+	var ts time.Time
+	rows, err := a.db.Query(`SELECT id, type, hash, timestamp FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
 
 	if err != nil {
 		log.Printf("Show latest objects Error : %v", err)
@@ -37,8 +35,8 @@ func (a *dbagent) GetLatestBlockHash() string {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&id, &dtype, &hash)
-		log.Printf("latest block : %d, %s, %s", id, dtype, hash)
+		rows.Scan(&id, &dtype, &ts, &hash)
+		log.Printf("latest block : %d, %s, %v, %s", id, dtype, ts, hash)
 	}
 
 	return hash
@@ -64,7 +62,7 @@ func (a *dbagent) RemoveObject(hash string) bool {
 func (a *dbagent) GetObject(obj *StorageObj) int64 {
 	var data []byte
 	var id int64 = 0
-	switch err := a.db.QueryRow("SELECT id, type, hash, data FROM bcobjects WHERE hash=?", obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &data); err {
+	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, data FROM bcobjects WHERE hash=?", obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &data); err {
 	case sql.ErrNoRows:
 		log.Printf("Object Not found : %v", err)
 	case nil:
@@ -83,13 +81,13 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 		return -1
 	}
 
-	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, data) VALUES (?, ?, ?)")
+	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, data) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Prepare adding object error : %v", err)
 		return -1
 	}
 	data := serial.Serialize(obj.Data)
-	rst, err := st.Exec(obj.Type, obj.Hash, data)
+	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, data)
 	if err != nil {
 		log.Panicf("Exec adding object error : %v", err)
 		return -1
@@ -105,7 +103,7 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 func (a *dbagent) GetTransactionwithRandom() []string {
 	selhashes := []string{}
 	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT type, hash, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	rows, err := a.db.Query(`SELECT type, hash, timestamp, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return selhashes
@@ -115,11 +113,10 @@ func (a *dbagent) GetTransactionwithRandom() []string {
 
 	// Select a transaction in each block
 	for rows.Next() {
-		var dtype, hash string
 		var data []byte
 		hashes := []string{}
-		obj := StorageObj{"block", hash, &hashes}
-		rows.Scan(&dtype, &hash, &data)
+		obj := StorageObj{"block", "", 0, &hashes}
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &data)
 		serial.Deserialize(data, obj.Data)
 		//log.Printf("selected item : %s, %s", dtype, hash)
 		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
@@ -133,7 +130,7 @@ func (a *dbagent) GetTransactionwithRandom() []string {
 func (a *dbagent) GetTransactionwithTimeWeight() []string {
 	selhashes := []string{}
 	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT type, hash, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	rows, err := a.db.Query(`SELECT type, hash, timestamp, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return selhashes
@@ -143,11 +140,10 @@ func (a *dbagent) GetTransactionwithTimeWeight() []string {
 
 	// Select a transaction in each block
 	for rows.Next() {
-		var dtype, hash string
 		var data []byte
 		hashes := []string{}
-		obj := StorageObj{"block", hash, &hashes}
-		rows.Scan(&dtype, &hash, &data)
+		obj := StorageObj{"block", "", 0, &hashes}
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &data)
 		serial.Deserialize(data, obj.Data)
 		//log.Printf("selected item : %s, %s", dtype, hash)
 		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
@@ -172,28 +168,28 @@ func (a *dbagent) getObjectCount(hash string) int {
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hash, t}
+	obj := StorageObj{"transaction", hash, t.Timestamp, t}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t}
+	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, t}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 	hashes := []string{}
-	obj := StorageObj{"block", hash, &hashes}
+	obj := StorageObj{"block", hash, b.Header.Timestamp, &hashes}
 	a.GetObject(&obj)
 
 	h := blockchain.BlockHeader{}
@@ -215,10 +211,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 		return 0
 	}
 
-	hash := sha256.Sum256(serial.Serialize(b.Header))
-	log.Printf("Check Replicatoin exists : %v", b)
-
-	log.Printf("end Replicatoin exists : %v", b)
+	hash := b.Header.GetHash()
 	shash := hex.EncodeToString(hash[:])
 	a.AddBlockHeader(shash, &b.Header)
 
@@ -230,7 +223,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 		}
 	}
 
-	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), hashes}
+	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, hashes}
 	return a.AddObject(&obj)
 }
 
@@ -245,7 +238,7 @@ func (a *dbagent) ShowAllObjets() bool {
 	for rows.Next() {
 		var obj StorageObj
 		var id int
-		rows.Scan(&id, &obj.Type, &obj.Hash, &obj.Data)
+		rows.Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
 		log.Printf("id=%d : %s %s", id, obj.Type, obj.Hash)
 		if obj.Type == "transaction" {
 			tr := blockchain.Transaction{}
@@ -259,7 +252,7 @@ func (a *dbagent) ShowAllObjets() bool {
 
 func (a *dbagent) GetDBSize() uint64 {
 	var size uint64 = 0
-	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects")
+	rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects")
 	if err != nil {
 		log.Printf("Show db size Error : %v", err)
 		return 0
@@ -268,9 +261,9 @@ func (a *dbagent) GetDBSize() uint64 {
 	defer rows.Close()
 	for rows.Next() {
 		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Data)
-		size += uint64(unsafe.Sizeof(obj.Type)) + uint64(unsafe.Sizeof(obj.Hash)) + uint64(len(obj.Data.([]byte)))
-		//log.Printf("size : %d %d %d", unsafe.Sizeof(obj.Type), unsafe.Sizeof(obj.Hash), len(obj.Data.([]byte)))
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
+		size += uint64(unsafe.Sizeof(obj.Type)) + uint64(unsafe.Sizeof(obj.Hash)) + uint64(unsafe.Sizeof(obj.Timestamp)) + uint64(len(obj.Data.([]byte)))
+		//log.Printf("size : %d %d %d %d", unsafe.Sizeof(obj.Type), unsafe.Sizeof(obj.Hash), unsafe.Sizeof(obj.Timestamp), len(obj.Data.([]byte)))
 	}
 	return size
 }
@@ -294,7 +287,7 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 }
 
 func (a *dbagent) updateRemoveDBStatus(hash string) {
-	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects WHERE hash=?", hash)
+	rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects WHERE hash=?", hash)
 	if err != nil {
 		log.Printf("update remove db status error : %v", err)
 		return
@@ -307,8 +300,8 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 
 	for rows.Next() {
 		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Data)
-		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(len(obj.Data.([]byte)))
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
+		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(unsafe.Sizeof(obj.Timestamp)) + int(len(obj.Data.([]byte)))
 		switch obj.Type {
 		case "block":
 			status.Blocks -= 1
@@ -333,7 +326,7 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 }
 
 func (a *dbagent) updateAddDBStatus(id int64) {
-	rows, err := a.db.Query("SELECT type, hash, data FROM bcobjects WHERE id=?", id)
+	rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects WHERE id=?", id)
 	if err != nil {
 		log.Printf("update remove db status error : %v", err)
 		return
@@ -346,8 +339,8 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 
 	for rows.Next() {
 		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Data)
-		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(len(obj.Data.([]byte)))
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
+		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(unsafe.Sizeof(obj.Timestamp)) + int(len(obj.Data.([]byte)))
 		switch obj.Type {
 		case "block":
 			status.Blocks += 1
@@ -398,10 +391,11 @@ func newDBSqlite(path string) DBAgent {
 	}
 
 	create_objtlb := `CREATE TABLE IF NOT EXISTS bcobjects (
-		id      INTEGER  PRIMARY KEY AUTOINCREMENT,
-		type 	TEXT,
-		hash    TEXT,
-		data	BLOB
+		id      	INTEGER  PRIMARY KEY AUTOINCREMENT,
+		type 		TEXT,
+		hash    	TEXT,
+		timestamp	INTEGER,
+		data		BLOB
 	);`
 
 	st, err := db.Prepare(create_objtlb)
