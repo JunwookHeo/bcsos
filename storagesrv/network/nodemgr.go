@@ -3,7 +3,6 @@ package network
 import (
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/common/dtype"
@@ -50,8 +49,9 @@ func (n *NodeMgr) Update(sim dtype.Simulator, local dtype.NodeInfo) {
 				n.Neighbours[l.Hash] = l
 			}
 		}
-
-		log.Printf("Update neighbours : %v", n.Neighbours)
+		for _, nn := range n.Neighbours {
+			log.Printf("Update neighbours : %v", nn)
+		}
 	}
 	for _, node := range n.Neighbours {
 		checkVer(node.IP, node.Port, node.Hash)
@@ -59,25 +59,6 @@ func (n *NodeMgr) Update(sim dtype.Simulator, local dtype.NodeInfo) {
 
 	if len(n.Neighbours) == 0 {
 		checkVer(sim.IP, sim.Port, "")
-	}
-}
-
-func (n *NodeMgr) VersionHandler(ws *websocket.Conn, w http.ResponseWriter, r *http.Request) {
-
-	var version dtype.Version
-	if err := ws.ReadJSON(&version); err != nil {
-		log.Printf("Read json error : %v", err)
-		return
-	}
-	log.Printf("receive version : %v", version)
-
-	var nodes []dtype.NodeInfo
-	for _, n := range n.Neighbours {
-		nodes = append(nodes, n)
-	}
-	if err := ws.WriteJSON(nodes); err != nil {
-		log.Printf("Write json error : %v", err)
-		return
 	}
 }
 
