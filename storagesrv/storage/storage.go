@@ -23,6 +23,7 @@ type Handler struct {
 	local dtype.NodeInfo
 	tmc   *testmgrcli.TestMgrCli
 	nm    *network.NodeMgr
+	om    *ObjectMgr
 }
 
 var upgrader = websocket.Upgrader{
@@ -269,10 +270,12 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 		local:   local,
 		tmc:     nil,
 		nm:      nil,
+		om:      nil,
 	}
 
 	h.tmc = testmgrcli.NewTMC(h.db, &h.sim, &h.local)
 	h.nm = network.NewNodeMgr()
+	h.om = NewObjMgr(h.db)
 
 	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/newblock", h.newBlockHandler)

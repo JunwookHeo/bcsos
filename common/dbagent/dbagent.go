@@ -17,15 +17,17 @@ type DBAgent interface {
 	AddBlock(b *blockchain.Block) int64
 	GetBlock(hash string, b *blockchain.Block) int64
 	ShowAllObjets() bool
-	GetDBSize() uint64
+	GetDBDataSize() uint64
 	GetDBStatus(status *DBStatus) bool
 	GetTransactionwithRandom() []string
+	GetTransactionwithTimeWeight() []string
 }
 
 type StorageObj struct {
 	Type      string
 	Hash      string
 	Timestamp int64
+	ACTime    int64
 	Data      interface{}
 }
 

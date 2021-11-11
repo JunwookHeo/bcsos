@@ -58,16 +58,16 @@ func TestDBSqliteAdd(t *testing.T) {
 	dba.GetLatestBlockHash()
 	//dba.ShowAllObjets()
 
-	log.Println(dba.GetDBSize())
+	log.Println(dba.GetDBDataSize())
 	dba.RemoveObject(hex.EncodeToString(b2.Transactions[0].Hash))
 	dba.GetDBStatus(&status)
-	log.Println(dba.GetDBSize())
+	log.Println(dba.GetDBDataSize())
 	dba.RemoveObject(hex.EncodeToString(b2.Transactions[1].Hash))
 	dba.GetDBStatus(&status)
-	log.Println(dba.GetDBSize())
+	log.Println(dba.GetDBDataSize())
 	dba.RemoveObject(hex.EncodeToString(b2.Transactions[2].Hash))
 	dba.GetDBStatus(&status)
-	log.Println(dba.GetDBSize())
+	log.Println(dba.GetDBDataSize())
 	log.Println(status)
 
 	//dba.ShowAllObjets()
@@ -96,7 +96,7 @@ func TestDBAgentReplicatoin(t *testing.T) {
 	status := DBStatus{}
 	dba.GetDBStatus(&status)
 	log.Printf("DB Status : %v", status)
-	dba.GetDBSize()
+	dba.GetDBDataSize()
 
 	// hash1, _ := hex.DecodeString("0007c6e53cff577e2b87ea385541acb3872d10874eb3f2cc438b37c5f0683f93")
 	// obj1 := blockchain.Block{}

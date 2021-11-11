@@ -58,14 +58,20 @@ func (a *dbagent) RemoveObject(hash string) bool {
 	return cnt > 0
 }
 
+func (a *dbagent) updateACTimeObject(id int64) {
+	// obj.ACTime = time.Now().Unix()
+}
+
 func (a *dbagent) GetObject(obj *StorageObj) int64 {
 	var data []byte
 	var id int64 = 0
-	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, data FROM bcobjects WHERE hash=?", obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &data); err {
+	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, actime, data FROM bcobjects WHERE hash=?",
+		obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &data); err {
 	case sql.ErrNoRows:
 		log.Printf("Object Not found : %v", err)
 	case nil:
 		serial.Deserialize(data, obj.Data)
+		a.updateACTimeObject(id)
 		return id
 	default:
 		log.Printf("Get object error : %v", err)
@@ -80,13 +86,14 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 		return id
 	}
 
-	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, data) VALUES (?, ?, ?, ?)")
+	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, actime, data) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Prepare adding object error : %v", err)
 		return -1
 	}
+	obj.ACTime = time.Now().Unix()
 	data := serial.Serialize(obj.Data)
-	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, data)
+	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, obj.ACTime, data)
 	if err != nil {
 		log.Panicf("Exec adding object error : %v", err)
 		return -1
@@ -102,7 +109,7 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 func (a *dbagent) GetTransactionwithRandom() []string {
 	selhashes := []string{}
 	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT type, hash, timestamp, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	rows, err := a.db.Query(`SELECT data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return selhashes
@@ -113,10 +120,9 @@ func (a *dbagent) GetTransactionwithRandom() []string {
 	// Select a transaction in each block
 	for rows.Next() {
 		var data []byte
-		hashes := []string{}
-		obj := StorageObj{"block", "", 0, &hashes}
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &data)
-		serial.Deserialize(data, obj.Data)
+		var hashes []string
+		rows.Scan(&data)
+		serial.Deserialize(data, &hashes)
 		//log.Printf("selected item : %s, %s", dtype, hash)
 		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
 		selhashes = append(selhashes, hashes[num])
@@ -129,7 +135,7 @@ func (a *dbagent) GetTransactionwithRandom() []string {
 func (a *dbagent) GetTransactionwithTimeWeight() []string {
 	selhashes := []string{}
 	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT type, hash, timestamp, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	rows, err := a.db.Query(`SELECT type, hash, timestamp, actime, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return selhashes
@@ -141,8 +147,8 @@ func (a *dbagent) GetTransactionwithTimeWeight() []string {
 	for rows.Next() {
 		var data []byte
 		hashes := []string{}
-		obj := StorageObj{"block", "", 0, &hashes}
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &data)
+		var obj StorageObj
+		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &data)
 		serial.Deserialize(data, obj.Data)
 		//log.Printf("selected item : %s, %s", dtype, hash)
 		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
@@ -167,28 +173,28 @@ func (a *dbagent) getObjectCount(hash string) int {
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, h}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, h}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hash, t.Timestamp, t}
+	obj := StorageObj{"transaction", hash, t.Timestamp, 0, t}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, t}
+	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, 0, t}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 	hashes := []string{}
-	obj := StorageObj{"block", hash, b.Header.Timestamp, &hashes}
+	obj := StorageObj{"block", hash, b.Header.Timestamp, 0, &hashes}
 	a.GetObject(&obj)
 
 	h := blockchain.BlockHeader{}
@@ -205,7 +211,7 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 }
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
-	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, nil}
+	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, nil}
 	if id := a.GetObject(&obj); id != 0 {
 		log.Printf("Replicatoin exists : %v - %v", id, hex.EncodeToString(b.Header.Hash))
 		return id
@@ -223,7 +229,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 		}
 	}
 
-	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, hashes}
+	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, hashes}
 	return a.AddObject(&obj)
 }
 
@@ -238,7 +244,7 @@ func (a *dbagent) ShowAllObjets() bool {
 	for rows.Next() {
 		var obj StorageObj
 		var id int
-		rows.Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
+		rows.Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &obj.Data)
 		log.Printf("id=%d : %s %s", id, obj.Type, obj.Hash)
 		if obj.Type == "transaction" {
 			tr := blockchain.Transaction{}
@@ -250,7 +256,7 @@ func (a *dbagent) ShowAllObjets() bool {
 	return false
 }
 
-func (a *dbagent) GetDBSize() uint64 {
+func (a *dbagent) GetDBDataSize() uint64 {
 	var size uint64 = 0
 	err := a.db.QueryRow(`SELECT sum(length(type)) + sum(length(hash)) + sum(length(timestamp)) + sum(length(data)) AS size FROM bcobjects;`).Scan(&size)
 	if err != nil {
@@ -396,6 +402,7 @@ func newDBSqlite(path string) DBAgent {
 		type 		TEXT,
 		hash    	TEXT,
 		timestamp	INTEGER,
+		actime		INTEGER,
 		data		BLOB
 	);`
 
