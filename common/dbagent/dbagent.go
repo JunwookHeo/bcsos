@@ -30,12 +30,14 @@ type StorageObj struct {
 }
 
 type DBStatus struct {
-	ID           int
-	Headers      int
-	Blocks       int
-	Transactions int
-	Size         int
-	Timestamp    time.Time
+	ID                int
+	TotalBlocks       int
+	TotalTransactoins int
+	Headers           int
+	Blocks            int
+	Transactions      int
+	Size              int
+	Timestamp         time.Time
 }
 
 func NewDBAgent(path string) DBAgent {

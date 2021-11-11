@@ -96,6 +96,7 @@ func TestDBAgentReplicatoin(t *testing.T) {
 	status := DBStatus{}
 	dba.GetDBStatus(&status)
 	log.Printf("DB Status : %v", status)
+	dba.GetDBSize()
 
 	// hash1, _ := hex.DecodeString("0007c6e53cff577e2b87ea385541acb3872d10874eb3f2cc438b37c5f0683f93")
 	// obj1 := blockchain.Block{}

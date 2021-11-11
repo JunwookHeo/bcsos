@@ -6,7 +6,6 @@ import (
 	"log"
 	"math/rand"
 	"time"
-	"unsafe"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/serial"
@@ -76,9 +75,9 @@ func (a *dbagent) GetObject(obj *StorageObj) int64 {
 }
 
 func (a *dbagent) AddObject(obj *StorageObj) int64 {
-	if a.getObjectCount(obj.Hash) > 0 {
-		log.Panicf("Replicatoin exists : %v", obj)
-		return -1
+	if id := a.GetObject(obj); id != 0 {
+		log.Printf("Replicatoin exists : %v - %v", id, obj)
+		return id
 	}
 
 	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, data) VALUES (?, ?, ?, ?)")
@@ -206,9 +205,10 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 }
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
-	if a.getObjectCount(hex.EncodeToString(b.Header.Hash)) > 0 {
-		log.Panicf("Replicatoin exists : %v", hex.EncodeToString(b.Header.Hash))
-		return 0
+	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, nil}
+	if id := a.GetObject(&obj); id != 0 {
+		log.Printf("Replicatoin exists : %v - %v", id, hex.EncodeToString(b.Header.Hash))
+		return id
 	}
 
 	hash := b.Header.GetHash()
@@ -223,7 +223,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 		}
 	}
 
-	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, hashes}
+	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, hashes}
 	return a.AddObject(&obj)
 }
 
@@ -252,24 +252,17 @@ func (a *dbagent) ShowAllObjets() bool {
 
 func (a *dbagent) GetDBSize() uint64 {
 	var size uint64 = 0
-	rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects")
+	err := a.db.QueryRow(`SELECT sum(length(type)) + sum(length(hash)) + sum(length(timestamp)) + sum(length(data)) AS size FROM bcobjects;`).Scan(&size)
 	if err != nil {
-		log.Printf("Show db size Error : %v", err)
-		return 0
+		log.Printf("get size error : %v", err)
 	}
+	log.Printf("size : %v", size)
 
-	defer rows.Close()
-	for rows.Next() {
-		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
-		size += uint64(unsafe.Sizeof(obj.Type)) + uint64(unsafe.Sizeof(obj.Hash)) + uint64(unsafe.Sizeof(obj.Timestamp)) + uint64(len(obj.Data.([]byte)))
-		//log.Printf("size : %d %d %d %d", unsafe.Sizeof(obj.Type), unsafe.Sizeof(obj.Hash), unsafe.Sizeof(obj.Timestamp), len(obj.Data.([]byte)))
-	}
 	return size
 }
 
 func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
-	rows, err := a.db.Query("SELECT id, headers, blocks, transactions, size, timestamp FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus)")
+	rows, err := a.db.Query("SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, timestamp FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus)")
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
 		return false
@@ -278,7 +271,7 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&status.ID, &status.Headers, &status.Blocks, &status.Transactions, &status.Size, &status.Timestamp)
+		rows.Scan(&status.ID, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions, &status.Size, &status.Timestamp)
 		//log.Printf("DB Status : %v", status)
 		return true
 	}
@@ -287,7 +280,8 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 }
 
 func (a *dbagent) updateRemoveDBStatus(hash string) {
-	rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects WHERE hash=?", hash)
+	rows, err := a.db.Query("SELECT type, length(hash) + length(timestamp) + length(data) FROM bcobjects WHERE hash=?", hash)
+	//rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects WHERE hash=?", hash)
 	if err != nil {
 		log.Printf("update remove db status error : %v", err)
 		return
@@ -300,8 +294,10 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 
 	for rows.Next() {
 		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
-		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(unsafe.Sizeof(obj.Timestamp)) + int(len(obj.Data.([]byte)))
+		//rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
+		//size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(unsafe.Sizeof(obj.Timestamp)) + int(len(obj.Data.([]byte)))
+		var size int
+		rows.Scan(&obj.Type, &size)
 		switch obj.Type {
 		case "block":
 			status.Blocks -= 1
@@ -326,7 +322,8 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 }
 
 func (a *dbagent) updateAddDBStatus(id int64) {
-	rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects WHERE id=?", id)
+	rows, err := a.db.Query("SELECT type, length(hash) + length(timestamp) + length(data) FROM bcobjects WHERE id=?", id)
+	//rows, err := a.db.Query("SELECT type, hash, timestamp, data FROM bcobjects WHERE id=?", id)
 	if err != nil {
 		log.Printf("update remove db status error : %v", err)
 		return
@@ -339,14 +336,18 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 
 	for rows.Next() {
 		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
-		size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(unsafe.Sizeof(obj.Timestamp)) + int(len(obj.Data.([]byte)))
+		//rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.Data)
+		//size := int(unsafe.Sizeof(obj.Type)) + int(unsafe.Sizeof(obj.Hash)) + int(unsafe.Sizeof(obj.Timestamp)) + int(len(obj.Data.([]byte)))
+		var size int
+		rows.Scan(&obj.Type, &size)
 		switch obj.Type {
 		case "block":
+			status.TotalBlocks += 1
 			status.Blocks += 1
 			status.Size += size
 			update = true
 		case "transaction":
+			status.TotalTransactoins += 1
 			status.Transactions += 1
 			status.Size += size
 			update = true
@@ -365,12 +366,12 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 }
 
 func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
-	st, err := a.db.Prepare("INSERT INTO dbstatus (headers, blocks, transactions, size, timestamp) VALUES (?, ?, ?, ?,  datetime('now'))")
+	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, timestamp) VALUES (?, ?, ?, ?, ?, ?,  datetime('now'))")
 	if err != nil {
 		log.Printf("Prepare adding dbstatus error : %v", err)
 		return -1
 	}
-	rst, err := st.Exec(status.Headers, status.Blocks, status.Transactions, status.Size)
+	rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size)
 	if err != nil {
 		log.Panicf("Exec adding dbstatus error : %v", err)
 		return -1
@@ -405,12 +406,14 @@ func newDBSqlite(path string) DBAgent {
 	st.Exec()
 
 	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
-		id      		INTEGER  PRIMARY KEY AUTOINCREMENT,
-		headers			INTEGER,
-		blocks 			INTEGER,
-		transactions    INTEGER,
-		size			INTEGER,
-		timestamp		DATETIME
+		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
+		totalblocks			INTEGER,
+		totaltransactions 	INTERGER,
+		headers				INTEGER,
+		blocks 				INTEGER,
+		transactions    	INTEGER,
+		size				INTEGER,
+		timestamp			DATETIME
 	);`
 
 	st, err = db.Prepare(create_statustlb)
