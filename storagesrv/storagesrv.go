@@ -76,6 +76,7 @@ func main() {
 	local := GetLocalAddress()
 	s := storage.NewHandler(db_path, local)
 	s.UpdateNeighbourNodes()
+	s.UpdateObjectbyAccessPattern()
 
 	log.Printf("Server start : %v", local.Port)
 	go http.ListenAndServe(fmt.Sprintf(":%v", local.Port), s.Handler)

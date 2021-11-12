@@ -19,8 +19,9 @@ type DBAgent interface {
 	ShowAllObjets() bool
 	GetDBDataSize() uint64
 	GetDBStatus(status *DBStatus) bool
-	GetTransactionwithRandom() []string
+	GetTransactionwithRandom(num int) []string
 	GetTransactionwithTimeWeight() []string
+	DeleteNoAccedObject()
 }
 
 type StorageObj struct {

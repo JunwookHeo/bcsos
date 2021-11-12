@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"log"
-	"math/rand"
 	"time"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
@@ -59,16 +58,30 @@ func (a *dbagent) RemoveObject(hash string) bool {
 	return cnt > 0
 }
 
-func (a *dbagent) updateACTimeObject(id int64) {
-	// TODO : Access Pattern
-	// obj.ACTime = time.Now().Unix()
+func (a *dbagent) updateACTimeObject(id int64) bool {
+	st, err := a.db.Prepare("UPDATE bcobjects SET actime=?, aflevel=? WHERE id=?")
+	if err != nil {
+		log.Panicf("Update error id(%v) : %v", id, err)
+		return false
+	}
+
+	act := time.Now().Unix()
+	rst, err := st.Exec(act, a.AFLevel, id)
+	if err != nil {
+		log.Panicf("Update exec error id(%v): %v", id, err)
+		return false
+	}
+
+	cnt, _ := rst.RowsAffected()
+
+	return cnt > 0
 }
 
 func (a *dbagent) GetObject(obj *StorageObj) int64 {
 	var data []byte
 	var id int64 = 0
-	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, actime, data FROM bcobjects WHERE hash=?",
-		obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &data); err {
+	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, actime, aflevel, data FROM bcobjects WHERE hash=?",
+		obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &obj.AFLevel, &data); err {
 	case sql.ErrNoRows:
 		log.Printf("Object Not found : %v", err)
 	case nil:
@@ -147,70 +160,56 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 	return id
 }
 
-func (a *dbagent) GetTransactionwithRandom() []string {
-	selhashes := []string{}
-	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+//DeleteNoAccedObject will delete transaction if there is no access more than a hour
+func (a *dbagent) DeleteNoAccedObject() {
+	ts := time.Now().Unix() - int64(60*60*(a.AFLevel+1)) // no access for if one hour, delete it
+	rows, err := a.db.Query(`SELECT hash, timestamp FROM bcobjects WHERE type = 'transaction' AND timestamp < ?;`, ts)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
-		return selhashes
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hash string
+		rows.Scan(&hash)
+		log.Printf("Delete no access transaction : %v", hash)
+		a.RemoveObject(hash)
+	}
+}
+
+func (a *dbagent) GetTransactionwithRandom(num int) []string {
+	hashes := []string{}
+	// Randomly select 10 blocks in the ledger
+	rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
+	if err != nil {
+		log.Printf("Object Not found : %v", err)
+		return hashes
 	}
 
 	defer rows.Close()
 
 	// Select a transaction in each block
 	for rows.Next() {
-		var data []byte
-		var hashes []string
-		rows.Scan(&data)
-		serial.Deserialize(data, &hashes)
-		//log.Printf("selected item : %s, %s", dtype, hash)
-		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
-		selhashes = append(selhashes, hashes[num])
+		var hash string
+		rows.Scan(&hash)
+		hashes = append(hashes, hash)
+		log.Printf("Random choose hash : %v", hash)
 	}
 
-	//log.Printf("hash : %v", selhashes)
-	return selhashes
+	return hashes
 }
 
 func (a *dbagent) GetTransactionwithTimeWeight() []string {
-	selhashes := []string{}
+	hashes := []string{}
+	var mid int64
 	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT type, hash, timestamp, actime, data FROM bcobjects WHERE type = 'block' ORDER BY RANDOM() LIMIT 10;`)
+	err := a.db.QueryRow(`SELECT timestamp FROM dbstatus WHERE MIN(id);`).Scan(&mid)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
-		return selhashes
+		return hashes
 	}
-
-	defer rows.Close()
-
-	// Select a transaction in each block
-	for rows.Next() {
-		var data []byte
-		hashes := []string{}
-		var obj StorageObj
-		rows.Scan(&obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &data)
-		serial.Deserialize(data, obj.Data)
-		//log.Printf("selected item : %s, %s", dtype, hash)
-		num := rand.Intn(len(hashes)-1) + 1 // because the first is a hash of header
-		selhashes = append(selhashes, hashes[num])
-	}
-
-	//log.Printf("hash : %v", selhashes)
-	return selhashes
-}
-
-func (a *dbagent) getObjectCount(hash string) int {
-	var count int = 0
-
-	err := a.db.QueryRow("SELECT COUNT(*) FROM bcobjects WHERE hash=?", hash).Scan(&count)
-	switch {
-	case err != nil:
-		log.Fatal(err)
-	default:
-		log.Printf("Number of rows are %d", count)
-	}
-	return count
+	//log.Printf("hash : %v", hashes)
+	return hashes
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
@@ -284,7 +283,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 }
 
 func (a *dbagent) ShowAllObjets() bool {
-	rows, err := a.db.Query("SELECT * FROM bcobjects")
+	rows, err := a.db.Query("SELECT idx, transactionhash FROM blocktrtbl")
 	if err != nil {
 		log.Printf("Show all objects Error : %v", err)
 		return false
@@ -292,13 +291,17 @@ func (a *dbagent) ShowAllObjets() bool {
 
 	defer rows.Close()
 	for rows.Next() {
-		var obj StorageObj
-		var id int
-		rows.Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &obj.Data)
-		log.Printf("id=%d : %s %s", id, obj.Type, obj.Hash)
-		if obj.Type == "transaction" {
+		var index int
+		var hash string
+		rows.Scan(&index, &hash)
+		//log.Printf("%v : %v", index, hash)
+		if index == 0 { // header
+			bh := blockchain.BlockHeader{}
+			a.GetBlockHeader(hash, &bh)
+			log.Printf("Block Header %v : %v", bh.Hash, bh.Timestamp)
+		} else {
 			tr := blockchain.Transaction{}
-			a.GetTransaction(obj.Hash, &tr)
+			a.GetTransaction(hash, &tr)
 			log.Printf("Transaction : %s", tr.Data)
 		}
 	}

@@ -3,6 +3,7 @@ package storage
 import (
 	"log"
 
+	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/dbagent"
 )
 
@@ -26,9 +27,20 @@ func Update() {
 
 }
 
-func (c *ObjectMgr) AccessWithRandom() {
-	hashes := c.db.GetTransactionwithRandom()
-	log.Printf("Randomly selected transactions %v", hashes)
+func (c *ObjectMgr) DeleteNoAccedObject() {
+	c.db.DeleteNoAccedObject()
+}
+
+func (c *ObjectMgr) AccessWithRandom(num int) []string {
+	hashes := c.db.GetTransactionwithRandom(num)
+	var rethashes []string
+	for _, hash := range hashes {
+		var tr blockchain.Transaction
+		if c.db.GetTransaction(hash, &tr) == 0 {
+			rethashes = append(rethashes, hash)
+		}
+	}
+	return rethashes
 }
 
 func (c *ObjectMgr) AccessWithTimeWeight() {

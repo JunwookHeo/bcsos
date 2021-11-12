@@ -1,7 +1,9 @@
 package dbagent
 
 import (
+	"encoding/csv"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -75,33 +77,46 @@ func TestDBSqliteAdd(t *testing.T) {
 	os.Remove(path)
 }
 
-// func TestDBSqliteRandom(t *testing.T) {
-// 	dba := NewDBAgent("../../storagesrv/bc_storagesrv.db", 0)
-// 	hashes := dba.GetTransactionwithRandom()
-// 	for _, h := range hashes {
-// 		var tr blockchain.Transaction
-// 		dba.GetTransaction(h, &tr)
-// 		assert.Equal(t, hex.EncodeToString(tr.Hash), h)
-// 	}
-// 	for i := 0; i < 100; i++ {
-// 		expdist := rand.ExpFloat64() / 0.5
-// 		log.Printf(", %v", expdist)
-// 	}
-// }
+func TestDBSqliteRandom(t *testing.T) {
+	dba := NewDBAgent("../../storagesrv/bc_dev.db", 0)
+	hashes := dba.GetTransactionwithRandom(50)
 
-func TestDBAgentReplicatoin(t *testing.T) {
-	path := "../../storagesrv/bc_dev.db"
-	if !assert.FileExistsf(t, path, "no file exist"){
-		return
+	csvfile, _ := os.Create("../../rs.csv")
+	csvwriter := csv.NewWriter(csvfile)
+
+	row := []string{"Hash", "Time"}
+	csvwriter.Write(row)
+	for _, h := range hashes {
+		var tr blockchain.Transaction
+		dba.GetTransaction(h, &tr)
+		log.Printf("timestamp : %v", tr.Timestamp)
+		row := []string{h, fmt.Sprintf("%v", tr.Timestamp)}
+		csvwriter.Write(row)
+		assert.Equal(t, h, hex.EncodeToString(tr.Hash))
 	}
 
-	dba := NewDBAgent(path, 0)
-	dba.ShowAllObjets()
-	dba.GetLatestBlockHash()
-	status := DBStatus{}
-	dba.GetDBStatus(&status)
-	log.Printf("DB Status : %v", status)
-	dba.GetDBDataSize()
+	csvwriter.Flush()
+	csvfile.Close()
+
+	// for i := 0; i < 100; i++ {
+	// 	expdist := rand.ExpFloat64() / 0.5
+	// 	log.Printf(", %v", expdist)
+	// }
+}
+
+func TestDBAgentReplicatoin(t *testing.T) {
+	// path := "../../storagesrv/bc_dev.db"
+	// if !assert.FileExistsf(t, path, "no file exist"){
+	// 	return
+	// }
+
+	// dba := NewDBAgent(path, 0)
+	// dba.ShowAllObjets()
+	// dba.GetLatestBlockHash()
+	// status := DBStatus{}
+	// dba.GetDBStatus(&status)
+	// log.Printf("DB Status : %v", status)
+	// dba.GetDBDataSize()
 
 	// hash1, _ := hex.DecodeString("0007c6e53cff577e2b87ea385541acb3872d10874eb3f2cc438b37c5f0683f93")
 	// obj1 := blockchain.Block{}

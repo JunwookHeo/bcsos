@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
@@ -246,6 +247,24 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Write json error : %v", err)
 		return
 	}
+}
+
+func (h *Handler) UpdateObjectbyAccessPattern() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			<-ticker.C
+			hashes := h.om.AccessWithRandom(10)
+			for _, hash := range hashes {
+				tr := h.getTransactionQuery(hash)
+				if tr != nil {
+					h.db.AddTransaction(tr)
+					log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+				}
+			}
+		}
+	}()
 }
 
 func (h *Handler) UpdateNeighbourNodes() {
