@@ -284,14 +284,26 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 
 	// Add block - transactions list in the table
 	a.AddBlockTransactionMatching(hash, 0, header_hash)
+	cnt := 0
 	for i, t := range b.Transactions {
 		a.AddBlockTransactionMatching(hash, i+1, hex.EncodeToString(t.Hash))
 		a.AddTransaction(t)
+		cnt++
 	}
 
 	// Add only block information without data, the data is stored in block-transaction matching table
 	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, int64(a.AFLevel), []byte{}}
-	return a.AddObject(&obj)
+	if id := a.AddObject(&obj); id != 0 {
+		status := DBStatus{}
+		if a.getLatestDBStatus(&status) {
+			status.TotalBlocks += 1
+			status.TotalTransactoins += cnt
+			a.updateDBStatus(&status)
+		}
+		return id
+	}
+
+	return 0
 }
 
 func (a *dbagent) ShowAllObjets() bool {
@@ -409,12 +421,10 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 		rows.Scan(&obj.Type, &size)
 		switch obj.Type {
 		case "block":
-			status.TotalBlocks += 1
 			status.Blocks += 1
 			status.Size += size
 			update = true
 		case "transaction":
-			status.TotalTransactoins += 1
 			status.Transactions += 1
 			status.Size += size
 			update = true
