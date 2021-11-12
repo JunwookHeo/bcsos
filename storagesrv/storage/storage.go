@@ -105,6 +105,7 @@ func (h *Handler) getTransactionHandler(w http.ResponseWriter, r *http.Request) 
 	if h.db.GetTransaction(hash, &transaction) == 0 {
 		log.Printf("Not having it, so request the transaction to other node")
 		transaction = *h.getTransactionQuery(hash)
+		go h.db.AddTransaction(&transaction)
 	}
 
 	ws.WriteJSON(transaction)
@@ -251,7 +252,7 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 	h.mutex.Lock()
 	nodes := []dtype.NodeInfo{}
 	for _, n := range h.nm.Neighbours {
-		nodes = append(nodes, n)
+		nodes = append(nodes, []dtype.NodeInfo{n}...)
 	}
 	h.mutex.Unlock()
 
@@ -263,11 +264,11 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateObjectbyAccessPattern() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(time.Duration(config.TIME_AP_GEN) * time.Second)
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			hashes := h.om.AccessWithRandom(10)
+			hashes := h.om.AccessWithRandom(config.NUM_AP_GEN)
 			for _, hash := range hashes {
 				tr := h.getTransactionQuery(hash)
 				if tr != nil {
@@ -284,7 +285,7 @@ func (h *Handler) UpdateObjectbyAccessPattern() {
 
 func (h *Handler) UpdateNeighbourNodes() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Second)
+		ticker := time.NewTicker(time.Duration(config.TIME_UPDATE_NEITHBOUR) * time.Second)
 		defer ticker.Stop()
 		for {
 			<-ticker.C

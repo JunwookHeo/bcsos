@@ -68,6 +68,8 @@ func (a *dbagent) RemoveObject(hash string) bool {
 }
 
 func (a *dbagent) updateACTimeObject(id int64) bool {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	st, err := a.db.Prepare("UPDATE bcobjects SET actime=?, aflevel=? WHERE id=?")
 	if err != nil {
 		log.Panicf("Update error id(%v) : %v", id, err)
