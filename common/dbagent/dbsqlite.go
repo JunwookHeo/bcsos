@@ -13,7 +13,8 @@ import (
 )
 
 type dbagent struct {
-	db *sql.DB
+	db      *sql.DB
+	AFLevel int
 }
 
 func (a *dbagent) Close() {
@@ -59,6 +60,7 @@ func (a *dbagent) RemoveObject(hash string) bool {
 }
 
 func (a *dbagent) updateACTimeObject(id int64) {
+	// TODO : Access Pattern
 	// obj.ACTime = time.Now().Unix()
 }
 
@@ -86,14 +88,14 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 		return id
 	}
 
-	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, actime, data) VALUES (?, ?, ?, ?, ?)")
+	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, actime, aflevel, data) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Prepare adding object error : %v", err)
 		return -1
 	}
 	obj.ACTime = time.Now().Unix()
 	data := serial.Serialize(obj.Data)
-	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, obj.ACTime, data)
+	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, obj.ACTime, obj.AFLevel, data)
 	if err != nil {
 		log.Panicf("Exec adding object error : %v", err)
 		return -1
@@ -103,6 +105,45 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 
 	// Update db status after adding object
 	a.updateAddDBStatus(id)
+	return id
+}
+
+func (a *dbagent) GetBlockTransactionMatching(bh string, hashes *[]string) int {
+	var th string
+	var index int64 = 0
+	rows, err := a.db.Query("SELECT idx, transactionhash FROM blocktrtbl WHERE blockhash=? ORDER BY idx ASC", bh)
+	if err != nil {
+		log.Printf("GetBlockTransactionMatching get transaction hashes error : %v", err)
+		return 0
+	}
+	defer rows.Close()
+
+	cnt := 0
+	for rows.Next() {
+		rows.Scan(&index, &th)
+		*hashes = append(*hashes, th)
+		cnt++
+		log.Printf("transactions : %d, %v", index, th)
+	}
+
+	return cnt
+}
+
+func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) int64 {
+	st, err := a.db.Prepare("INSERT INTO blocktrtbl (blockhash, idx, transactionhash) VALUES (?, ?, ?)")
+	if err != nil {
+		log.Printf("AddBlockTransactionMatching adding object error : %v", err)
+		return 0
+	}
+
+	rst, err := st.Exec(bh, index, th)
+	if err != nil {
+		log.Panicf("Exec adding object error : %v", err)
+		return 0
+	}
+
+	id, _ := rst.LastInsertId()
+
 	return id
 }
 
@@ -173,33 +214,41 @@ func (a *dbagent) getObjectCount(hash string) int {
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, int64(a.AFLevel), h}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, int64(a.AFLevel), h}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hash, t.Timestamp, 0, t}
+	obj := StorageObj{"transaction", hash, t.Timestamp, 0, int64(a.AFLevel), t}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, 0, t}
+	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, 0, int64(a.AFLevel), t}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
-	hashes := []string{}
-	obj := StorageObj{"block", hash, b.Header.Timestamp, 0, &hashes}
-	a.GetObject(&obj)
+	obj := StorageObj{}
+	obj.Type, obj.Hash = "block", hash
+	id := a.GetObject(&obj)
+	if id == 0 {
+		log.Printf("Not found block : %v", hash)
+		return 0
+	}
 
-	h := blockchain.BlockHeader{}
-	a.GetBlockHeader(hashes[0], &h)
-	b.Header = h
+	var hashes []string = []string{}
+	cnt := a.GetBlockTransactionMatching(hash, &hashes)
+	if cnt == 0 {
+		log.Printf("Not found matching transactions : %v", hash)
+		return 0
+	}
+	a.GetBlockHeader(hashes[0], &b.Header)
 
 	for i := 1; i < len(hashes); i++ {
 		tr := blockchain.Transaction{}
@@ -207,29 +256,30 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 		b.Transactions = append(b.Transactions, &tr)
 	}
 
-	return a.GetObject(&obj)
+	return id
 }
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
-	obj := StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, nil}
+	hash := hex.EncodeToString(b.Header.Hash)
+	obj := StorageObj{"block", hash, b.Header.Timestamp, 0, int64(a.AFLevel), nil}
 	if id := a.GetObject(&obj); id != 0 {
 		log.Printf("Replicatoin exists : %v - %v", id, hex.EncodeToString(b.Header.Hash))
 		return id
 	}
 
-	hash := b.Header.GetHash()
-	shash := hex.EncodeToString(hash[:])
-	a.AddBlockHeader(shash, &b.Header)
+	data := b.Header.GetHash()
+	header_hash := hex.EncodeToString(data[:])
+	a.AddBlockHeader(header_hash, &b.Header)
 
-	var hashes []string
-	hashes = append(hashes, shash)
-	for _, t := range b.Transactions {
-		if a.AddTransaction(t) > 0 {
-			hashes = append(hashes, hex.EncodeToString(t.Hash))
-		}
+	// Add block - transactions list in the table
+	a.AddBlockTransactionMatching(hash, 0, header_hash)
+	for i, t := range b.Transactions {
+		a.AddBlockTransactionMatching(hash, i+1, hex.EncodeToString(t.Hash))
+		a.AddTransaction(t)
 	}
 
-	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, hashes}
+	// Add only block information without data, the data is stored in block-transaction matching table
+	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, int64(a.AFLevel), []byte{}}
 	return a.AddObject(&obj)
 }
 
@@ -322,7 +372,7 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 		}
 	}
 
-	if update == true {
+	if update {
 		a.updateDBStatus(&status)
 	}
 }
@@ -366,7 +416,7 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 		}
 	}
 
-	if update == true {
+	if update {
 		a.updateDBStatus(&status)
 	}
 }
@@ -391,7 +441,7 @@ func (a *dbagent) GetDBStatus(status *DBStatus) bool {
 	return a.getLatestDBStatus(status)
 }
 
-func newDBSqlite(path string) DBAgent {
+func newDBSqlite(path string, afl int) DBAgent {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		log.Panicf("Open sqlite db error : %v", err)
@@ -403,10 +453,26 @@ func newDBSqlite(path string) DBAgent {
 		hash    	TEXT,
 		timestamp	INTEGER,
 		actime		INTEGER,
+		aflevel		INTEGER, 
 		data		BLOB
 	);`
 
 	st, err := db.Prepare(create_objtlb)
+	if err != nil {
+		log.Panicf("create_objtlb error %v", err)
+	}
+	st.Exec()
+
+	// block - transaction matching table
+	// idx : 0-th is header, n-th transaction string from 0
+	create_blocktrtbl := `CREATE TABLE IF NOT EXISTS blocktrtbl (
+		id      		INTEGER  PRIMARY KEY AUTOINCREMENT,
+		blockhash 		TEXT,
+		idx				INTEGER,
+		transactionhash TEXT
+	);`
+
+	st, err = db.Prepare(create_blocktrtbl)
 	if err != nil {
 		log.Panicf("create_objtlb error %v", err)
 	}
@@ -429,5 +495,5 @@ func newDBSqlite(path string) DBAgent {
 	}
 	st.Exec()
 
-	return &dbagent{db: db}
+	return &dbagent{db: db, AFLevel: afl}
 }

@@ -28,6 +28,7 @@ type StorageObj struct {
 	Hash      string
 	Timestamp int64
 	ACTime    int64
+	AFLevel   int64 // access frequency level
 	Data      interface{}
 }
 
@@ -42,6 +43,6 @@ type DBStatus struct {
 	Timestamp         time.Time
 }
 
-func NewDBAgent(path string) DBAgent {
-	return newDBSqlite(path)
+func NewDBAgent(path string, afl int) DBAgent {
+	return newDBSqlite(path, afl)
 }

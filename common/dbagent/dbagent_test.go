@@ -12,7 +12,7 @@ import (
 
 func TestDBSqlite(t *testing.T) {
 	path := "test1.db"
-	dba := NewDBAgent(path)
+	dba := NewDBAgent(path, 0)
 	assert.FileExists(t, path)
 	dba.Close()
 	os.Remove(path)
@@ -20,7 +20,7 @@ func TestDBSqlite(t *testing.T) {
 
 func TestDBSqliteAdd(t *testing.T) {
 	path := "test2.db"
-	dba := NewDBAgent(path)
+	dba := NewDBAgent(path, 0)
 	assert.FileExists(t, path)
 
 	crbl := func(pre string) *blockchain.Block {
@@ -76,7 +76,7 @@ func TestDBSqliteAdd(t *testing.T) {
 }
 
 // func TestDBSqliteRandom(t *testing.T) {
-// 	dba := NewDBAgent("../../storagesrv/bc_storagesrv.db")
+// 	dba := NewDBAgent("../../storagesrv/bc_storagesrv.db", 0)
 // 	hashes := dba.GetTransactionwithRandom()
 // 	for _, h := range hashes {
 // 		var tr blockchain.Transaction
@@ -90,7 +90,12 @@ func TestDBSqliteAdd(t *testing.T) {
 // }
 
 func TestDBAgentReplicatoin(t *testing.T) {
-	dba := NewDBAgent("../../storagesrv/bc_dev.db")
+	path := "../../storagesrv/bc_dev.db"
+	if !assert.FileExistsf(t, path, "no file exist"){
+		return
+	}
+
+	dba := NewDBAgent(path, 0)
 	dba.ShowAllObjets()
 	dba.GetLatestBlockHash()
 	status := DBStatus{}

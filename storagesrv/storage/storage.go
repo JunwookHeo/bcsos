@@ -265,7 +265,7 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
-		db:      dbagent.NewDBAgent(path),
+		db:      dbagent.NewDBAgent(path, local.SC),
 		sim:     dtype.Simulator{IP: "", Port: 0},
 		local:   local,
 		tmc:     nil,

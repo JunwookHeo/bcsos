@@ -164,7 +164,7 @@ func NewHandler(path string) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
-		db:      dbagent.NewDBAgent(path),
+		db:      dbagent.NewDBAgent(path, 100), // simulator use storage class 100
 		Nodes:   make(map[string]dtype.NodeInfo),
 		BCDummy: nil,
 		TC:      nil,
