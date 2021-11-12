@@ -248,10 +248,13 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("receive version : %v", version)
 
+	h.mutex.Lock()
 	nodes := []dtype.NodeInfo{}
 	for _, n := range h.nm.Neighbours {
 		nodes = append(nodes, n)
 	}
+	h.mutex.Unlock()
+
 	if err := ws.WriteJSON(nodes); err != nil {
 		log.Printf("Write json error : %v", err)
 		return

@@ -14,9 +14,10 @@ import (
 )
 
 type dbagent struct {
-	db      *sql.DB
-	AFLevel int
-	mutex   sync.Mutex
+	db       *sql.DB
+	AFLevel  int
+	dbstatus DBStatus
+	mutex    sync.Mutex
 }
 
 func (a *dbagent) Close() {
@@ -294,12 +295,10 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 	// Add only block information without data, the data is stored in block-transaction matching table
 	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, int64(a.AFLevel), []byte{}}
 	if id := a.AddObject(&obj); id != 0 {
-		status := DBStatus{}
-		if a.getLatestDBStatus(&status) {
-			status.TotalBlocks += 1
-			status.TotalTransactoins += cnt
-			a.updateDBStatus(&status)
-		}
+		status := &a.dbstatus
+		status.TotalBlocks += 1
+		status.TotalTransactoins += cnt
+		a.updateDBStatus(status)
 		return id
 	}
 
@@ -345,6 +344,8 @@ func (a *dbagent) GetDBDataSize() uint64 {
 }
 
 func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	rows, err := a.db.Query(`SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, overhead, timestamp 
 				FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
 	if err != nil {
@@ -372,12 +373,12 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 	}
 
 	defer rows.Close()
-	status := DBStatus{}
-	a.getLatestDBStatus(&status)
+
+	status := &a.dbstatus
 	update := false
 
 	for rows.Next() {
-		var obj StorageObj
+		obj := StorageObj{}
 		var size int
 		rows.Scan(&obj.Type, &size)
 		switch obj.Type {
@@ -399,7 +400,7 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 	}
 
 	if update {
-		a.updateDBStatus(&status)
+		a.updateDBStatus(status)
 	}
 }
 
@@ -411,8 +412,8 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 	}
 
 	defer rows.Close()
-	status := DBStatus{}
-	a.getLatestDBStatus(&status)
+
+	status := &a.dbstatus
 	update := false
 
 	for rows.Next() {
@@ -438,11 +439,13 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 	}
 
 	if update {
-		a.updateDBStatus(&status)
+		a.updateDBStatus(status)
 	}
 }
 
 func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, overhead, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?,  datetime('now'))")
 	if err != nil {
 		log.Printf("Prepare adding dbstatus error : %v", err)
@@ -459,12 +462,12 @@ func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
 	id, _ := rst.LastInsertId()
 	return id
 }
+
 func (a *dbagent) UpdateDBNetworkOverhead(qc int) {
-	var status DBStatus
 	if qc > 0 {
-		a.getLatestDBStatus(&status)
+		status := &a.dbstatus
 		status.Overhead += qc
-		a.updateDBStatus(&status)
+		a.updateDBStatus(status)
 	}
 
 }
@@ -534,5 +537,7 @@ func newDBSqlite(path string, afl int) DBAgent {
 
 	st.Exec()
 
-	return &dbagent{db: db, AFLevel: afl, mutex: sync.Mutex{}}
+	dba := dbagent{db: db, AFLevel: afl, dbstatus: DBStatus{}, mutex: sync.Mutex{}}
+	dba.getLatestDBStatus(&dba.dbstatus)
+	return &dba
 }
