@@ -22,6 +22,7 @@ type DBAgent interface {
 	GetTransactionwithRandom(num int) []string
 	GetTransactionwithTimeWeight() []string
 	DeleteNoAccedObject()
+	UpdateDBNetworkOverhead(qc int)
 }
 
 type StorageObj struct {
@@ -41,6 +42,7 @@ type DBStatus struct {
 	Blocks            int
 	Transactions      int
 	Size              int
+	Overhead          int // the number of additional query
 	Timestamp         time.Time
 }
 

@@ -1,9 +1,7 @@
 package dbagent
 
 import (
-	"encoding/csv"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -79,29 +77,24 @@ func TestDBSqliteAdd(t *testing.T) {
 
 func TestDBSqliteRandom(t *testing.T) {
 	dba := NewDBAgent("../../storagesrv/bc_dev.db", 0)
-	hashes := dba.GetTransactionwithRandom(50)
+	//hashes := dba.GetTransactionwithRandom(50)
+	dba.DeleteNoAccedObject()
+	// csvfile, _ := os.Create("../../rs.csv")
+	// csvwriter := csv.NewWriter(csvfile)
 
-	csvfile, _ := os.Create("../../rs.csv")
-	csvwriter := csv.NewWriter(csvfile)
-
-	row := []string{"Hash", "Time"}
-	csvwriter.Write(row)
-	for _, h := range hashes {
-		var tr blockchain.Transaction
-		dba.GetTransaction(h, &tr)
-		log.Printf("timestamp : %v", tr.Timestamp)
-		row := []string{h, fmt.Sprintf("%v", tr.Timestamp)}
-		csvwriter.Write(row)
-		assert.Equal(t, h, hex.EncodeToString(tr.Hash))
-	}
-
-	csvwriter.Flush()
-	csvfile.Close()
-
-	// for i := 0; i < 100; i++ {
-	// 	expdist := rand.ExpFloat64() / 0.5
-	// 	log.Printf(", %v", expdist)
+	// row := []string{"Hash", "Time"}
+	// csvwriter.Write(row)
+	// for _, h := range hashes {
+	// 	var tr blockchain.Transaction
+	// 	dba.GetTransaction(h, &tr)
+	// 	log.Printf("timestamp : %v", tr.Timestamp)
+	// 	row := []string{h, fmt.Sprintf("%v", tr.Timestamp)}
+	// 	csvwriter.Write(row)
+	// 	assert.Equal(t, h, hex.EncodeToString(tr.Hash))
 	// }
+
+	// csvwriter.Flush()
+	// csvfile.Close()
 }
 
 func TestDBAgentReplicatoin(t *testing.T) {

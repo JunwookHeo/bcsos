@@ -25,6 +25,6 @@ screen -dmS n7021 go run storagesrv.go -mode=pan -type=2 -port=7021
 screen -dmS n7022 go run storagesrv.go -mode=pan -type=2 -port=7022
 
 # Storage Class == 3
-screen -dmS n7033 go run storagesrv.go -mode=pan -type=3 -port=7033
+screen -dmS n7031 go run storagesrv.go -mode=pan -type=3 -port=7031
 
 screen -ls

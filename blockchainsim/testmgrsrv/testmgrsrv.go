@@ -53,8 +53,6 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	ws.WriteJSON(node)
 	log.Printf("From client : %v", node)
-	//TODO: n node connection
-	//h.Ready <- true
 }
 
 func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,11 +72,8 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Read json error : %v", err)
 				return
 			}
-			log.Printf("receive : %v", test)
-			if test.Start {
-				h.Ready = true
-				log.Printf("send ready : %v", h.Ready)
-			}
+			log.Printf("Test start/stop receive : %v", test)
+			h.UpdateTestStatus(test.Start)
 		}
 	}()
 
@@ -131,6 +126,11 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Write json error : %v", err)
 		return
 	}
+}
+
+func (h *Handler) UpdateTestStatus(ready bool) {
+	h.Ready = ready
+	h.BCDummy.Ready = ready
 }
 
 func (h *Handler) StartService(port int) {

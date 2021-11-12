@@ -6,11 +6,13 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/storagesrv/network"
@@ -25,6 +27,7 @@ type Handler struct {
 	tmc   *testmgrcli.TestMgrCli
 	nm    *network.NodeMgr
 	om    *ObjectMgr
+	mutex sync.Mutex
 }
 
 var upgrader = websocket.Upgrader{
@@ -38,11 +41,14 @@ func (h *Handler) Stop() {
 
 func (h *Handler) sortbyTypeNeighbourMap() *[]dtype.NodeInfo {
 	var nodes []dtype.NodeInfo
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 	for _, n := range h.nm.Neighbours {
 		if h.local.SC < n.SC {
 			nodes = append(nodes, n)
 		}
 	}
+
 	sort.Slice(nodes, func(i, j int) bool {
 		return nodes[i].SC < nodes[j].SC
 	})
@@ -92,11 +98,11 @@ func (h *Handler) getTransactionHandler(w http.ResponseWriter, r *http.Request) 
 	var hash string
 	if err := ws.ReadJSON(&hash); err != nil {
 		log.Printf("Read json error : %v", err)
+		return
 	}
 
-	var transaction blockchain.Transaction
+	transaction := blockchain.Transaction{}
 	if h.db.GetTransaction(hash, &transaction) == 0 {
-		// TODO:
 		log.Printf("Not having it, so request the transaction to other node")
 		transaction = *h.getTransactionQuery(hash)
 	}
@@ -118,6 +124,9 @@ func (h *Handler) getTransactionQuery(hash string) *blockchain.Transaction {
 			return nil
 		}
 		defer ws.Close()
+
+		// the number of query to other nodes
+		h.db.UpdateDBNetworkOverhead(1)
 
 		if err := ws.WriteJSON(hash); err != nil {
 			log.Printf("Write json error : %v", err)
@@ -232,14 +241,14 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	var version dtype.Version
+	version := dtype.Version{}
 	if err := ws.ReadJSON(&version); err != nil {
 		log.Printf("Read json error : %v", err)
 		return
 	}
 	log.Printf("receive version : %v", version)
 
-	var nodes []dtype.NodeInfo
+	nodes := []dtype.NodeInfo{}
 	for _, n := range h.nm.Neighbours {
 		nodes = append(nodes, n)
 	}
@@ -262,6 +271,9 @@ func (h *Handler) UpdateObjectbyAccessPattern() {
 					h.db.AddTransaction(tr)
 					log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
 				}
+			}
+			if h.local.SC < config.MAX_SC {
+				h.om.DeleteNoAccedObject()
 			}
 		}
 	}()
@@ -290,6 +302,7 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 		tmc:     nil,
 		nm:      nil,
 		om:      nil,
+		mutex:   sync.Mutex{},
 	}
 
 	h.tmc = testmgrcli.NewTMC(h.db, &h.sim, &h.local)
