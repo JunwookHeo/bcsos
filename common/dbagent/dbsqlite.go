@@ -368,7 +368,10 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 }
 
 func (a *dbagent) updateRemoveDBStatus(hash string) {
-	rows, err := a.db.Query("SELECT type, length(hash) + length(timestamp) + length(data) FROM bcobjects WHERE hash=?", hash)
+	// TODO: How to calculate the size of data
+	// Include meta data like timestamp
+	//rows, err := a.db.Query("SELECT type, length(hash) + length(timestamp) + length(data) FROM bcobjects WHERE hash=?", hash)
+	rows, err := a.db.Query("SELECT type, length(hash) + length(data) FROM bcobjects WHERE hash=?", hash)
 	if err != nil {
 		log.Printf("update remove db status error : %v", err)
 		return
@@ -407,7 +410,10 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 }
 
 func (a *dbagent) updateAddDBStatus(id int64) {
-	rows, err := a.db.Query("SELECT type, length(hash) + length(timestamp) + length(data) FROM bcobjects WHERE id=?", id)
+	// TODO: How to calculate the size of data
+	// Include meta data like timestamp
+	//rows, err := a.db.Query("SELECT type, length(hash) + length(timestamp) + length(data) FROM bcobjects WHERE id=?", id)
+	rows, err := a.db.Query("SELECT type, length(hash) + length(data) FROM bcobjects WHERE id=?", id)
 	if err != nil {
 		log.Printf("update remove db status error : %v", err)
 		return
@@ -519,6 +525,7 @@ func newDBSqlite(path string, afl int) DBAgent {
 
 	st.Exec()
 
+	// overhead : the number of queries to get deleted transactions
 	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
 		totalblocks			INTEGER,
