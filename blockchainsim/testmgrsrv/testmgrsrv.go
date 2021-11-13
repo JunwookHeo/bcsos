@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainsim/bcdummy"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 )
@@ -31,6 +33,7 @@ type Handler struct {
 	BCDummy *bcdummy.Handler
 	TC      *TestConfig
 	Ready   bool
+	mutex   sync.Mutex
 }
 
 func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,12 +52,16 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	ip := strings.Split(ws.RemoteAddr().String(), ":")
 	node.IP = ip[0]
+	h.mutex.Lock()
 	h.Nodes[node.Hash] = node
+	h.mutex.Unlock()
 
 	ws.WriteJSON(node)
 	log.Printf("From client : %v", node)
 }
 
+// Send nodes information connected to simulator.
+// Web app will receive the information
 func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
@@ -90,7 +97,7 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 					nodes = append(nodes, n)
 				}
 				sort.Slice(nodes, func(i, j int) bool {
-					return nodes[i].Hash < nodes[j].Hash
+					return nodes[i].SC < nodes[j].SC
 				})
 
 				if err := ws.WriteJSON(nodes); err != nil {
@@ -102,7 +109,7 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
-func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) pingHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -111,17 +118,18 @@ func (h *Handler) versionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	var version dtype.Version
-	if err := ws.ReadJSON(&version); err != nil {
+	peer := dtype.NodeInfo{}
+	if err := ws.ReadJSON(&peer); err != nil {
 		log.Printf("Read json error : %v", err)
 		return
 	}
-	log.Printf("receive version : %v", version)
+	log.Printf("receive peer : %v", peer)
 
 	var nodes []dtype.NodeInfo
 	for _, n := range h.Nodes {
 		nodes = append(nodes, n)
 	}
+
 	if err := ws.WriteJSON(nodes); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
@@ -164,17 +172,18 @@ func NewHandler(path string) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
-		db:      dbagent.NewDBAgent(path, 100), // simulator use storage class 100
+		db:      dbagent.NewDBAgent(path, config.SIM_SC), // simulator use storage class 100
 		Nodes:   make(map[string]dtype.NodeInfo),
 		BCDummy: nil,
 		TC:      nil,
 		Ready:   false,
+		mutex:   sync.Mutex{},
 	}
 
 	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/register", h.registerHandler)
 	m.HandleFunc("/nodes", h.nodesHandler)
-	m.HandleFunc("/version", h.versionHandler)
+	m.HandleFunc("/ping", h.pingHandler)
 
 	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
 	h.TC = NewTestConfig(h.db, &h.Nodes)

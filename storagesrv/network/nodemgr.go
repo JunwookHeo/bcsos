@@ -6,43 +6,32 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dtype"
 )
 
 type NodeMgr struct {
-	Neighbours []dtype.NodeInfo
-	mutex      sync.Mutex
+	scn   scnInfo //[]dtype.NodeInfo
+	mutex sync.Mutex
 }
 
-var version dtype.Version = dtype.Version{Ver: 1}
-
-func (n *NodeMgr) Synbc() bool {
-	return false
-}
-
-func (n *NodeMgr) Update(sim dtype.Simulator, local dtype.NodeInfo) {
-	checkVer := func(ip string, port int, hash string) {
-		url := fmt.Sprintf("ws://%v:%v/version", ip, port)
-		log.Printf("Update neighbour checking version : %v", url)
+// Update peers list
+func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
+	sendPing := func(node dtype.NodeInfo) {
+		url := fmt.Sprintf("ws://%v:%v/ping", node.IP, node.Port)
+		log.Printf("Send ping with local info : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
-
 		if err != nil {
-			if hash != "" {
-				n.mutex.Lock()
-				for i, nei := range n.Neighbours {
-					if nei.Hash == hash {
-						n.Neighbours = append(n.Neighbours[:i], n.Neighbours[i+1:]...)
-					}
-				}
-				n.mutex.Unlock()
-				log.Printf("Remove node because checking version error : %v", err)
+			if node.Hash != "" {
+				n.scn.DeleteSCNNode(node)
+				log.Printf("Remove node because ping error : %v", err)
 			}
 			return
 		}
 		defer ws.Close()
 
-		if err := ws.WriteJSON(version); err != nil {
+		if err := ws.WriteJSON(local); err != nil {
 			log.Printf("Write json error : %v", err)
 			return
 		}
@@ -52,43 +41,44 @@ func (n *NodeMgr) Update(sim dtype.Simulator, local dtype.NodeInfo) {
 			log.Printf("Read json error : %v", err)
 			return
 		}
-
+		//log.Printf("Read json nodes : %v", nodes)
 		for _, nh := range nodes {
-			if nh.Hash != local.Hash {
-				n.mutex.Lock()
-				find := false
-				for _, nn := range n.Neighbours {
-					if nh == nn {
-						find = true
-					}
-				}
-				if !find {
-					n.Neighbours = append(n.Neighbours, nh)
-				}
-				n.mutex.Unlock()
+			if nh.Hash != "" && nh.Hash != local.Hash {
+				n.scn.AddNSCNNode(nh)
 			}
 		}
-		// for _, nn := range n.Neighbours {
-		// 	log.Printf("Update neighbours : %v", nn)
-		// }
 	}
 
-	n.mutex.Lock()
-	neighbours := make([]dtype.NodeInfo, len(n.Neighbours))
-	copy(neighbours, n.Neighbours)
-	n.mutex.Unlock()
-
-	for _, node := range neighbours {
-		checkVer(node.IP, node.Port, node.Hash)
+	checked := false
+	for i := 0; i <= config.MAX_SC; i++ {
+		nodes := n.scn.GetSCNNodeList(i)
+		for _, node := range nodes {
+			sendPing(node)
+			checked = true
+		}
 	}
 
-	if len(neighbours) == 0 {
-		checkVer(sim.IP, sim.Port, "")
+	if !checked {
+		sendPing(sim)
 	}
+
+	n.scn.ShowSCNNodeList()
 }
 
-func NewNodeMgr() *NodeMgr {
-	nm := NodeMgr{Neighbours: []dtype.NodeInfo{}, mutex: sync.Mutex{}}
+func (n *NodeMgr) AddNSCNNode(node dtype.NodeInfo) {
+	n.scn.AddNSCNNode(node)
+}
+
+func (n *NodeMgr) GetSCNNodeListAll() []dtype.NodeInfo {
+	return n.scn.GetSCNNodeListAll()
+}
+
+func (n *NodeMgr) GetSCNNodeList(sc int) []dtype.NodeInfo {
+	return n.scn.GetSCNNodeList(sc)
+}
+
+func NewNodeMgr(local *dtype.NodeInfo) *NodeMgr {
+	nm := NodeMgr{scn: *NewSCNInfo(local), mutex: sync.Mutex{}}
 
 	return &nm
 }

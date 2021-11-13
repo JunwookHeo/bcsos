@@ -15,7 +15,7 @@ import (
 )
 
 type TestMgrCli struct {
-	sim   *dtype.Simulator
+	sim   *dtype.NodeInfo
 	local *dtype.NodeInfo
 	db    dbagent.DBAgent
 }
@@ -120,7 +120,7 @@ func (t *TestMgrCli) startResolver() {
 	<-ctx.Done()
 }
 
-func NewTMC(db dbagent.DBAgent, sim *dtype.Simulator, local *dtype.NodeInfo) *TestMgrCli {
+func NewTMC(db dbagent.DBAgent, sim *dtype.NodeInfo, local *dtype.NodeInfo) *TestMgrCli {
 	log.Println("start Testmgr Client")
 	tmc := TestMgrCli{sim: sim, local: local, db: db}
 	go tmc.startResolver()

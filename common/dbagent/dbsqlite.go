@@ -94,14 +94,14 @@ func (a *dbagent) GetObject(obj *StorageObj) int64 {
 	var id int64 = 0
 	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, actime, aflevel, data FROM bcobjects WHERE hash=?",
 		obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &obj.AFLevel, &data); err {
-	case sql.ErrNoRows:
-		log.Printf("Object Not found : %v", err)
+	// case sql.ErrNoRows:
+	// 	log.Printf("Object Not found : %v", err)
 	case nil:
 		serial.Deserialize(data, obj.Data)
 		a.updateACTimeObject(id)
 		return id
-	default:
-		log.Printf("Get object error : %v", err)
+		// default:
+		// 	log.Printf("Get object error : %v", err)
 	}
 
 	return id
@@ -187,7 +187,7 @@ func (a *dbagent) DeleteNoAccedObject() {
 	for rows.Next() {
 		var hash string
 		rows.Scan(&hash)
-		log.Printf("Delete no access transaction : %v", hash)
+		//log.Printf("Delete no access transaction : %v", hash)
 		go a.RemoveObject(hash)
 	}
 }
@@ -208,7 +208,7 @@ func (a *dbagent) GetTransactionwithRandom(num int) []string {
 		var hash string
 		rows.Scan(&hash)
 		hashes = append(hashes, hash)
-		log.Printf("Random choose hash : %v", hash)
+		// log.Printf("Random choose hash : %v", hash)
 	}
 
 	return hashes
