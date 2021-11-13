@@ -58,9 +58,9 @@ func (h *Handler) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 
 	h.db.AddBlock(&block)
 	// ws.WriteJSON(block)
-	for _, t := range block.Transactions {
-		log.Printf("From client : %s", t.Data)
-	}
+	// for _, t := range block.Transactions {
+	// 	log.Printf("From client : %s", t.Data)
+	// }
 }
 
 // getTransactionHandler is called when transaction query from other nodes is received
@@ -84,7 +84,7 @@ func (h *Handler) getTransactionHandler(w http.ResponseWriter, r *http.Request) 
 
 	transaction := blockchain.Transaction{}
 	if h.db.GetTransaction(hash, &transaction) == 0 {
-		log.Printf("Not having it, so request the transaction to other node")
+		// log.Printf("Not having it, so request the transaction to other node")
 		if h.getTransactionQuery(hash, &transaction) {
 			h.db.AddTransaction(&transaction)
 		}
@@ -261,7 +261,7 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 				tr := blockchain.Transaction{}
 				if h.getTransactionQuery(hash, &tr) {
 					h.db.AddTransaction(&tr)
-					log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+					// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
 				}
 			}
 			if h.local.SC < config.MAX_SC {
