@@ -26,7 +26,7 @@ func (t *Transaction) GetHash() []byte {
 }
 
 func CreateTransaction(d []byte) *Transaction {
-	t := Transaction{nil, time.Now().Unix(), d[:]}
+	t := Transaction{nil, time.Now().UnixNano(), d[:]}
 	t.Hash = t.GetHash()
 	return &t
 }

@@ -77,7 +77,7 @@ func (a *dbagent) updateACTimeObject(id int64) bool {
 	}
 	defer st.Close()
 
-	act := time.Now().Unix()
+	act := time.Now().UnixNano()
 	rst, err := st.Exec(act, a.AFLevel, id)
 	if err != nil {
 		log.Panicf("Update exec error id(%v): %v", id, err)
@@ -120,7 +120,7 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	}
 	defer st.Close()
 
-	obj.ACTime = time.Now().Unix()
+	obj.ACTime = time.Now().UnixNano()
 	data := serial.Serialize(obj.Data)
 	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, obj.ACTime, obj.AFLevel, data)
 	if err != nil {
@@ -177,7 +177,7 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 
 //DeleteNoAccedObject will delete transaction if there is no access more than a hour
 func (a *dbagent) DeleteNoAccedObject() {
-	ts := time.Now().Unix() - int64(config.T0SC0*(a.AFLevel+1)) // no access for if one hour, delete it
+	ts := time.Now().UnixNano() - int64(config.T0SC0*(a.AFLevel+1)) // no access for if one hour, delete it
 	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type = 'transaction' AND actime < ?`, ts)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)

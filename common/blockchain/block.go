@@ -23,7 +23,7 @@ type Block struct {
 }
 
 func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
-	h := BlockHeader{nil, prevhash, nil, time.Now().Unix(), 0, 0}
+	h := BlockHeader{nil, prevhash, nil, time.Now().UnixNano(), 0, 0}
 	block := &Block{h, trs}
 	block.Header.MerkleRoot = block.MerkleRoot()
 
