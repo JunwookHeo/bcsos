@@ -99,7 +99,7 @@ func (h *Handler) getTransactionHandler(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) getTransactionQuery(hash string, tr *blockchain.Transaction) bool {
 	queryTransaction := func(ip string, port int, hash string, tr *blockchain.Transaction) bool {
 		url := fmt.Sprintf("ws://%v:%v/gettransaction", ip, port)
-		log.Printf("getTransactionQuery : %v", url)
+		//log.Printf("getTransactionQuery : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
@@ -172,7 +172,7 @@ func (h *Handler) getBlockHeaderHandler(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) getBlockHeaderQuery(hash string, bh *blockchain.BlockHeader) bool {
 	queryBlockHeader := func(ip string, port int, hash string, bh *blockchain.BlockHeader) bool {
 		url := fmt.Sprintf("ws://%v:%v/getblockheader", ip, port)
-		log.Printf("getBlockHeaderQuery : %v", url)
+		//log.Printf("getBlockHeaderQuery : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
