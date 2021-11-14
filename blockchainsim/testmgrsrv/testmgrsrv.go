@@ -143,7 +143,7 @@ func (h *Handler) UpdateTestStatus(ready bool) {
 }
 
 func (h *Handler) StartService(port int) {
-	log.Println("starting http service...")
+	log.Printf("starting http service... : %v", port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), h.Handler); err != nil {
 		log.Fatal(err)
 	}

@@ -42,7 +42,11 @@ func (a *dbagent) GetLatestBlockHash() string {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&id, &dtype, &ts, &hash)
+		err := rows.Scan(&id, &dtype, &ts, &hash)
+		if err != nil {
+			log.Printf("Read rows Error : %v", err)
+			return hash
+		}
 		log.Printf("latest block : %d, %s, %v, %s", id, dtype, ts, hash)
 	}
 
@@ -71,20 +75,20 @@ func (a *dbagent) RemoveObject(hash string) bool {
 	return cnt > 0
 }
 
-func (a *dbagent) updateACTimeObject(id int64) bool {
+func (a *dbagent) updateACTimeObject(hash string) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare("UPDATE bcobjects SET actime=?, aflevel=? WHERE id=?")
+	st, err := a.db.Prepare("UPDATE blocktrtbl SET actime=?, aflevel=? WHERE transactionhash=?")
 	if err != nil {
-		log.Panicf("Update error id(%v) : %v", id, err)
+		log.Panicf("Update error id(%v) : %v", hash, err)
 		return false
 	}
 	defer st.Close()
 
 	act := time.Now().UnixNano()
-	rst, err := st.Exec(act, a.AFLevel, id)
+	rst, err := st.Exec(act, a.AFLevel, hash)
 	if err != nil {
-		log.Panicf("Update exec error id(%v): %v", id, err)
+		log.Panicf("Update exec error id(%v): %v", hash, err)
 		return false
 	}
 
@@ -96,16 +100,17 @@ func (a *dbagent) updateACTimeObject(id int64) bool {
 func (a *dbagent) GetObject(obj *StorageObj) int64 {
 	var data []byte
 	var id int64 = 0
-	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, actime, aflevel, data FROM bcobjects WHERE hash=?",
-		obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &obj.ACTime, &obj.AFLevel, &data); err {
-	// case sql.ErrNoRows:
-	// 	log.Printf("Object Not found : %v", err)
+	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, data FROM bcobjects WHERE hash=?",
+		obj.Hash).Scan(&id, &obj.Type, &obj.Hash, &obj.Timestamp, &data); err {
+	case sql.ErrNoRows:
+		//log.Printf("Object Not found : %v", err)
+		break
 	case nil:
 		serial.Deserialize(data, obj.Data)
-		a.updateACTimeObject(id)
+		a.updateACTimeObject(obj.Hash)
 		return id
-		// default:
-		// 	log.Printf("Get object error : %v", err)
+	default:
+		log.Printf("Get object error : %v", err)
 	}
 
 	return id
@@ -117,16 +122,15 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 		return id
 	}
 
-	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, actime, aflevel, data) VALUES (?, ?, ?, ?, ?, ?)")
+	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, data) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("Prepare adding object error : %v", err)
 		return -1
 	}
 	defer st.Close()
 
-	obj.ACTime = time.Now().UnixNano()
 	data := serial.Serialize(obj.Data)
-	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, obj.ACTime, obj.AFLevel, data)
+	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, data)
 	if err != nil {
 		log.Panicf("Exec adding object error : %v", err)
 		return -1
@@ -151,7 +155,11 @@ func (a *dbagent) GetBlockTransactionMatching(bh string, hashes *[]string) int {
 
 	cnt := 0
 	for rows.Next() {
-		rows.Scan(&index, &th)
+		err := rows.Scan(&index, &th)
+		if err != nil {
+			log.Printf("Read rows Error : %v", err)
+			return 0
+		}
 		*hashes = append(*hashes, th)
 		cnt++
 		log.Printf("transactions : %d, %v", index, th)
@@ -161,14 +169,15 @@ func (a *dbagent) GetBlockTransactionMatching(bh string, hashes *[]string) int {
 }
 
 func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) int64 {
-	st, err := a.db.Prepare("INSERT INTO blocktrtbl (blockhash, idx, transactionhash) VALUES (?, ?, ?)")
+	obj := StorageBLTR{bh, index, th, time.Now().UnixNano(), a.AFLevel}
+	st, err := a.db.Prepare("INSERT INTO blocktrtbl (blockhash, idx, transactionhash, actime, aflevel) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("AddBlockTransactionMatching adding object error : %v", err)
 		return 0
 	}
 	defer st.Close()
 
-	rst, err := st.Exec(bh, index, th)
+	rst, err := st.Exec(obj.Blockhash, obj.index, obj.Transactionhash, obj.ACTime, obj.AFLever)
 	if err != nil {
 		log.Panicf("Exec adding object error : %v", err)
 		return 0
@@ -183,7 +192,9 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 func (a *dbagent) DeleteNoAccedObjects() {
 	//log.Printf("%v", config.TSC0F)
 	ts := time.Now().UnixNano() - int64(config.TSC0F*(a.AFLevel+1)*1e9) // no access for if one hour, delete it
-	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type = 'transaction' AND actime < ?`, ts)
+	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE actime >= ? AND actime < ?;`, a.latestts, ts)
+	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type != 'block' AND hash 
+								IN (SELECT transactionhash FROM blocktrtbl WHERE actime < ?) LIMIT 50;`, ts)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return
@@ -195,20 +206,26 @@ func (a *dbagent) DeleteNoAccedObjects() {
 			break
 		}
 		var hash string
-		rows.Scan(&hash)
+		err := rows.Scan(&hash)
+		if err != nil {
+			log.Printf("Delete no access transaction error : %v", err)
+			return
+		}
 		//log.Printf("Delete no access transaction : %v", hash)
 		go a.RemoveObject(hash)
+
 		cnt++
 	}
 }
 
-func (a *dbagent) GetTransactionwithRandom(num int) []string {
-	hashes := []string{}
+func (a *dbagent) GetTransactionwithRandom(num int) *RemoverbleObj {
+	hashes := RemoverbleObj{}
 	// Randomly select 10 blocks in the ledger
-	rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
+	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
+	rows, err := a.db.Query(`SELECT idx, transactionhash FROM blocktrtbl ORDER BY RANDOM() LIMIT ?;`, num)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
-		return hashes
+		return &hashes
 	}
 
 	defer rows.Close()
@@ -216,64 +233,102 @@ func (a *dbagent) GetTransactionwithRandom(num int) []string {
 	// Select a transaction in each block
 	for rows.Next() {
 		var hash string
-		rows.Scan(&hash)
-		hashes = append(hashes, hash)
+		var idx int
+		err := rows.Scan(&idx, &hash)
+		if err != nil {
+			log.Printf("Read rows Error : %v", err)
+			return &hashes
+		}
+		if idx == 0 {
+			hashes.BlockHeaderHash = append(hashes.BlockHeaderHash, hash)
+		} else {
+			hashes.TransactionHash = append(hashes.TransactionHash, hash)
+		}
 		// log.Printf("Random choose hash : %v", hash)
 	}
 
-	return hashes
+	return &hashes
 }
 
-func (a *dbagent) GetTransactionwithTimeWeight(num int) []string {
+func (a *dbagent) GetTransactionwithTimeWeight(num int) *RemoverbleObj {
 	w := config.BASIC_UNIT_TIME * config.RATE_TSC0
 	ids := func(w int, umn int) string {
 		ids := []string{}
-		for i := 0; i < num; i++ {
+		cnt := 0
+		for {
+			if cnt > num {
+				break
+			}
+
 			f := rand.ExpFloat64() / float64(config.LAMBDA_ED)
 			l := int(f) * w
-			ids = append(ids, strconv.Itoa(l))
+			flg := false
+			for i := 0; i < cnt; i++ {
+				if ids[i] == strconv.Itoa(l) {
+					flg = true
+					break
+				}
+			}
+			if !flg {
+				ids = append(ids, strconv.Itoa(l))
+				cnt++
+			}
 		}
 		return strings.Join(ids, ", ")
 	}(w, num)
 
-	hashes := []string{}
-	select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by id desc) rownum 
-						from blocktrtbl where idx != 0) where rownum in (%s);`, ids)
+	//log.Printf("num : %v", ids)
+	hashes := RemoverbleObj{}
+	// select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by actime desc) rownum
+	// 					from blocktrtbl where idx != 0) where rownum in (%s) LIMIT 50;`, ids)
+	select_hashes := fmt.Sprintf(`SELECT idx, transactionhash FROM (SELECT *, row_number() OVER (ORDER BY actime desc) rownum 
+						FROM blocktrtbl) WHERE rownum IN (%s) LIMIT 50;`, ids)
 
 	//log.Printf("exponential items: %v", select_hashes)
 	rows, err := a.db.Query(select_hashes)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
-		return hashes
+		return &hashes
 	}
 
 	defer rows.Close()
 	for rows.Next() {
 		var hash string
-		rows.Scan(&hash)
-		hashes = append(hashes, hash)
+		var idx int
+		err := rows.Scan(&idx, &hash)
+		if err != nil {
+			log.Printf("Read rows Error : %v", err)
+			return &hashes
+		}
+		if idx == 0 {
+			hashes.BlockHeaderHash = append(hashes.BlockHeaderHash, hash)
+		} else {
+			hashes.TransactionHash = append(hashes.TransactionHash, hash)
+		}
+
 	}
-	//log.Printf("GetTransactionwithTimeWeight : %v", hashes)
-	return hashes
+	//log.Printf("GetTransactionwithTimeWeight : %v", hashes.BlockHeaderHash)
+	//log.Printf("GetTransactionwithTimeWeight : %v", hashes.TransactionHash)
+	return &hashes
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, int64(a.AFLevel), h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
-	obj := StorageObj{"blockheader", hash, h.Timestamp, 0, int64(a.AFLevel), h}
+	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hash, t.Timestamp, 0, int64(a.AFLevel), t}
+	obj := StorageObj{"transaction", hash, t.Timestamp, t}
 	return a.GetObject(&obj)
 }
 
 func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
-	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, 0, int64(a.AFLevel), t}
+	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, t}
 	return a.AddObject(&obj)
 }
 
@@ -305,7 +360,7 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 	hash := hex.EncodeToString(b.Header.Hash)
-	obj := StorageObj{"block", hash, b.Header.Timestamp, 0, int64(a.AFLevel), nil}
+	obj := StorageObj{"block", hash, b.Header.Timestamp, nil}
 	if id := a.GetObject(&obj); id != 0 {
 		log.Printf("Replicatoin exists : %v - %v", id, hex.EncodeToString(b.Header.Hash))
 		return id
@@ -325,7 +380,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 	}
 
 	// Add only block information without data, the data is stored in block-transaction matching table
-	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, 0, int64(a.AFLevel), []byte{}}
+	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, []byte{}}
 	if id := a.AddObject(&obj); id != 0 {
 		status := &a.dbstatus
 		status.TotalBlocks += 1
@@ -378,7 +433,7 @@ func (a *dbagent) GetDBDataSize() uint64 {
 func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	rows, err := a.db.Query(`SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, overhead, timestamp 
+	rows, err := a.db.Query(`SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, overheadfrom, overheadto, timestamp 
 				FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
@@ -389,7 +444,7 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 
 	for rows.Next() {
 		rows.Scan(&status.ID, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions,
-			&status.Size, &status.Overhead, &status.Timestamp)
+			&status.Size, &status.Overheadfrom, status.Overheadto, &status.Timestamp)
 		//log.Printf("DB Status : %v", status)
 		return true
 	}
@@ -484,34 +539,33 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, overhead, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?,  datetime('now'))")
+	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, overheadfrom, overheadto, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?,  datetime('now'))")
 	if err != nil {
 		log.Printf("Prepare adding dbstatus error : %v", err)
 		return -1
 	}
 	defer st.Close()
 
-	rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size, status.Overhead)
+	rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size, status.Overheadfrom, status.Overheadto)
 	if err != nil {
 		log.Panicf("Exec adding dbstatus error : %v", err)
 		return -1
 	}
 
 	id, _ := rst.LastInsertId()
+	status.ID = int(id)
 	return id
 }
 
-func (a *dbagent) UpdateDBNetworkOverhead(qc int) {
-	if qc > 0 {
-		status := &a.dbstatus
-		status.Overhead += qc
-		a.updateDBStatus(status)
-	}
-
+func (a *dbagent) UpdateDBNetworkOverhead(fromqc int, toqc int) {
+	status := &a.dbstatus
+	status.Overheadfrom += fromqc
+	status.Overheadto += toqc
+	a.updateDBStatus(status)
 }
 
-func (a *dbagent) GetDBStatus(status *DBStatus) bool {
-	return a.getLatestDBStatus(status)
+func (a *dbagent) GetDBStatus() *DBStatus {
+	return &a.dbstatus
 }
 
 func newDBSqlite(path string, afl int) DBAgent {
@@ -524,9 +578,7 @@ func newDBSqlite(path string, afl int) DBAgent {
 		id      	INTEGER  PRIMARY KEY AUTOINCREMENT,
 		type 		TEXT,
 		hash    	TEXT,
-		timestamp	INTEGER,
-		actime		INTEGER,
-		aflevel		INTEGER, 
+		timestamp	INTEGER,		
 		data		BLOB
 	);`
 
@@ -544,7 +596,9 @@ func newDBSqlite(path string, afl int) DBAgent {
 		id      		INTEGER  PRIMARY KEY AUTOINCREMENT,
 		blockhash 		TEXT,
 		idx				INTEGER,
-		transactionhash TEXT
+		transactionhash TEXT,
+		actime			INTEGER,
+		aflevel			INTEGER
 	);`
 
 	st, err = db.Prepare(create_blocktrtbl)
@@ -555,7 +609,8 @@ func newDBSqlite(path string, afl int) DBAgent {
 
 	st.Exec()
 
-	// overhead : the number of queries to get deleted transactions
+	// overheadfrom : the number of received queries to get deleted transactions
+	// overheadto : the number of send queries to get deleted transactions
 	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
 		totalblocks			INTEGER,
@@ -564,7 +619,8 @@ func newDBSqlite(path string, afl int) DBAgent {
 		blocks 				INTEGER,
 		transactions    	INTEGER,
 		size				INTEGER,
-		overhead			INTEGR,
+		overheadfrom		INTEGR,
+		overheadto			INTEGR,
 		timestamp			DATETIME
 	);`
 

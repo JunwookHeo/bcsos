@@ -36,12 +36,11 @@ func TestDBSqliteAdd(t *testing.T) {
 		return blockchain.CreateBlock(trs, nil)
 	}
 
-	status := DBStatus{}
-
 	dba.GetLatestBlockHash()
 	b1 := crbl("aaaaa-")
 	dba.AddBlock(b1)
-	dba.GetDBStatus(&status)
+	status := dba.GetDBStatus()
+	log.Println(status)
 	dba.GetLatestBlockHash()
 
 	hash := hex.EncodeToString(b1.Header.Hash)
@@ -54,19 +53,22 @@ func TestDBSqliteAdd(t *testing.T) {
 
 	b1 = crbl("bbbbb-")
 	dba.AddBlock(b1)
-	dba.GetDBStatus(&status)
+	status = dba.GetDBStatus()
+	log.Println(status)
 	dba.GetLatestBlockHash()
 	//dba.ShowAllObjets()
 
 	log.Println(dba.GetDBDataSize())
 	dba.RemoveObject(hex.EncodeToString(b2.Transactions[0].Hash))
-	dba.GetDBStatus(&status)
+	status = dba.GetDBStatus()
+	log.Println(status)
 	log.Println(dba.GetDBDataSize())
 	dba.RemoveObject(hex.EncodeToString(b2.Transactions[1].Hash))
-	dba.GetDBStatus(&status)
+	status = dba.GetDBStatus()
+	log.Println(status)
 	log.Println(dba.GetDBDataSize())
 	dba.RemoveObject(hex.EncodeToString(b2.Transactions[2].Hash))
-	dba.GetDBStatus(&status)
+	status = dba.GetDBStatus()
 	log.Println(dba.GetDBDataSize())
 	log.Println(status)
 

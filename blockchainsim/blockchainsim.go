@@ -10,7 +10,7 @@ import (
 )
 
 const DB_PATH = "./bc_dummy.db"
-const PORT = 8082
+const PORT = 8080
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)

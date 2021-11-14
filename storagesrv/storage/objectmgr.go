@@ -13,28 +13,41 @@ func (c *ObjectMgr) DeleteNoAccedObjects() {
 	c.db.DeleteNoAccedObjects()
 }
 
-func (c *ObjectMgr) AccessWithRandom(num int) []string {
+func (c *ObjectMgr) AccessWithRandom(num int) *dbagent.RemoverbleObj {
 	hashes := c.db.GetTransactionwithRandom(num)
-	var rethashes []string
-	for _, hash := range hashes {
+	rethashes := dbagent.RemoverbleObj{}
+	for _, hash := range hashes.TransactionHash {
 		var tr blockchain.Transaction
 		if c.db.GetTransaction(hash, &tr) == 0 {
-			rethashes = append(rethashes, hash)
+			rethashes.TransactionHash = append(rethashes.TransactionHash, hash)
 		}
 	}
-	return rethashes
+
+	for _, hash := range hashes.BlockHeaderHash {
+		var bh blockchain.BlockHeader
+		if c.db.GetBlockHeader(hash, &bh) == 0 {
+			rethashes.BlockHeaderHash = append(rethashes.BlockHeaderHash, hash)
+		}
+	}
+	return &rethashes
 }
 
-func (c *ObjectMgr) AccessWithTimeWeight(num int) []string {
+func (c *ObjectMgr) AccessWithTimeWeight(num int) *dbagent.RemoverbleObj {
 	hashes := c.db.GetTransactionwithTimeWeight(num)
-	var rethashes []string
-	for _, hash := range hashes {
+	rethashes := dbagent.RemoverbleObj{}
+	for _, hash := range hashes.TransactionHash {
 		var tr blockchain.Transaction
 		if c.db.GetTransaction(hash, &tr) == 0 {
-			rethashes = append(rethashes, hash)
+			rethashes.TransactionHash = append(rethashes.TransactionHash, hash)
 		}
 	}
-	return rethashes
+	for _, hash := range hashes.BlockHeaderHash {
+		var bh blockchain.BlockHeader
+		if c.db.GetBlockHeader(hash, &bh) == 0 {
+			rethashes.BlockHeaderHash = append(rethashes.BlockHeaderHash, hash)
+		}
+	}
+	return &rethashes
 }
 
 func NewObjMgr(db dbagent.DBAgent) *ObjectMgr {

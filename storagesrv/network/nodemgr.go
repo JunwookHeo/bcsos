@@ -19,7 +19,7 @@ type NodeMgr struct {
 func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
 	sendPing := func(node dtype.NodeInfo) {
 		url := fmt.Sprintf("ws://%v:%v/ping", node.IP, node.Port)
-		log.Printf("Send ping with local info : %v", url)
+		//log.Printf("Send ping with local info : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
@@ -62,7 +62,7 @@ func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
 		sendPing(sim)
 	}
 
-	n.scn.ShowSCNNodeList()
+	//n.scn.ShowSCNNodeList()
 }
 
 func (n *NodeMgr) AddNSCNNode(node dtype.NodeInfo) {

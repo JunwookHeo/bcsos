@@ -22,7 +22,7 @@ const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
 //   0.2     3.45
 //   0.1     6.9
 // The basic unit of time (T)
-const BASIC_UNIT_TIME int = 60 // 60 seconds
+const BASIC_UNIT_TIME int = 5 // 60 // 60 seconds
 const HALF_PROBABILITY_FACTOR float32 = 0.69
 
 // Time period for Remove data : T x TSC0

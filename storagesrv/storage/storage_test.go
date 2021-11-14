@@ -13,7 +13,6 @@ func TestDBAgent(t *testing.T) {
 	dba := dbagent.NewDBAgent(DB_PATH_TEST, 0)
 	dba.ShowAllObjets()
 	dba.GetLatestBlockHash()
-	status := dbagent.DBStatus{}
-	dba.GetDBStatus(&status)
+	status := dba.GetDBStatus()
 	log.Printf("DB Status : %v", status)
 }

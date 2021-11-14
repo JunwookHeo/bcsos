@@ -18,22 +18,27 @@ type DBAgent interface {
 	GetBlock(hash string, b *blockchain.Block) int64
 	ShowAllObjets() bool
 	GetDBDataSize() uint64
-	GetDBStatus(status *DBStatus) bool
-	GetTransactionwithRandom(num int) []string
-	GetTransactionwithTimeWeight(num int) []string
+	GetDBStatus() *DBStatus
+	GetTransactionwithRandom(num int) *RemoverbleObj
+	GetTransactionwithTimeWeight(num int) *RemoverbleObj
 	DeleteNoAccedObjects()
-	UpdateDBNetworkOverhead(qc int)
+	UpdateDBNetworkOverhead(fromqc int, toqc int)
 }
 
 type StorageObj struct {
 	Type      string
 	Hash      string
 	Timestamp int64
-	ACTime    int64
-	AFLevel   int64 // access frequency level
 	Data      interface{}
 }
 
+type StorageBLTR struct {
+	Blockhash       string
+	index           int
+	Transactionhash string
+	ACTime          int64
+	AFLever         int
+}
 type DBStatus struct {
 	ID                int
 	TotalBlocks       int
@@ -42,8 +47,14 @@ type DBStatus struct {
 	Blocks            int
 	Transactions      int
 	Size              int
-	Overhead          int // the number of additional query
+	Overheadfrom      int // the number of received query
+	Overheadto        int // the number of send query
 	Timestamp         time.Time
+}
+
+type RemoverbleObj struct {
+	BlockHeaderHash []string
+	TransactionHash []string
 }
 
 func NewDBAgent(path string, afl int) DBAgent {

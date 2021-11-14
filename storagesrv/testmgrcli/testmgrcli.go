@@ -73,8 +73,8 @@ func (t *TestMgrCli) NodeInfoHandler(ws *websocket.Conn, w http.ResponseWriter, 
 			case <-done:
 				return
 			case <-ticker.C:
-				var status dbagent.DBStatus
-				t.db.GetDBStatus(&status)
+				//var status dbagent.DBStatus
+				status := t.db.GetDBStatus()
 				if err := ws.WriteJSON(status); err != nil {
 					log.Printf("Write json error : %v", err)
 					return
