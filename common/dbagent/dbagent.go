@@ -20,8 +20,8 @@ type DBAgent interface {
 	GetDBDataSize() uint64
 	GetDBStatus(status *DBStatus) bool
 	GetTransactionwithRandom(num int) []string
-	GetTransactionwithTimeWeight() []string
-	DeleteNoAccedObject()
+	GetTransactionwithTimeWeight(num int) []string
+	DeleteNoAccedObjects()
 	UpdateDBNetworkOverhead(qc int)
 }
 

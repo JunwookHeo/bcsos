@@ -3,7 +3,11 @@ package dbagent
 import (
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"math/rand"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -175,20 +179,26 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 	return id
 }
 
-//DeleteNoAccedObject will delete transaction if there is no access more than a hour
-func (a *dbagent) DeleteNoAccedObject() {
-	ts := time.Now().UnixNano() - int64(config.T0SC0*(a.AFLevel+1)) // no access for if one hour, delete it
+//DeleteNoAccedObjects will delete transaction if there is no access more than a hour
+func (a *dbagent) DeleteNoAccedObjects() {
+	//log.Printf("%v", config.TSC0F)
+	ts := time.Now().UnixNano() - int64(config.TSC0F*(a.AFLevel+1)*1e9) // no access for if one hour, delete it
 	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type = 'transaction' AND actime < ?`, ts)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return
 	}
 	defer rows.Close()
+	cnt := 0
 	for rows.Next() {
+		if cnt > 50 {
+			break
+		}
 		var hash string
 		rows.Scan(&hash)
 		//log.Printf("Delete no access transaction : %v", hash)
 		go a.RemoveObject(hash)
+		cnt++
 	}
 }
 
@@ -214,16 +224,36 @@ func (a *dbagent) GetTransactionwithRandom(num int) []string {
 	return hashes
 }
 
-func (a *dbagent) GetTransactionwithTimeWeight() []string {
+func (a *dbagent) GetTransactionwithTimeWeight(num int) []string {
+	w := config.BASIC_UNIT_TIME * config.RATE_TSC0
+	ids := func(w int, umn int) string {
+		ids := []string{}
+		for i := 0; i < num; i++ {
+			f := rand.ExpFloat64() / float64(config.LAMBDA_ED)
+			l := int(f) * w
+			ids = append(ids, strconv.Itoa(l))
+		}
+		return strings.Join(ids, ", ")
+	}(w, num)
+
 	hashes := []string{}
-	var mid int64
-	// Randomly select 10 blocks in the ledger
-	err := a.db.QueryRow(`SELECT timestamp FROM dbstatus WHERE MIN(id);`).Scan(&mid)
+	select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by id desc) rownum 
+						from blocktrtbl where idx != 0) where rownum in (%s);`, ids)
+
+	//log.Printf("exponential items: %v", select_hashes)
+	rows, err := a.db.Query(select_hashes)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return hashes
 	}
-	//log.Printf("hash : %v", hashes)
+
+	defer rows.Close()
+	for rows.Next() {
+		var hash string
+		rows.Scan(&hash)
+		hashes = append(hashes, hash)
+	}
+	//log.Printf("GetTransactionwithTimeWeight : %v", hashes)
 	return hashes
 }
 

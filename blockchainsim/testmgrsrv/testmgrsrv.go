@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -180,7 +181,12 @@ func NewHandler(path string) *Handler {
 		mutex:   sync.Mutex{},
 	}
 
-	m.Handle("/", http.FileServer(http.Dir("static")))
+	//m.Handle("/", http.FileServer(http.Dir("./static")))
+	fs := http.FileServer(http.Dir("./static"))
+	m.Handle("/", fs)
+	m.Handle("/left.html", fs)
+	m.Handle("/right.html", fs)
+
 	m.HandleFunc("/register", h.registerHandler)
 	m.HandleFunc("/nodes", h.nodesHandler)
 	m.HandleFunc("/ping", h.pingHandler)
@@ -191,4 +197,12 @@ func NewHandler(path string) *Handler {
 	go h.StartDummy()
 
 	return h
+}
+
+func Home(w http.ResponseWriter, r *http.Request) {
+	t, _ := template.ParseFiles("/")
+	err := t.Execute(w, nil)
+	if err != nil {
+		log.Printf("%v", err)
+	}
 }

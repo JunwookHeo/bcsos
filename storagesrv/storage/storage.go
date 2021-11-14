@@ -255,7 +255,14 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			hashes := h.om.AccessWithRandom(config.NUM_AP_GEN)
+			hashes := []string{}
+
+			if config.ACCESS_FREQUENCY_PATTERN == config.RANDOM_ACCESS_PATTERN {
+				hashes = h.om.AccessWithRandom(config.NUM_AP_GEN)
+			} else {
+				hashes = h.om.AccessWithTimeWeight(config.NUM_AP_GEN)
+			}
+
 			for _, hash := range hashes {
 				tr := blockchain.Transaction{}
 				if h.getTransactionQuery(hash, &tr) {
@@ -264,7 +271,7 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 				}
 			}
 			if h.local.SC < config.MAX_SC {
-				h.om.DeleteNoAccedObject()
+				h.om.DeleteNoAccedObjects()
 			}
 		}
 	}()

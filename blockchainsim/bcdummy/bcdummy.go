@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 )
@@ -58,20 +59,28 @@ func (h *Handler) Start() {
 		b := blockchain.CreateGenesis()
 		h.db.AddBlock(b)
 		h.broadcastNewBlock(b)
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
 	}
 
 	msg := make(chan string)
 	go LoadRawdata(PATH, msg)
 
-	ticker := time.NewTicker(5 * time.Second)
+	num_tr := func() int {
+		if 0 < config.NUM_TRANSACTION_BLOCK {
+			return config.NUM_TRANSACTION_BLOCK
+		} else {
+			return rand.Intn(3) + 3
+		}
+	}()
+
+	ticker := time.NewTicker(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
 		if h.Ready {
-			num := rand.Intn(3) + 1
+
 			var trs []*blockchain.Transaction
-			for i := 0; i < num; i++ {
+			for i := 0; i < num_tr; i++ {
 				d := <-msg
 				log.Printf("==>%s", d)
 				tr := blockchain.CreateTransaction([]byte(d))
