@@ -21,6 +21,14 @@ const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
 //   0.5     1.38
 //   0.2     3.45
 //   0.1     6.9
+/////////////////////////////////////////////////
+// P	Lambda	Time
+// 0.5	0.1		6.931471806
+// 0.6	0.1		9.162907319
+// 0.7	0.1		12.03972804
+// 0.8	0.1		16.09437912
+// 0.9	0.1		23.02585093
+
 // The basic unit of time (T)
 const BASIC_UNIT_TIME int = 5 // 60 // 60 seconds
 const HALF_PROBABILITY_FACTOR float32 = 0.69

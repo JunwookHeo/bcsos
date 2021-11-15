@@ -54,7 +54,7 @@ func (a *dbagent) GetLatestBlockHash() string {
 }
 
 func (a *dbagent) RemoveObject(hash string) bool {
-	// Before removing data, update status first.
+	//Before removing data, update status first.
 	a.updateRemoveDBStatus(hash)
 
 	a.mutex.Lock()
@@ -70,10 +70,38 @@ func (a *dbagent) RemoveObject(hash string) bool {
 	rst, err := st.Exec(hash)
 	if err != nil {
 		log.Printf("Exec removing object error : %v", err)
+		return false
 	}
 	cnt, _ := rst.RowsAffected()
 	return cnt > 0
 }
+
+// func (a *dbagent) RemoveObjectMultiple(hashes []string) bool {
+// 	//Before removing data, update status first.
+// 	//a.updateRemoveDBStatus(hash)
+// 	hashes_str := ""
+// 	hashes_str += fmt.Sprintf("\"%s\"", strings.Join(hashes, `", "`))
+
+// 	a.mutex.Lock()
+// 	defer a.mutex.Unlock()
+// 	delete_strings := fmt.Sprintf("DELETE FROM bcobjects WHERE hash IN (%v);", hashes_str)
+// 	//log.Printf("delete : %v", delete_strings)
+// 	st, err := a.db.Prepare(delete_strings)
+// 	if err != nil {
+// 		log.Printf("Preparing removig object error : %v", err)
+// 		return false
+// 	}
+// 	defer st.Close()
+
+// 	rst, err := st.Exec()
+// 	if err != nil {
+// 		log.Printf("Exec removing object error : %v", err)
+// 		return false
+// 	}
+// 	cnt, _ := rst.RowsAffected()
+// 	log.Printf("delete multiple : %v", cnt)
+// 	return cnt > 0
+// }
 
 func (a *dbagent) updateACTimeObject(hash string) bool {
 	a.mutex.Lock()
@@ -199,12 +227,9 @@ func (a *dbagent) DeleteNoAccedObjects() {
 		log.Printf("Object Not found : %v", err)
 		return
 	}
+
 	defer rows.Close()
-	cnt := 0
 	for rows.Next() {
-		if cnt > 50 {
-			break
-		}
 		var hash string
 		err := rows.Scan(&hash)
 		if err != nil {
@@ -213,13 +238,11 @@ func (a *dbagent) DeleteNoAccedObjects() {
 		}
 		//log.Printf("Delete no access transaction : %v", hash)
 		go a.RemoveObject(hash)
-
-		cnt++
 	}
 }
 
-func (a *dbagent) GetTransactionwithRandom(num int) *RemoverbleObj {
-	hashes := RemoverbleObj{}
+func (a *dbagent) GetTransactionwithRandom(num int) *[]RemoverbleObj {
+	hashes := []RemoverbleObj{}
 	// Randomly select 10 blocks in the ledger
 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
 	rows, err := a.db.Query(`SELECT idx, transactionhash FROM blocktrtbl ORDER BY RANDOM() LIMIT ?;`, num)
@@ -239,18 +262,14 @@ func (a *dbagent) GetTransactionwithRandom(num int) *RemoverbleObj {
 			log.Printf("Read rows Error : %v", err)
 			return &hashes
 		}
-		if idx == 0 {
-			hashes.BlockHeaderHash = append(hashes.BlockHeaderHash, hash)
-		} else {
-			hashes.TransactionHash = append(hashes.TransactionHash, hash)
-		}
+		hashes = append(hashes, RemoverbleObj{idx, hash})
 		// log.Printf("Random choose hash : %v", hash)
 	}
 
 	return &hashes
 }
 
-func (a *dbagent) GetTransactionwithTimeWeight(num int) *RemoverbleObj {
+func (a *dbagent) GetTransactionwithTimeWeight(num int) *[]RemoverbleObj {
 	w := config.BASIC_UNIT_TIME * config.RATE_TSC0
 	ids := func(w int, umn int) string {
 		ids := []string{}
@@ -278,7 +297,7 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int) *RemoverbleObj {
 	}(w, num)
 
 	//log.Printf("num : %v", ids)
-	hashes := RemoverbleObj{}
+	hashes := []RemoverbleObj{}
 	// select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by actime desc) rownum
 	// 					from blocktrtbl where idx != 0) where rownum in (%s) LIMIT 50;`, ids)
 	select_hashes := fmt.Sprintf(`SELECT idx, transactionhash FROM (SELECT *, row_number() OVER (ORDER BY actime desc) rownum 
@@ -300,15 +319,9 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int) *RemoverbleObj {
 			log.Printf("Read rows Error : %v", err)
 			return &hashes
 		}
-		if idx == 0 {
-			hashes.BlockHeaderHash = append(hashes.BlockHeaderHash, hash)
-		} else {
-			hashes.TransactionHash = append(hashes.TransactionHash, hash)
-		}
-
+		hashes = append(hashes, RemoverbleObj{idx, hash})
 	}
-	//log.Printf("GetTransactionwithTimeWeight : %v", hashes.BlockHeaderHash)
-	//log.Printf("GetTransactionwithTimeWeight : %v", hashes.TransactionHash)
+	//log.Printf("GetTransactionwithTimeWeight : %v", hashes)
 	return &hashes
 }
 

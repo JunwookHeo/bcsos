@@ -155,12 +155,13 @@ func (h *Handler) getBlockHeaderHandler(w http.ResponseWriter, r *http.Request) 
 		log.Printf("Read json error : %v", err)
 	}
 
-	var bh blockchain.BlockHeader
+	bh := blockchain.BlockHeader{}
 	if h.db.GetBlockHeader(hash, &bh) == 0 {
 		// TODO:
 		//log.Printf("Not having it, so request the transaction to other node")
-		bh := blockchain.BlockHeader{}
-		h.getBlockHeaderQuery(hash, &bh)
+		if h.getBlockHeaderQuery(hash, &bh) {
+			h.db.AddBlockHeader(string(bh.Hash), &bh)
+		}
 	}
 
 	ws.WriteJSON(bh)
@@ -256,7 +257,7 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			var hashes *dbagent.RemoverbleObj
+			hashes := &[]dbagent.RemoverbleObj{}
 
 			if config.ACCESS_FREQUENCY_PATTERN == config.RANDOM_ACCESS_PATTERN {
 				hashes = h.om.AccessWithRandom(config.NUM_AP_GEN)
@@ -264,25 +265,27 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 				hashes = h.om.AccessWithTimeWeight(config.NUM_AP_GEN)
 			}
 
-			for _, hash := range hashes.TransactionHash {
-				tr := blockchain.Transaction{}
-				if h.getTransactionQuery(hash, &tr) {
-					h.db.AddTransaction(&tr)
-					// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+			for _, hash := range *hashes {
+				if hash.HashType == 0 {
+					bh := blockchain.BlockHeader{}
+					if h.getBlockHeaderQuery(hash.Hash, &bh) {
+						h.db.AddBlockHeader(hash.Hash, &bh)
+						// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+					}
+				} else {
+					tr := blockchain.Transaction{}
+					if h.getTransactionQuery(hash.Hash, &tr) {
+						h.db.AddTransaction(&tr)
+						// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+					}
 				}
 			}
-			for _, hash := range hashes.BlockHeaderHash {
-				bh := blockchain.BlockHeader{}
-				if h.getBlockHeaderQuery(hash, &bh) {
-					h.db.AddBlockHeader(hash, &bh)
-					// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
-				}
-			}
+
 			if h.local.SC < config.MAX_SC {
 				h.om.DeleteNoAccedObjects()
 			}
 			status := h.om.db.GetDBStatus()
-			log.Printf("Status : %v", *status)
+			log.Printf("Status : %v", status)
 		}
 	}()
 }

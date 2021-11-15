@@ -19,8 +19,8 @@ type DBAgent interface {
 	ShowAllObjets() bool
 	GetDBDataSize() uint64
 	GetDBStatus() *DBStatus
-	GetTransactionwithRandom(num int) *RemoverbleObj
-	GetTransactionwithTimeWeight(num int) *RemoverbleObj
+	GetTransactionwithRandom(num int) *[]RemoverbleObj
+	GetTransactionwithTimeWeight(num int) *[]RemoverbleObj
 	DeleteNoAccedObjects()
 	UpdateDBNetworkOverhead(fromqc int, toqc int)
 }
@@ -53,8 +53,8 @@ type DBStatus struct {
 }
 
 type RemoverbleObj struct {
-	BlockHeaderHash []string
-	TransactionHash []string
+	HashType int // blockheader == 0 otherwise transaction
+	Hash     string
 }
 
 func NewDBAgent(path string, afl int) DBAgent {
