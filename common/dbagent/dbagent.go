@@ -19,8 +19,8 @@ type DBAgent interface {
 	ShowAllObjets() bool
 	GetDBDataSize() uint64
 	GetDBStatus() *DBStatus
-	GetTransactionwithRandom(num int) *[]RemoverbleObj
-	GetTransactionwithTimeWeight(num int) *[]RemoverbleObj
+	GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool
+	GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj) bool
 	DeleteNoAccedObjects()
 	UpdateDBNetworkOverhead(fromqc int, toqc int)
 }

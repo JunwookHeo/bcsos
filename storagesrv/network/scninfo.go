@@ -46,10 +46,6 @@ func NewSCNInfo(l *dtype.NodeInfo) *scnInfo {
 	return &scn
 }
 
-// func (c *scnInfo) newSCNNode(n dtype.NodeInfo) *scnNode {
-// 	return &scnNode{nil, nil, n}
-// }
-
 func zeroNode() dtype.NodeInfo {
 	return dtype.NodeInfo{Mode: "", SC: 0, IP: "", Port: 0, Hash: ""}
 }
@@ -84,55 +80,24 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 
 	switch pos {
 	case 0:
-		c.scnodes[n.SC] = append([]dtype.NodeInfo{n}, c.scnodes[n.SC][1:]...)
+		//c.scnodes[n.SC] = append([]dtype.NodeInfo{n}, c.scnodes[n.SC][1:]...)
+		for i := config.MAX_SC_PEER - 1; 0 < i; i-- {
+			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
+		}
+		c.scnodes[n.SC][0] = n
 	case config.MAX_SC_PEER - 1:
 		c.scnodes[n.SC][pos] = n
 	case config.MAX_SC_PEER:
 		break
 	default:
-		tmp := append([]dtype.NodeInfo{n}, c.scnodes[n.SC][pos+1:]...)
-		c.scnodes[n.SC] = append(c.scnodes[n.SC][:pos], tmp...)
+		//tmp := append([]dtype.NodeInfo{n}, c.scnodes[n.SC][pos+1:]...)
+		//c.scnodes[n.SC] = append(c.scnodes[n.SC][:pos], tmp...)
+		for i := config.MAX_SC_PEER - 1; pos < i; i-- {
+			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
+		}
+		c.scnodes[n.SC][pos] = n
 
 	}
-
-	// sl := &c.scnodes[n.SC]
-	// if sl.header == nil {
-	// 	sl.header = c.newSCNNode(n)
-	// 	sl.count = 1
-	// 	return
-	// } else {
-	// 	cur := sl.header
-	// 	pre := (*scnNode)(nil)
-	// 	d1 := xordistance(c.local.Hash, n.Hash)
-	// 	for {
-	// 		if cur.node.Hash == n.Hash {
-	// 			return
-	// 		}
-
-	// 		d2 := xordistance(c.local.Hash, cur.node.Hash)
-	// 		if d1.Cmp(d2) < 0 { // if new node is closer than cur node, insert new node
-	// 			item := c.newSCNNode(n)
-	// 			item.next = cur
-	// 			item.pre = pre
-	// 			cur.pre = item
-	// 			if pre == nil {
-	// 				sl.header = item
-	// 			} else {
-	// 				pre.next = item
-	// 			}
-	// 			sl.count++
-	// 			return
-	// 		} else if cur.next == nil { // new node has the largest distance
-	// 			item := c.newSCNNode(n)
-	// 			cur.next = item
-	// 			item.pre = cur
-	// 			sl.count++
-	// 			return
-	// 		}
-	// 		cur = cur.next
-	// 		pre = cur
-	// 	}
-	// }
 }
 
 func (c *scnInfo) DeleteSCNNode(n dtype.NodeInfo) {
@@ -151,103 +116,61 @@ func (c *scnInfo) DeleteSCNNode(n dtype.NodeInfo) {
 	}
 	switch pos {
 	case 0:
-		c.scnodes[n.SC] = append(c.scnodes[n.SC][1:], []dtype.NodeInfo{zeroNode()}...)
+		//c.scnodes[n.SC] = append(c.scnodes[n.SC][1:], []dtype.NodeInfo{zeroNode()}...)
+		for i := 0; i < config.MAX_SC_PEER-1; i++ {
+			c.scnodes[n.SC][i] = c.scnodes[n.SC][i+1]
+		}
+		c.scnodes[n.SC][config.MAX_SC_PEER-1] = zeroNode()
 	case config.MAX_SC_PEER - 1:
 		c.scnodes[n.SC][pos] = zeroNode()
 	case config.MAX_SC_PEER:
 		break
 	default:
-		tmp := append(c.scnodes[n.SC][pos+1:], []dtype.NodeInfo{zeroNode()}...)
-		c.scnodes[n.SC] = append(c.scnodes[n.SC][:pos], tmp...)
+		// tmp := append(c.scnodes[n.SC][pos+1:], []dtype.NodeInfo{zeroNode()}...)
+		// c.scnodes[n.SC] = append(c.scnodes[n.SC][:pos], tmp...)
+		for i := pos; i < config.MAX_SC_PEER-1; i++ {
+			c.scnodes[n.SC][i] = c.scnodes[n.SC][i+1]
+		}
+		c.scnodes[n.SC][config.MAX_SC_PEER-1] = zeroNode()
 
 	}
-
-	// c.mutex.Lock()
-	// defer c.mutex.Unlock()
-	// sl := &c.scnodes[n.SC]
-	// if sl.header == nil {
-	// 	return
-	// } else {
-	// 	cur := sl.header
-	// 	for {
-	// 		if cur == nil {
-	// 			return
-	// 		}
-	// 		if cur.node.Hash == n.Hash {
-	// 			if cur.pre == nil {
-	// 				sl.header = cur.next
-	// 			} else {
-	// 				cur.pre.next = cur.next
-	// 			}
-	// 			sl.count--
-	// 			return
-	// 		}
-	// 		cur = cur.next
-	// 	}
-	// }
 }
 
 // return the copy of node list due to conccurency issues
-func (c *scnInfo) GetSCNNodeList(sc int) []dtype.NodeInfo {
+func (c *scnInfo) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
 	if sc > config.MAX_SC {
-		return nil
+		return false
 	}
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	newscn := []dtype.NodeInfo{}
+	//newscn := []dtype.NodeInfo{}
 
+	pos := 0
 	for _, peer := range c.scnodes[sc] {
 		if peer.Hash != "" {
-			newscn = append(newscn, []dtype.NodeInfo{peer}...)
+			//newscn = append(newscn, []dtype.NodeInfo{peer}...)
+			nodes[pos] = peer
+			pos++
 		}
 	}
 
-	return newscn
-	// scn := &c.scnodes[sc]
-	// if scn.header == nil {
-	// 	return nil
-	// }
-	// c.mutex.Lock()
-	// defer c.mutex.Unlock()
-
-	// newnl := []dtype.NodeInfo{}
-	// node := scn.header
-
-	// for {
-	// 	if node == nil {
-	// 		break
-	// 	}
-	// 	newnl = append(newnl, []dtype.NodeInfo{node.node}...)
-	// 	node = node.next
-	// }
-	// return newnl
+	return pos > 0
 }
 
-func (c *scnInfo) GetSCNNodeListAll() []dtype.NodeInfo {
+func (c *scnInfo) GetSCNNodeListAll(nodes *[(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	newscn := []dtype.NodeInfo{}
+	//newscn := []dtype.NodeInfo{}
+	pos := 0
 	for _, scn := range c.scnodes {
 		for _, peer := range scn {
 			if peer.Hash != "" {
-				newscn = append(newscn, []dtype.NodeInfo{peer}...)
+				//newscn = append(newscn, []dtype.NodeInfo{peer}...)
+				nodes[pos] = peer
 			}
 		}
 	}
-	return newscn
-	// for _, scn := range c.scnodes {
-	// 	node := scn.header
-	// 	for {
-	// 		if node == nil {
-	// 			break
-	// 		}
-	// 		newscn = append(newscn, []dtype.NodeInfo{node.node}...)
-
-	// 		node = node.next
-	// 	}
-	// }
-	// return newscn
 }
 
 func (c *scnInfo) ShowSCNNodeList() {
@@ -260,15 +183,4 @@ func (c *scnInfo) ShowSCNNodeList() {
 			}
 		}
 	}
-
-	// for i, scn := range c.scnodes {
-	// 	node := scn.header
-	// 	for {
-	// 		if node == nil {
-	// 			break
-	// 		}
-	// 		log.Printf("SC:%v, node:%v", i, node.node)
-	// 		node = node.next
-	// 	}
-	// }
 }

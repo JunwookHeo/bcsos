@@ -125,12 +125,15 @@ func (h *Handler) getTransactionQuery(hash string, tr *blockchain.Transaction) b
 	}
 
 	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
-		nodes := h.nm.GetSCNNodeList(i)
-		for _, node := range nodes {
-			if queryTransaction(node.IP, node.Port, hash, tr) {
-				return true
+		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
+		if h.nm.GetSCNNodeList(i, &nodes) {
+			for _, node := range nodes {
+				if queryTransaction(node.IP, node.Port, hash, tr) {
+					return true
+				}
+				//time.Sleep(time.Duration(200 * time.Microsecond.Seconds()))
+				log.Printf("queryTransaction fail : query other nodes")
 			}
-			time.Sleep(time.Duration(200 * time.Microsecond.Seconds()))
 		}
 	}
 
@@ -157,7 +160,6 @@ func (h *Handler) getBlockHeaderHandler(w http.ResponseWriter, r *http.Request) 
 
 	bh := blockchain.BlockHeader{}
 	if h.db.GetBlockHeader(hash, &bh) == 0 {
-		// TODO:
 		//log.Printf("Not having it, so request the transaction to other node")
 		if h.getBlockHeaderQuery(hash, &bh) {
 			h.db.AddBlockHeader(string(bh.Hash), &bh)
@@ -196,12 +198,15 @@ func (h *Handler) getBlockHeaderQuery(hash string, bh *blockchain.BlockHeader) b
 	}
 
 	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
-		nodes := h.nm.GetSCNNodeList(i)
-		for _, node := range nodes {
-			if queryBlockHeader(node.IP, node.Port, hash, bh) {
-				return true
+		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
+		if h.nm.GetSCNNodeList(i, &nodes) {
+			for _, node := range nodes {
+				if queryBlockHeader(node.IP, node.Port, hash, bh) {
+					return true
+				}
+				//time.Sleep(time.Duration(100 * time.Microsecond.Seconds()))
+				log.Printf("queryBlockHeader fail : query other nodes")
 			}
-			time.Sleep(time.Duration(200 * time.Microsecond.Seconds()))
 		}
 	}
 
@@ -244,7 +249,8 @@ func (h *Handler) pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send peers info to the connector
-	nodes := h.nm.GetSCNNodeListAll()
+	var nodes [(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo
+	h.nm.GetSCNNodeListAll(&nodes)
 	if err := ws.WriteJSON(nodes); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
@@ -257,33 +263,37 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 		defer ticker.Stop()
 		for {
 			<-ticker.C
-			hashes := &[]dbagent.RemoverbleObj{}
+			hashes := []dbagent.RemoverbleObj{}
+			ret := false
 
 			if config.ACCESS_FREQUENCY_PATTERN == config.RANDOM_ACCESS_PATTERN {
-				hashes = h.om.AccessWithRandom(config.NUM_AP_GEN)
+				ret = h.om.AccessWithRandom(config.NUM_AP_GEN, &hashes)
 			} else {
-				hashes = h.om.AccessWithTimeWeight(config.NUM_AP_GEN)
+				ret = h.om.AccessWithTimeWeight(config.NUM_AP_GEN, &hashes)
 			}
 
-			for _, hash := range *hashes {
-				if hash.HashType == 0 {
-					bh := blockchain.BlockHeader{}
-					if h.getBlockHeaderQuery(hash.Hash, &bh) {
-						h.db.AddBlockHeader(hash.Hash, &bh)
-						// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+			if ret {
+				for _, hash := range hashes {
+					if hash.HashType == 0 {
+						bh := blockchain.BlockHeader{}
+						if h.getBlockHeaderQuery(hash.Hash, &bh) {
+							h.db.AddBlockHeader(hash.Hash, &bh)
+							// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+						}
+					} else {
+						tr := blockchain.Transaction{}
+						if h.getTransactionQuery(hash.Hash, &tr) {
+							h.db.AddTransaction(&tr)
+							// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
+						}
 					}
-				} else {
-					tr := blockchain.Transaction{}
-					if h.getTransactionQuery(hash.Hash, &tr) {
-						h.db.AddTransaction(&tr)
-						// log.Printf("add transaction from other node %v", hex.EncodeToString(tr.Hash))
-					}
+				}
+
+				if h.local.SC < config.MAX_SC {
+					h.om.DeleteNoAccedObjects()
 				}
 			}
 
-			if h.local.SC < config.MAX_SC {
-				h.om.DeleteNoAccedObjects()
-			}
 			status := h.om.db.GetDBStatus()
 			log.Printf("Status : %v", status)
 		}

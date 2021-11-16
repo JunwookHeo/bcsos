@@ -51,10 +51,12 @@ func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
 
 	checked := false
 	for i := 0; i <= config.MAX_SC; i++ {
-		nodes := n.scn.GetSCNNodeList(i)
-		for _, node := range nodes {
-			sendPing(node)
-			checked = true
+		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
+		if n.scn.GetSCNNodeList(i, &nodes) {
+			for _, node := range nodes {
+				sendPing(node)
+				checked = true
+			}
 		}
 	}
 
@@ -62,19 +64,18 @@ func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
 		sendPing(sim)
 	}
 
-	//n.scn.ShowSCNNodeList()
+	n.scn.ShowSCNNodeList()
 }
 
 func (n *NodeMgr) AddNSCNNode(node dtype.NodeInfo) {
 	n.scn.AddNSCNNode(node)
 }
 
-func (n *NodeMgr) GetSCNNodeListAll() []dtype.NodeInfo {
-	return n.scn.GetSCNNodeListAll()
+func (n *NodeMgr) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
+	return n.scn.GetSCNNodeList(sc, nodes)
 }
-
-func (n *NodeMgr) GetSCNNodeList(sc int) []dtype.NodeInfo {
-	return n.scn.GetSCNNodeList(sc)
+func (n *NodeMgr) GetSCNNodeListAll(nodes *[(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo) {
+	n.scn.GetSCNNodeListAll(nodes)
 }
 
 func NewNodeMgr(local *dtype.NodeInfo) *NodeMgr {

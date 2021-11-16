@@ -56,7 +56,8 @@ func (a *dbagent) GetLatestBlockHash() string {
 func (a *dbagent) RemoveObject(hash string) bool {
 	//Before removing data, update status first.
 	a.updateRemoveDBStatus(hash)
-
+	// log.Printf("RemoveObject starting %v", hash)
+	// defer log.Printf("RemoveObject finished %v", hash)
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -241,14 +242,13 @@ func (a *dbagent) DeleteNoAccedObjects() {
 	}
 }
 
-func (a *dbagent) GetTransactionwithRandom(num int) *[]RemoverbleObj {
-	hashes := []RemoverbleObj{}
+func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool {
 	// Randomly select 10 blocks in the ledger
 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
 	rows, err := a.db.Query(`SELECT idx, transactionhash FROM blocktrtbl ORDER BY RANDOM() LIMIT ?;`, num)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
-		return &hashes
+		return false
 	}
 
 	defer rows.Close()
@@ -260,16 +260,16 @@ func (a *dbagent) GetTransactionwithRandom(num int) *[]RemoverbleObj {
 		err := rows.Scan(&idx, &hash)
 		if err != nil {
 			log.Printf("Read rows Error : %v", err)
-			return &hashes
+			return false
 		}
-		hashes = append(hashes, RemoverbleObj{idx, hash})
-		// log.Printf("Random choose hash : %v", hash)
+		*hashes = append(*hashes, RemoverbleObj{idx, hash})
+		//log.Printf("Random choose hash : %v", hash)
 	}
-
-	return &hashes
+	log.Printf("Random choose hash : %v", *hashes)
+	return true
 }
 
-func (a *dbagent) GetTransactionwithTimeWeight(num int) *[]RemoverbleObj {
+func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj) bool {
 	w := config.BASIC_UNIT_TIME * config.RATE_TSC0
 	ids := func(w int, umn int) string {
 		ids := []string{}
@@ -296,8 +296,6 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int) *[]RemoverbleObj {
 		return strings.Join(ids, ", ")
 	}(w, num)
 
-	//log.Printf("num : %v", ids)
-	hashes := []RemoverbleObj{}
 	// select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by actime desc) rownum
 	// 					from blocktrtbl where idx != 0) where rownum in (%s) LIMIT 50;`, ids)
 	select_hashes := fmt.Sprintf(`SELECT idx, transactionhash FROM (SELECT *, row_number() OVER (ORDER BY actime desc) rownum 
@@ -307,7 +305,7 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int) *[]RemoverbleObj {
 	rows, err := a.db.Query(select_hashes)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
-		return &hashes
+		return false
 	}
 
 	defer rows.Close()
@@ -317,12 +315,12 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int) *[]RemoverbleObj {
 		err := rows.Scan(&idx, &hash)
 		if err != nil {
 			log.Printf("Read rows Error : %v", err)
-			return &hashes
+			return false
 		}
-		hashes = append(hashes, RemoverbleObj{idx, hash})
+		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 	}
 	//log.Printf("GetTransactionwithTimeWeight : %v", hashes)
-	return &hashes
+	return true
 }
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
@@ -331,6 +329,9 @@ func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
 }
 
 func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
+	if hash == "" {
+		return 0
+	}
 	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
 	return a.AddObject(&obj)
 }
@@ -341,11 +342,18 @@ func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
 }
 
 func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
+	if hex.EncodeToString(t.Hash) == "" {
+		return 0
+	}
 	obj := StorageObj{"transaction", hex.EncodeToString(t.Hash), t.Timestamp, t}
 	return a.AddObject(&obj)
 }
 
 func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
+	if hash == "" {
+		return 0
+	}
+
 	obj := StorageObj{}
 	obj.Type, obj.Hash = "block", hash
 	id := a.GetObject(&obj)
