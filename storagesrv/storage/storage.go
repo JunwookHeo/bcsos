@@ -126,7 +126,7 @@ func (h *Handler) getTransactionQuery(hash string, tr *blockchain.Transaction) b
 
 	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
 		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
-		if h.nm.GetSCNNodeList(i, &nodes) {
+		if h.nm.GetSCNNodeListbyDistance(i, hash, &nodes) {
 			for _, node := range nodes {
 				if queryTransaction(node.IP, node.Port, hash, tr) {
 					return true
@@ -199,7 +199,7 @@ func (h *Handler) getBlockHeaderQuery(hash string, bh *blockchain.BlockHeader) b
 
 	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
 		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
-		if h.nm.GetSCNNodeList(i, &nodes) {
+		if h.nm.GetSCNNodeListbyDistance(i, hash, &nodes) {
 			for _, node := range nodes {
 				if queryBlockHeader(node.IP, node.Port, hash, bh) {
 					return true

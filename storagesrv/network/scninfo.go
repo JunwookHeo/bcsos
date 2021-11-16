@@ -158,6 +158,38 @@ func (c *scnInfo) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeIn
 	return pos > 0
 }
 
+// return the copy of node list due to conccurency issues
+func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
+	if sc > config.MAX_SC {
+		return false
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	pos := 0
+	var dists [config.MAX_SC_PEER]*big.Int
+	for _, peer := range c.scnodes[sc] {
+		if peer.Hash != "" {
+			dists[pos] = xordistance(oid, peer.Hash)
+			nodes[pos] = peer
+			pos++
+		}
+	}
+	if 1 < pos {
+		// Buble sort by distance
+		for i := 0; i < pos; i++ {
+			for j := 1; j < pos-i; j++ {
+				if dists[j].Cmp(dists[j-1]) < 0 {
+					nodes[j], nodes[j-1] = nodes[j-1], nodes[j]
+				}
+			}
+		}
+	}
+
+	return pos > 0
+}
+
 func (c *scnInfo) GetSCNNodeListAll(nodes *[(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

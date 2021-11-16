@@ -19,7 +19,7 @@ import (
 
 type dbagent struct {
 	db       *sql.DB
-	AFLevel  int
+	SClass   int
 	dbstatus DBStatus
 	mutex    sync.Mutex
 }
@@ -115,7 +115,7 @@ func (a *dbagent) updateACTimeObject(hash string) bool {
 	defer st.Close()
 
 	act := time.Now().UnixNano()
-	rst, err := st.Exec(act, a.AFLevel, hash)
+	rst, err := st.Exec(act, a.SClass, hash)
 	if err != nil {
 		log.Panicf("Update exec error id(%v): %v", hash, err)
 		return false
@@ -198,7 +198,7 @@ func (a *dbagent) GetBlockTransactionMatching(bh string, hashes *[]string) int {
 }
 
 func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) int64 {
-	obj := StorageBLTR{bh, index, th, time.Now().UnixNano(), a.AFLevel}
+	obj := StorageBLTR{bh, index, th, time.Now().UnixNano(), a.SClass}
 	st, err := a.db.Prepare("INSERT INTO blocktrtbl (blockhash, idx, transactionhash, actime, aflevel) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("AddBlockTransactionMatching adding object error : %v", err)
@@ -219,8 +219,8 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 
 //DeleteNoAccedObjects will delete transaction if there is no access more than a hour
 func (a *dbagent) DeleteNoAccedObjects() {
-	//log.Printf("%v", config.TSC0F)
-	ts := time.Now().UnixNano() - int64(config.TSC0F*(a.AFLevel+1)*1e9) // no access for if one hour, delete it
+	//log.Printf("%v", config.TSC0I)
+	ts := time.Now().UnixNano() - int64(config.TSCX[a.SClass]*1e9) // no access for if one hour, delete it
 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE actime >= ? AND actime < ?;`, a.latestts, ts)
 	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type != 'block' AND hash 
 								IN (SELECT transactionhash FROM blocktrtbl WHERE actime < ?) LIMIT 50;`, ts)
@@ -270,7 +270,7 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 }
 
 func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj) bool {
-	w := config.BASIC_UNIT_TIME * config.RATE_TSC0
+	w := config.BASIC_UNIT_TIME * config.RATE_TSC
 	ids := func(w int, umn int) string {
 		ids := []string{}
 		cnt := 0
@@ -589,7 +589,7 @@ func (a *dbagent) GetDBStatus() *DBStatus {
 	return &a.dbstatus
 }
 
-func newDBSqlite(path string, afl int) DBAgent {
+func newDBSqlite(path string, sc int) DBAgent {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		log.Panicf("Open sqlite db error : %v", err)
@@ -653,7 +653,7 @@ func newDBSqlite(path string, afl int) DBAgent {
 
 	st.Exec()
 
-	dba := dbagent{db: db, AFLevel: afl, dbstatus: DBStatus{}, mutex: sync.Mutex{}}
+	dba := dbagent{db: db, SClass: sc, dbstatus: DBStatus{}, mutex: sync.Mutex{}}
 	dba.getLatestDBStatus(&dba.dbstatus)
 	return &dba
 }
