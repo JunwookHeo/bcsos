@@ -271,6 +271,7 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 
 func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj) bool {
 	w := config.BASIC_UNIT_TIME * config.RATE_TSC
+
 	ids := func(w int, umn int) string {
 		ids := []string{}
 		cnt := 0
@@ -319,7 +320,7 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj)
 		}
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 	}
-	//log.Printf("GetTransactionwithTimeWeight : %v", hashes)
+	log.Printf("GetTransactionwithTimeWeight : %v", hashes)
 	return true
 }
 
@@ -424,7 +425,11 @@ func (a *dbagent) ShowAllObjets() bool {
 	for rows.Next() {
 		var index int
 		var hash string
-		rows.Scan(&index, &hash)
+		err = rows.Scan(&index, &hash)
+		if err != nil {
+			log.Printf("ShowAllObjets error : %v", err)
+			return false
+		}
 		//log.Printf("%v : %v", index, hash)
 		if index == 0 { // header
 			bh := blockchain.BlockHeader{}
@@ -445,6 +450,7 @@ func (a *dbagent) GetDBDataSize() uint64 {
 	err := a.db.QueryRow(`SELECT sum(length(type)) + sum(length(hash)) + sum(length(timestamp)) + sum(length(data)) AS size FROM bcobjects;`).Scan(&size)
 	if err != nil {
 		log.Printf("get size error : %v", err)
+		return 0
 	}
 	log.Printf("size : %v", size)
 

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 
@@ -81,6 +82,10 @@ func main() {
 	log.Printf("Server start : %v", local.Port)
 	go http.ListenAndServe(fmt.Sprintf(":%v", local.Port), s.Handler)
 	//go http.ListenAndServe(":8080", s.Handler)
+
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	<-interrupt
 	log.Println("interrupt")
