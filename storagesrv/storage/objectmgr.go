@@ -20,6 +20,7 @@ func (c *ObjectMgr) AccessWithRandom(num int, rethashes *[]dbagent.RemoverbleObj
 		return false
 	}
 
+	cnt := 0
 	for _, hash := range hashes {
 		if hash.HashType == 0 {
 			var bh blockchain.BlockHeader
@@ -34,7 +35,9 @@ func (c *ObjectMgr) AccessWithRandom(num int, rethashes *[]dbagent.RemoverbleObj
 				ret = true
 			}
 		}
+		cnt++
 	}
+	c.db.UpdateDBNetworkQuery(0, 0, cnt)
 
 	return ret
 }
@@ -46,6 +49,7 @@ func (c *ObjectMgr) AccessWithTimeWeight(num int, rethashes *[]dbagent.Removerbl
 		return false
 	}
 
+	cnt := 0
 	for _, hash := range hashes {
 		if hash.HashType == 0 {
 			var bh blockchain.BlockHeader
@@ -60,7 +64,9 @@ func (c *ObjectMgr) AccessWithTimeWeight(num int, rethashes *[]dbagent.Removerbl
 				ret = true
 			}
 		}
+		cnt++
 	}
+	c.db.UpdateDBNetworkQuery(0, 0, cnt)
 	return ret
 }
 

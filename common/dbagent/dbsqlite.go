@@ -31,7 +31,7 @@ func (a *dbagent) Close() {
 func (a *dbagent) GetLatestBlockHash() string {
 	var id int = 0
 	var dtype, hash string = "", ""
-	var ts time.Time
+	var ts int64
 	rows, err := a.db.Query(`SELECT id, type, hash, timestamp FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
 
 	if err != nil {
@@ -42,7 +42,7 @@ func (a *dbagent) GetLatestBlockHash() string {
 	defer rows.Close()
 
 	for rows.Next() {
-		err := rows.Scan(&id, &dtype, &ts, &hash)
+		err := rows.Scan(&id, &dtype, &hash, &ts)
 		if err != nil {
 			log.Printf("Read rows Error : %v", err)
 			return hash
@@ -265,7 +265,7 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 		//log.Printf("Random choose hash : %v", hash)
 	}
-	log.Printf("Random choose hash : %v", *hashes)
+	//log.Printf("Random choose hash : %v", *hashes)
 	return true
 }
 
@@ -281,7 +281,7 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj)
 			}
 
 			f := rand.ExpFloat64() / float64(config.LAMBDA_ED)
-			l := int(f) * w
+			l := int(f * float64(w))
 			flg := false
 			for i := 0; i < cnt; i++ {
 				if ids[i] == strconv.Itoa(l) {
@@ -460,7 +460,7 @@ func (a *dbagent) GetDBDataSize() uint64 {
 func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	rows, err := a.db.Query(`SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, overheadfrom, overheadto, timestamp 
+	rows, err := a.db.Query(`SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, timestamp 
 				FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
@@ -471,7 +471,7 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 
 	for rows.Next() {
 		rows.Scan(&status.ID, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions,
-			&status.Size, &status.Overheadfrom, status.Overheadto, &status.Timestamp)
+			&status.Size, &status.TotalQuery, &status.QueryFrom, status.QueryTo, &status.Timestamp)
 		//log.Printf("DB Status : %v", status)
 		return true
 	}
@@ -566,14 +566,14 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, overheadfrom, overheadto, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?,  datetime('now'))")
+	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,  datetime('now'))")
 	if err != nil {
 		log.Printf("Prepare adding dbstatus error : %v", err)
 		return -1
 	}
 	defer st.Close()
 
-	rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size, status.Overheadfrom, status.Overheadto)
+	rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size, status.TotalQuery, status.QueryFrom, status.QueryTo)
 	if err != nil {
 		log.Panicf("Exec adding dbstatus error : %v", err)
 		return -1
@@ -584,10 +584,11 @@ func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
 	return id
 }
 
-func (a *dbagent) UpdateDBNetworkOverhead(fromqc int, toqc int) {
+func (a *dbagent) UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int) {
 	status := &a.dbstatus
-	status.Overheadfrom += fromqc
-	status.Overheadto += toqc
+	status.QueryFrom += fromqc
+	status.QueryTo += toqc
+	status.TotalQuery += totalqc
 	a.updateDBStatus(status)
 }
 
@@ -636,8 +637,9 @@ func newDBSqlite(path string, sc int) DBAgent {
 
 	st.Exec()
 
-	// overheadfrom : the number of received queries to get deleted transactions
-	// overheadto : the number of send queries to get deleted transactions
+	// totalquery : query objects including local storage
+	// queryfrom : the number of received queries to get deleted transactions
+	// queryto : the number of send queries to get deleted transactions
 	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
 		totalblocks			INTEGER,
@@ -646,8 +648,9 @@ func newDBSqlite(path string, sc int) DBAgent {
 		blocks 				INTEGER,
 		transactions    	INTEGER,
 		size				INTEGER,
-		overheadfrom		INTEGR,
-		overheadto			INTEGR,
+		totalquery			INTEGER,
+		queryfrom			INTEGER,
+		queryto				INTEGER,
 		timestamp			DATETIME
 	);`
 

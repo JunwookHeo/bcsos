@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -75,7 +76,7 @@ func (h *Handler) getTransactionHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	defer ws.Close()
 
-	defer h.db.UpdateDBNetworkOverhead(1, 0)
+	defer h.db.UpdateDBNetworkQuery(1, 0, 1)
 	var hash string
 	if err := ws.ReadJSON(&hash); err != nil {
 		log.Printf("Read json error : %v", err)
@@ -109,7 +110,7 @@ func (h *Handler) getTransactionQuery(hash string, tr *blockchain.Transaction) b
 		defer ws.Close()
 
 		// the number of query to other nodes
-		defer h.db.UpdateDBNetworkOverhead(0, 1)
+		defer h.db.UpdateDBNetworkQuery(0, 1, 1)
 
 		if err := ws.WriteJSON(hash); err != nil {
 			log.Printf("Write json error : %v", err)
@@ -257,6 +258,29 @@ func (h *Handler) pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Response to web app with dbstatus information
+// keep sending dbstatus to the web app
+func (h *Handler) endTestHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("endTestHandler", err)
+		return
+	}
+	defer ws.Close()
+	var endtest string
+	if err := ws.ReadJSON(&endtest); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+
+	if endtest == config.END_TEST {
+		log.Println("Received End test")
+		h.db.Close()
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+	}
+}
+
 func (h *Handler) ObjectbyAccessPatternProc() {
 	go func() {
 		ticker := time.NewTicker(time.Duration(config.TIME_AP_GEN) * time.Second)
@@ -336,5 +360,6 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 	m.HandleFunc("/getblockheader", h.getBlockHeaderHandler)
 	m.HandleFunc("/nodeinfo", h.nodeInfoHandler)
 	m.HandleFunc("/ping", h.pingHandler)
+	m.HandleFunc("/endtest", h.endTestHandler)
 	return h
 }

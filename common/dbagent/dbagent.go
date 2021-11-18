@@ -22,7 +22,7 @@ type DBAgent interface {
 	GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool
 	GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj) bool
 	DeleteNoAccedObjects()
-	UpdateDBNetworkOverhead(fromqc int, toqc int)
+	UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int)
 }
 
 type StorageObj struct {
@@ -47,8 +47,9 @@ type DBStatus struct {
 	Blocks            int
 	Transactions      int
 	Size              int
-	Overheadfrom      int // the number of received query
-	Overheadto        int // the number of send query
+	TotalQuery        int // the number of query including local storage
+	QueryFrom         int // the number of received query
+	QueryTo           int // the number of send query
 	Timestamp         time.Time
 }
 

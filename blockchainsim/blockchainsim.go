@@ -48,5 +48,5 @@ func main() {
 	defer service.Shutdown()
 
 	<-interrupt
-	log.Println("interrupt")
+	log.Println("interrupt finish")
 }

@@ -1,5 +1,8 @@
 package config
 
+// Total transactions
+const TOTAL_TRANSACTIONS int = 400000
+
 // Block create period
 const BLOCK_CREATE_PERIOD int = 5
 
@@ -11,7 +14,7 @@ const (
 	RANDOM_ACCESS_PATTERN      string = "Random_Distribution"
 	EXPONENTIAL_ACCESS_PATTERN string = "Exponential_Distribution"
 )
-const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
+const ACCESS_FREQUENCY_PATTERN string = RANDOM_ACCESS_PATTERN // EXPONENTIAL_ACCESS_PATTERN
 
 // P = 1 - e^(-lambda*t)
 // Example : Probability of event occure to be 50%
@@ -74,3 +77,5 @@ const TIME_AP_GEN int = 10 // Second
 
 // The time to search neighbour nodes to update node info
 const TIME_UPDATE_NEITHBOUR int = 10 //60 // Second
+
+const END_TEST string = "END_TEST"

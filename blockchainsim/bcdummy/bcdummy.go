@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -51,6 +52,32 @@ func (h *Handler) broadcastNewBlock(b *blockchain.Block) {
 	}
 }
 
+func (h *Handler) sendEndTest(ip string, port int) {
+	url := fmt.Sprintf("ws://%v:%v/endtest", ip, port)
+	log.Printf("Send End test to %v", url)
+
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Printf("dial: %v", err)
+		return
+	}
+	defer ws.Close()
+	log.Printf("DefaultDialer Send new block to %v", url)
+
+	if err := ws.WriteJSON(config.END_TEST); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+	log.Printf("Send end test : %v:%v", ip, port)
+}
+
+func (h *Handler) broadcastEndTest() {
+	log.Printf("broadcastEndTest : %v", *h.Nodes)
+	for _, node := range *h.Nodes {
+		h.sendEndTest(node.IP, node.Port)
+	}
+}
+
 func (h *Handler) Start() {
 	// Send Genesis Block
 	hash := h.db.GetLatestBlockHash()
@@ -63,7 +90,9 @@ func (h *Handler) Start() {
 	}
 
 	msg := make(chan string)
-	go LoadRawdata(PATH, msg)
+	//defer close(msg)
+	//go LoadRawdata(PATH, msg)
+	go LoadRawdataFromRandom(msg)
 
 	num_tr := func() int {
 		if 0 < config.NUM_TRANSACTION_BLOCK {
@@ -78,10 +107,15 @@ func (h *Handler) Start() {
 	for {
 		<-ticker.C
 		if h.Ready {
-
 			var trs []*blockchain.Transaction
 			for i := 0; i < num_tr; i++ {
 				d := <-msg
+				if d == config.END_TEST {
+					h.broadcastEndTest()
+					h.db.Close()
+					syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+					return
+				}
 				log.Printf("==>%s", d)
 				tr := blockchain.CreateTransaction([]byte(d))
 				trs = append(trs, tr)
@@ -90,11 +124,12 @@ func (h *Handler) Start() {
 			h.db.AddBlock(b)
 			h.broadcastNewBlock(b)
 		}
+
 	}
 }
 
-func Stop() {
-
+func (h *Handler) Stop() {
+	h.Ready = false
 }
 
 func NewBCDummy(db dbagent.DBAgent, nodes *map[string]dtype.NodeInfo) *Handler {

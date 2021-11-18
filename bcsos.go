@@ -16,8 +16,8 @@ func main() {
 	wallet.ValidateAddress([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
 
 	maxn := 0
-	for i := 0; i < 10000000000000; i++ {
-		f := rand.ExpFloat64() / 0.1
+	for i := 0; i < 10000000000; i++ {
+		f := rand.ExpFloat64() / 0.1 * 600
 		if int(f) > maxn {
 			log.Println(int(f))
 			maxn = int(f)
