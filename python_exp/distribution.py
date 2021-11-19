@@ -17,6 +17,6 @@ def exponential_select():
     plt.hist(x)
 
     plt.show()
-    plt.savefig("exponential4.png") 
+    #plt.savefig("exponential4.png") 
     
-random_select()
+exponential_select()

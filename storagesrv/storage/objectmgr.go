@@ -44,7 +44,7 @@ func (c *ObjectMgr) AccessWithRandom(num int, rethashes *[]dbagent.RemoverbleObj
 
 func (c *ObjectMgr) AccessWithTimeWeight(num int, rethashes *[]dbagent.RemoverbleObj) bool {
 	hashes := []dbagent.RemoverbleObj{}
-	ret := c.db.GetTransactionwithTimeWeight(num, &hashes)
+	ret := c.db.GetTransactionwithExponential(num, &hashes)
 	if !ret {
 		return false
 	}

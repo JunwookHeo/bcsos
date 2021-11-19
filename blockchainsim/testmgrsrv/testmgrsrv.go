@@ -181,8 +181,8 @@ func NewHandler(path string) *Handler {
 		mutex:   sync.Mutex{},
 	}
 
-	//m.Handle("/", http.FileServer(http.Dir("./static")))
 	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/static/", http.StripPrefix("/static", fs))
 	m.Handle("/", fs)
 	m.Handle("/left.html", fs)
 	m.Handle("/right.html", fs)

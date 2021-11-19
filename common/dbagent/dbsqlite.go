@@ -32,6 +32,7 @@ func (a *dbagent) GetLatestBlockHash() string {
 	var id int = 0
 	var dtype, hash string = "", ""
 	var ts int64
+
 	rows, err := a.db.Query(`SELECT id, type, hash, timestamp FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
 
 	if err != nil {
@@ -151,21 +152,27 @@ func (a *dbagent) AddObject(obj *StorageObj) int64 {
 		return id
 	}
 
-	st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, data) VALUES (?, ?, ?, ?)")
-	if err != nil {
-		log.Printf("Prepare adding object error : %v", err)
-		return -1
-	}
-	defer st.Close()
+	id := func() int64 {
+		a.mutex.Lock()
+		defer a.mutex.Unlock()
+		st, err := a.db.Prepare("INSERT INTO bcobjects (type, hash, timestamp, data) VALUES (?, ?, ?, ?)")
+		if err != nil {
+			log.Printf("Prepare adding object error : %v", err)
 
-	data := serial.Serialize(obj.Data)
-	rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, data)
-	if err != nil {
-		log.Panicf("Exec adding object error : %v", err)
-		return -1
-	}
+			return -1
+		}
+		defer st.Close()
 
-	id, _ := rst.LastInsertId()
+		data := serial.Serialize(obj.Data)
+		rst, err := st.Exec(obj.Type, obj.Hash, obj.Timestamp, data)
+		if err != nil {
+			log.Panicf("Exec adding object error : %v", err)
+			return -1
+		}
+
+		id, _ := rst.LastInsertId()
+		return id
+	}()
 
 	// Update db status after adding object
 	a.updateAddDBStatus(id)
@@ -199,6 +206,8 @@ func (a *dbagent) GetBlockTransactionMatching(bh string, hashes *[]string) int {
 
 func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) int64 {
 	obj := StorageBLTR{bh, index, th, time.Now().UnixNano(), a.SClass}
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	st, err := a.db.Prepare("INSERT INTO blocktrtbl (blockhash, idx, transactionhash, actime, aflevel) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Printf("AddBlockTransactionMatching adding object error : %v", err)
@@ -269,30 +278,18 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 	return true
 }
 
-func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj) bool {
-	w := config.BASIC_UNIT_TIME * config.RATE_TSC
+// It is difficult to select samples with exponential distribution.
+// It just select rows by exponentially generated numbers
+// without considering access time.
+func (a *dbagent) GetTransactionwithExponential(num int, hashes *[]RemoverbleObj) bool {
+	w := config.BASIC_UNIT_TIME * config.RATE_TSC 
 
-	ids := func(w int, umn int) string {
+	ids := func(w int, num int) string {
 		ids := []string{}
-		cnt := 0
-		for {
-			if cnt > num {
-				break
-			}
-
+		for i := 0; i < num; i++ {
 			f := rand.ExpFloat64() / float64(config.LAMBDA_ED)
 			l := int(f * float64(w))
-			flg := false
-			for i := 0; i < cnt; i++ {
-				if ids[i] == strconv.Itoa(l) {
-					flg = true
-					break
-				}
-			}
-			if !flg {
-				ids = append(ids, strconv.Itoa(l))
-				cnt++
-			}
+			ids = append(ids, strconv.Itoa(l))
 		}
 		return strings.Join(ids, ", ")
 	}(w, num)
@@ -300,7 +297,7 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj)
 	// select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by actime desc) rownum
 	// 					from blocktrtbl where idx != 0) where rownum in (%s) LIMIT 50;`, ids)
 	select_hashes := fmt.Sprintf(`SELECT idx, transactionhash FROM (SELECT *, row_number() OVER (ORDER BY actime desc) rownum 
-						FROM blocktrtbl) WHERE rownum IN (%s) LIMIT 50;`, ids)
+						FROM blocktrtbl) WHERE rownum IN (%s) LIMIT %d;`, ids, num)
 
 	//log.Printf("exponential items: %v", select_hashes)
 	rows, err := a.db.Query(select_hashes)
@@ -320,7 +317,7 @@ func (a *dbagent) GetTransactionwithTimeWeight(num int, hashes *[]RemoverbleObj)
 		}
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 	}
-	log.Printf("GetTransactionwithTimeWeight : %v", hashes)
+	log.Printf("GetTransactionwithExponential : %v", hashes)
 	return true
 }
 
@@ -593,6 +590,7 @@ func (a *dbagent) UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int) {
 }
 
 func (a *dbagent) GetDBStatus() *DBStatus {
+	a.dbstatus.Timestamp = time.Now()
 	return &a.dbstatus
 }
 

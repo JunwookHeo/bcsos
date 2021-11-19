@@ -181,6 +181,7 @@ func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MA
 		for i := 0; i < pos; i++ {
 			for j := 1; j < pos-i; j++ {
 				if dists[j].Cmp(dists[j-1]) < 0 {
+					dists[j], dists[j-1] = dists[j-1], dists[j]
 					nodes[j], nodes[j-1] = nodes[j-1], nodes[j]
 				}
 			}

@@ -2,36 +2,44 @@ package main
 
 import (
 	"log"
-	"math/rand"
-
-	"github.com/junwookheo/bcsos/common/wallet"
+	"net/http"
+	"text/template"
 )
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
 
-func main() {
-	log.Print("Print log")
-	wallet.ValidateAddress([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
+type Student struct {
+	Name       string
+	College    string
+	RollNumber int
+}
 
-	maxn := 0
-	for i := 0; i < 10000000000; i++ {
-		f := rand.ExpFloat64() / 0.1 * 600
-		if int(f) > maxn {
-			log.Println(int(f))
-			maxn = int(f)
-		}
+func renderTemplate(w http.ResponseWriter, r *http.Request) {
+	student := Student{
+		Name:       "GB",
+		College:    "GolangBlogs",
+		RollNumber: 1,
+	}
+	parsedTemplate, _ := template.ParseFiles("./blockchainsim/static/index.html")
+	err := parsedTemplate.Execute(w, student)
+	if err != nil {
+		log.Println("Error executing template :", err)
+		return
 	}
 }
 
-func BubbleSort(data []int) {
-	for i := 0; i < len(data); i++ {
-		for j := 1; j < len(data)-i; j++ {
-			if data[j] < data[j-1] {
-				data[j], data[j-1] = data[j-1], data[j]
-			}
-		}
+func main() {
+	log.Print("Print log")
+	// wallet.ValidateAddress([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
+
+	fileServer := http.FileServer(http.Dir("./blockchainsim/static"))
+	http.Handle("/static/", http.StripPrefix("/static", fileServer))
+	http.Handle("/", fileServer)
+	err := http.ListenAndServe(":5050", nil)
+	if err != nil {
+		log.Fatal("Error Starting the HTTP Server :", err)
+		return
 	}
-	log.Println(data)
 }

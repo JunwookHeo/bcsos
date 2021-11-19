@@ -1,7 +1,7 @@
 package config
 
 // Total transactions
-const TOTAL_TRANSACTIONS int = 400000
+const TOTAL_TRANSACTIONS int = 40000
 
 // Block create period
 const BLOCK_CREATE_PERIOD int = 5
@@ -31,6 +31,7 @@ const ACCESS_FREQUENCY_PATTERN string = RANDOM_ACCESS_PATTERN // EXPONENTIAL_ACC
 // 0.7	0.1		12.03972804
 // 0.8	0.1		16.09437912
 // 0.9	0.1		23.02585093
+// 0.99 0.1 	49.05170186
 
 // The basic unit of time (T)
 const BASIC_UNIT_TIME int = 60 // 60 seconds
