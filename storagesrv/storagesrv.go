@@ -6,11 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/serial"
@@ -70,6 +72,7 @@ func GetLocalAddress() dtype.NodeInfo {
 
 func main() {
 	log.Println("Start Storage Service")
+	rand.Seed(time.Now().UnixNano())
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Reset()

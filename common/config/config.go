@@ -14,7 +14,10 @@ const (
 	RANDOM_ACCESS_PATTERN      string = "Random_Distribution"
 	EXPONENTIAL_ACCESS_PATTERN string = "Exponential_Distribution"
 )
-const ACCESS_FREQUENCY_PATTERN string = RANDOM_ACCESS_PATTERN // EXPONENTIAL_ACCESS_PATTERN
+
+//const ACCESS_FREQUENCY_PATTERN string = RANDOM_ACCESS_PATTERN
+
+const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
 
 // P = 1 - e^(-lambda*t)
 // Example : Probability of event occure to be 50%

@@ -251,18 +251,58 @@ func (a *dbagent) DeleteNoAccedObjects() {
 	}
 }
 
+// func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool {
+// 	// Randomly select 10 blocks in the ledger
+// 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
+// 	rows, err := a.db.Query(`SELECT idx, transactionhash FROM blocktrtbl ORDER BY RANDOM() LIMIT ?;`, num)
+// 	if err != nil {
+// 		log.Printf("Object Not found : %v", err)
+// 		return false
+// 	}
+
+// 	defer rows.Close()
+
+// 	// Select a transaction in each block
+// 	for rows.Next() {
+// 		var hash string
+// 		var idx int
+// 		err := rows.Scan(&idx, &hash)
+// 		if err != nil {
+// 			log.Printf("Read rows Error : %v", err)
+// 			return false
+// 		}
+// 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
+// 		//log.Printf("Random choose hash : %v", hash)
+// 	}
+// 	//log.Printf("Random choose hash : %v", *hashes)
+// 	return true
+// }
+
 func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool {
-	// Randomly select 10 blocks in the ledger
-	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
-	rows, err := a.db.Query(`SELECT idx, transactionhash FROM blocktrtbl ORDER BY RANDOM() LIMIT ?;`, num)
+	w := config.TOTAL_TRANSACTIONS + config.TOTAL_TRANSACTIONS/config.NUM_TRANSACTION_BLOCK
+
+	ids := func(w int, num int) string {
+		ids := []string{}
+		for i := 0; i < num; i++ {
+			l := rand.Intn(int(w))
+			ids = append(ids, strconv.Itoa(l))
+		}
+		return strings.Join(ids, ", ")
+	}(w, num)
+
+	// select_hashes := fmt.Sprintf(`select transactionhash from (select *, row_number() over (order by actime desc) rownum
+	// 					from blocktrtbl where idx != 0) where rownum in (%s) LIMIT 50;`, ids)
+	select_hashes := fmt.Sprintf(`SELECT idx, transactionhash FROM (SELECT *, row_number() OVER (ORDER BY actime desc) rownum 
+						FROM blocktrtbl) WHERE rownum IN (%s) LIMIT %d;`, ids, num)
+
+	//log.Printf("exponential items: %v", select_hashes)
+	rows, err := a.db.Query(select_hashes)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return false
 	}
 
 	defer rows.Close()
-
-	// Select a transaction in each block
 	for rows.Next() {
 		var hash string
 		var idx int
@@ -272,9 +312,8 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 			return false
 		}
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
-		//log.Printf("Random choose hash : %v", hash)
 	}
-	//log.Printf("Random choose hash : %v", *hashes)
+	log.Printf("GetTransactionwithRandom : %v", hashes)
 	return true
 }
 
@@ -282,7 +321,7 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 // It just select rows by exponentially generated numbers
 // without considering access time.
 func (a *dbagent) GetTransactionwithExponential(num int, hashes *[]RemoverbleObj) bool {
-	w := config.BASIC_UNIT_TIME * config.RATE_TSC 
+	w := config.BASIC_UNIT_TIME * config.RATE_TSC
 
 	ids := func(w int, num int) string {
 		ids := []string{}
