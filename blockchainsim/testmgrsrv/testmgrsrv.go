@@ -88,22 +88,27 @@ func (h *Handler) nodesHandler(w http.ResponseWriter, r *http.Request) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	func() {
+		var cnt int = 0
 		for {
 			select {
 			case <-done:
 				return
 			case <-ticker.C:
 				var nodes []dtype.NodeInfo
-				for _, n := range h.Nodes {
-					nodes = append(nodes, n)
-				}
-				sort.Slice(nodes, func(i, j int) bool {
-					return nodes[i].SC < nodes[j].SC
-				})
+				if len(h.Nodes) != cnt {
+					cnt = len(h.Nodes)
 
-				if err := ws.WriteJSON(nodes); err != nil {
-					log.Printf("Write json error : %v", err)
-					return
+					for _, n := range h.Nodes {
+						nodes = append(nodes, n)
+					}
+					sort.Slice(nodes, func(i, j int) bool {
+						return nodes[i].SC < nodes[j].SC
+					})
+
+					if err := ws.WriteJSON(nodes); err != nil {
+						log.Printf("Write json error : %v", err)
+						return
+					}
 				}
 			}
 		}
