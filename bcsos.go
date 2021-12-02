@@ -1,15 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"math/rand"
-	"net/http"
-	"strconv"
-	"strings"
-	"text/template"
 	"time"
-
-	"github.com/junwookheo/bcsos/common/config"
 )
 
 func init() {
@@ -22,18 +16,21 @@ type Student struct {
 	RollNumber int
 }
 
-func renderTemplate(w http.ResponseWriter, r *http.Request) {
-	student := Student{
-		Name:       "GB",
-		College:    "GolangBlogs",
-		RollNumber: 1,
-	}
-	parsedTemplate, _ := template.ParseFiles("./blockchainsim/static/index.html")
-	err := parsedTemplate.Execute(w, student)
-	if err != nil {
-		log.Println("Error executing template :", err)
-		return
-	}
+// func renderTemplate(w http.ResponseWriter, r *http.Request) {
+// 	student := Student{
+// 		Name:       "GB",
+// 		College:    "GolangBlogs",
+// 		RollNumber: 1,
+// 	}
+// 	parsedTemplate, _ := template.ParseFiles("./blockchainsim/static/index.html")
+// 	err := parsedTemplate.Execute(w, student)
+// 	if err != nil {
+// 		log.Println("Error executing template :", err)
+// 		return
+// 	}
+// }
+type timetest struct {
+	ts time.Time
 }
 
 func main() {
@@ -49,35 +46,27 @@ func main() {
 	// 	return
 	// }
 
-	rand.Seed(time.Now().UnixNano())
-	for k := 0; k < 100; k++ {
-		func() {
-			w := config.BASIC_UNIT_TIME * config.RATE_TSC
+	ts := timetest{time.Now()}
 
-			ids := func(w int, num int) string {
-				ids := []string{}
-				for i := 0; i < num; i++ {
-					f := rand.ExpFloat64() / float64(config.LAMBDA_ED)
-					l := int(f * float64(w))
-					ids = append(ids, strconv.Itoa(l))
-				}
-				return strings.Join(ids, ", ")
-			}(w, 10)
-			log.Println("EXP :", ids)
-		}()
-		func() {
-			w := config.TOTAL_TRANSACTIONS + config.TOTAL_TRANSACTIONS/config.NUM_TRANSACTION_BLOCK
-
-			ids := func(w int, num int) string {
-				ids := []string{}
-				for i := 0; i < num; i++ {
-					l := rand.Intn(int(w))
-					ids = append(ids, strconv.Itoa(l))
-				}
-				return strings.Join(ids, ", ")
-			}(w, 10)
-
-			log.Println("RAND", ids)
-		}()
+	for i := 0; i < 5; i++ {
+		log.Printf("call test : %v", i)
+		ts.ts = time.Now()
+		go ts.time_test(fmt.Sprintf("test # %v", i))
+		time.Sleep(300 * time.Millisecond)
 	}
+	time.Sleep(3 * time.Second)
+}
+
+func (t *timetest) time_test(title string) {
+	log.Printf("test start : %v", title)
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	<-ticker.C
+	if time.Now().UnixNano()-t.ts.UnixNano() > 1*1000000000 {
+		log.Printf("test end: %v", title)
+	} else {
+		log.Printf("test cancel: %v", title)
+	}
+
 }

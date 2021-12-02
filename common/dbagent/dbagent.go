@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/config"
 )
 
 type DBAgent interface {
@@ -23,6 +24,7 @@ type DBAgent interface {
 	GetTransactionwithExponential(num int, hashes *[]RemoverbleObj) bool
 	DeleteNoAccedObjects()
 	UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int)
+	UpdateDBNetworkDelay(addtime int, hop int)
 }
 
 type StorageObj struct {
@@ -39,7 +41,9 @@ type StorageBLTR struct {
 	ACTime          int64
 	AFLever         int
 }
+
 type DBStatus struct {
+	Timestamp         time.Time
 	ID                int
 	TotalBlocks       int
 	TotalTransactoins int
@@ -50,7 +54,8 @@ type DBStatus struct {
 	TotalQuery        int // the number of query including local storage
 	QueryFrom         int // the number of received query
 	QueryTo           int // the number of send query
-	Timestamp         time.Time
+	TotalDelay        int
+	TotalHop          [config.MAX_SC]int
 }
 
 type RemoverbleObj struct {

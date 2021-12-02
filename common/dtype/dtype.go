@@ -7,3 +7,11 @@ type NodeInfo struct {
 	Port int    `json:"port"`
 	Hash string `json:"hash"`
 }
+
+type ReqData struct {
+	Addr      string `json:"Addr"`
+	Timestamp int64  `json:"Timestamp"`
+	Hop       int    `json:"Hop"`
+	ObjType   string `json:"ObjType"`
+	ObjHash   string `json:"ObjHash"`
+}

@@ -24,7 +24,7 @@ const PATH = "./iotdata/IoT_normal_fridge_1.log"
 
 func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
 	url := fmt.Sprintf("ws://%v:%v/newblock", ip, port)
-	log.Printf("Send new block to %v", url)
+	//log.Printf("Send new block to %v", url)
 
 	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
@@ -32,21 +32,21 @@ func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
 		return
 	}
 	defer ws.Close()
-	log.Printf("DefaultDialer Send new block to %v", url)
+	// log.Printf("DefaultDialer Send new block to %v", url)
 
 	if err := ws.WriteJSON(b); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
 
-	for _, t := range b.Transactions {
-		log.Printf("Recevied node : %s", t.Data)
-	}
+	// for _, t := range b.Transactions {
+	// 	log.Printf("Recevied node : %s", t.Data)
+	// }
 
 }
 
 func (h *Handler) broadcastNewBlock(b *blockchain.Block) {
-	log.Printf("broadcast : %v", *h.Nodes)
+	// log.Printf("broadcast : %v", *h.Nodes)
 	for _, node := range *h.Nodes {
 		go h.sendNewBlock(b, node.IP, node.Port)
 	}
@@ -80,13 +80,16 @@ func (h *Handler) broadcastEndTest() {
 
 func (h *Handler) Start() {
 	// Send Genesis Block
+	cnt := 0
 	hash := h.db.GetLatestBlockHash()
 	if len(hash) == 0 {
 		log.Printf("Create Genesis due to hash : %v", hash)
 		b := blockchain.CreateGenesis()
 		h.db.AddBlock(b)
 		h.broadcastNewBlock(b)
-		time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+		log.Printf("Broadcast a new block : %v", cnt)
+		cnt++
+		// time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
 	}
 
 	msg := make(chan string)
@@ -102,7 +105,7 @@ func (h *Handler) Start() {
 		}
 	}()
 
-	ticker := time.NewTicker(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+	ticker := time.NewTicker(time.Second * time.Duration(config.BLOCK_CREATE_PERIOD))
 	defer ticker.Stop()
 	for {
 		<-ticker.C
@@ -116,13 +119,15 @@ func (h *Handler) Start() {
 					syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 					return
 				}
-				log.Printf("==>%s", d)
+				// log.Printf("==>%s", d)
 				tr := blockchain.CreateTransaction([]byte(d))
 				trs = append(trs, tr)
 			}
 			b := blockchain.CreateBlock(trs, []byte(h.db.GetLatestBlockHash()))
 			h.db.AddBlock(b)
 			h.broadcastNewBlock(b)
+			log.Printf("Broadcast a new block : %v", cnt)
+			cnt++
 		}
 
 	}

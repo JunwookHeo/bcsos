@@ -2,7 +2,7 @@
 
 if compgen -G "./db_nodes/*.db" > /dev/null; then
     echo "pattern exists!"
-    rm ./db_nodes/*.db
+    rm ./db_nodes/*.*
 fi
 # Storage Class == 0
 screen -dmS n7001 go run storagesrv.go -mode=pan -type=0 -port=7001

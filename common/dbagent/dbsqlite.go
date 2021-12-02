@@ -1,8 +1,10 @@
 package dbagent
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -48,7 +50,7 @@ func (a *dbagent) GetLatestBlockHash() string {
 			log.Printf("Read rows Error : %v", err)
 			return hash
 		}
-		log.Printf("latest block : %d, %s, %v, %s", id, dtype, ts, hash)
+		//log.Printf("latest block : %d, %s, %v, %s", id, dtype, ts, hash)
 	}
 
 	return hash
@@ -77,33 +79,6 @@ func (a *dbagent) RemoveObject(hash string) bool {
 	cnt, _ := rst.RowsAffected()
 	return cnt > 0
 }
-
-// func (a *dbagent) RemoveObjectMultiple(hashes []string) bool {
-// 	//Before removing data, update status first.
-// 	//a.updateRemoveDBStatus(hash)
-// 	hashes_str := ""
-// 	hashes_str += fmt.Sprintf("\"%s\"", strings.Join(hashes, `", "`))
-
-// 	a.mutex.Lock()
-// 	defer a.mutex.Unlock()
-// 	delete_strings := fmt.Sprintf("DELETE FROM bcobjects WHERE hash IN (%v);", hashes_str)
-// 	//log.Printf("delete : %v", delete_strings)
-// 	st, err := a.db.Prepare(delete_strings)
-// 	if err != nil {
-// 		log.Printf("Preparing removig object error : %v", err)
-// 		return false
-// 	}
-// 	defer st.Close()
-
-// 	rst, err := st.Exec()
-// 	if err != nil {
-// 		log.Printf("Exec removing object error : %v", err)
-// 		return false
-// 	}
-// 	cnt, _ := rst.RowsAffected()
-// 	log.Printf("delete multiple : %v", cnt)
-// 	return cnt > 0
-// }
 
 func (a *dbagent) updateACTimeObject(hash string) bool {
 	a.mutex.Lock()
@@ -251,33 +226,6 @@ func (a *dbagent) DeleteNoAccedObjects() {
 	}
 }
 
-// func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool {
-// 	// Randomly select 10 blocks in the ledger
-// 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE idx != 0 ORDER BY RANDOM() LIMIT ?;`, num)
-// 	rows, err := a.db.Query(`SELECT idx, transactionhash FROM blocktrtbl ORDER BY RANDOM() LIMIT ?;`, num)
-// 	if err != nil {
-// 		log.Printf("Object Not found : %v", err)
-// 		return false
-// 	}
-
-// 	defer rows.Close()
-
-// 	// Select a transaction in each block
-// 	for rows.Next() {
-// 		var hash string
-// 		var idx int
-// 		err := rows.Scan(&idx, &hash)
-// 		if err != nil {
-// 			log.Printf("Read rows Error : %v", err)
-// 			return false
-// 		}
-// 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
-// 		//log.Printf("Random choose hash : %v", hash)
-// 	}
-// 	//log.Printf("Random choose hash : %v", *hashes)
-// 	return true
-// }
-
 func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool {
 	w := config.TOTAL_TRANSACTIONS + config.TOTAL_TRANSACTIONS/config.NUM_TRANSACTION_BLOCK
 
@@ -321,13 +269,13 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 // It just select rows by exponentially generated numbers
 // without considering access time.
 func (a *dbagent) GetTransactionwithExponential(num int, hashes *[]RemoverbleObj) bool {
-	w := config.BASIC_UNIT_TIME * config.RATE_TSC
+	w := float64(config.BASIC_UNIT_TIME*config.RATE_TSC*(config.NUM_TRANSACTION_BLOCK+1.)) / float64(config.BLOCK_CREATE_PERIOD)
 
-	ids := func(w int, num int) string {
+	ids := func(w float64, num int) string {
 		ids := []string{}
 		for i := 0; i < num; i++ {
 			f := rand.ExpFloat64() / float64(config.LAMBDA_ED)
-			l := int(f * float64(w))
+			l := int(f * w)
 			ids = append(ids, strconv.Itoa(l))
 		}
 		return strings.Join(ids, ", ")
@@ -356,7 +304,7 @@ func (a *dbagent) GetTransactionwithExponential(num int, hashes *[]RemoverbleObj
 		}
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 	}
-	log.Printf("GetTransactionwithExponential : %v", hashes)
+	//log.Printf("GetTransactionwithExponential : %v", hashes)
 	return true
 }
 
@@ -440,10 +388,13 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 	// Add only block information without data, the data is stored in block-transaction matching table
 	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, []byte{}}
 	if id := a.AddObject(&obj); id != 0 {
+		a.mutex.Lock()
+		defer a.mutex.Unlock()
 		status := &a.dbstatus
 		status.TotalBlocks += 1
 		status.TotalTransactoins += cnt
-		a.updateDBStatus(status)
+		//a.updateMemDBStatus(status)
+
 		return id
 	}
 
@@ -496,8 +447,8 @@ func (a *dbagent) GetDBDataSize() uint64 {
 func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	rows, err := a.db.Query(`SELECT id, totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, timestamp 
-				FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
+	rows, err := a.db.Query(`SELECT id, timestamp, totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, 
+				totaldelay, totalhop, FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
 		return false
@@ -506,10 +457,17 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&status.ID, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions,
-			&status.Size, &status.TotalQuery, &status.QueryFrom, status.QueryTo, &status.Timestamp)
-		//log.Printf("DB Status : %v", status)
-		return true
+		var data []byte
+		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions,
+			&status.Size, &status.TotalQuery, &status.QueryFrom, status.QueryTo, &status.TotalDelay, &data)
+		//serial.Deserialize(data, &status.TotalHop)
+		if err := json.Unmarshal(data, &status.TotalHop); err != nil {
+			log.Panicf("Unmarshal error : %v", err)
+			return false
+		} else {
+			//log.Printf("DB Status : %v", status)
+			return true
+		}
 	}
 
 	return false
@@ -527,8 +485,10 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 
 	defer rows.Close()
 
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	status := &a.dbstatus
-	update := false
+	// update := false
 
 	for rows.Next() {
 		obj := StorageObj{}
@@ -538,23 +498,23 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 		case "block":
 			status.Blocks -= 1
 			status.Size -= size
-			update = true
+			// update = true
 		case "transaction":
 			status.Transactions -= 1
 			status.Size -= size
-			update = true
+			// update = true
 		case "blockheader":
 			status.Headers -= 1
 			status.Size -= size
-			update = true
+			// update = true
 		default:
 			log.Printf("Type error %s", obj.Type)
 		}
 	}
 
-	if update {
-		a.updateDBStatus(status)
-	}
+	// if update {
+	// 	a.updateMemDBStatus(status)
+	// }
 }
 
 func (a *dbagent) updateAddDBStatus(id int64) {
@@ -569,8 +529,10 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 
 	defer rows.Close()
 
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	status := &a.dbstatus
-	update := false
+	// update := false
 
 	for rows.Next() {
 		var obj StorageObj
@@ -580,52 +542,103 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 		case "block":
 			status.Blocks += 1
 			status.Size += size
-			update = true
+			// update = true
 		case "transaction":
 			status.Transactions += 1
 			status.Size += size
-			update = true
+			// update = true
 		case "blockheader":
 			status.Headers += 1
 			status.Size += size
-			update = true
+			// update = true
 		default:
 			log.Printf("Type error %s", obj.Type)
 		}
 	}
 
-	if update {
-		a.updateDBStatus(status)
-	}
+	// if update {
+	// 	a.updateMemDBStatus(status)
+	// }
 }
 
-func (a *dbagent) updateDBStatus(status *DBStatus) int64 {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	st, err := a.db.Prepare("INSERT INTO dbstatus (totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,  datetime('now'))")
-	if err != nil {
-		log.Printf("Prepare adding dbstatus error : %v", err)
-		return -1
-	}
-	defer st.Close()
+// func (a *dbagent) updateMemDBStatus(status *DBStatus) {
+// 	a.mutex.Lock()
+// 	defer a.mutex.Unlock()
+// 	a.dbstatus = *status
+// }
 
-	rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size, status.TotalQuery, status.QueryFrom, status.QueryTo)
-	if err != nil {
-		log.Panicf("Exec adding dbstatus error : %v", err)
-		return -1
+func (a *dbagent) updateDBStatus() {
+	getHash := func(status DBStatus) string {
+		status.ID = 0
+		status.Timestamp = time.Time{}
+		byte_status := sha256.Sum256(serial.Serialize(status))
+		return hex.EncodeToString(byte_status[:])
 	}
 
-	id, _ := rst.LastInsertId()
-	status.ID = int(id)
-	return id
+	last_hash := getHash(a.dbstatus)
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		<-ticker.C
+		func() {
+			a.mutex.Lock()
+			defer a.mutex.Unlock()
+			status := &a.dbstatus
+			hash_status := getHash(*status)
+			if last_hash == hash_status {
+				return
+			}
+
+			last_hash = hash_status
+
+			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totaltransactions, headers, blocks, transactions, size, 
+			totalquery, queryfrom, queryto, totaldelay, totalhop) VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			if err != nil {
+				log.Printf("Prepare adding dbstatus error : %v", err)
+				return
+			}
+			defer st.Close()
+
+			//data := serial.Serialize(status.TotalHop)
+			data, err := json.Marshal(status.TotalHop)
+			if err != nil {
+				log.Panicf("Marshal error : %v", err)
+				return
+			}
+
+			rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size,
+				status.TotalQuery, status.QueryFrom, status.QueryTo, status.TotalDelay, data)
+			if err != nil {
+				log.Panicf("Exec adding dbstatus error : %v", err)
+				return
+			}
+
+			id, _ := rst.LastInsertId()
+			status.ID = int(id)
+			log.Printf("Update dbstatus : %v", status)
+		}()
+	}
 }
 
 func (a *dbagent) UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	status := &a.dbstatus
 	status.QueryFrom += fromqc
 	status.QueryTo += toqc
 	status.TotalQuery += totalqc
-	a.updateDBStatus(status)
+	// a.updateMemDBStatus(status)
+}
+
+// addtime : nano second
+// hop : 1 to 3
+func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
+	status := &a.dbstatus
+	status.TotalDelay += (addtime / 1000000) //milli second
+	if 0 < hop && hop <= config.MAX_SC {
+		status.TotalHop[hop-1] += 1
+	}
 }
 
 func (a *dbagent) GetDBStatus() *DBStatus {
@@ -679,6 +692,7 @@ func newDBSqlite(path string, sc int) DBAgent {
 	// queryto : the number of send queries to get deleted transactions
 	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
+		timestamp			DATETIME,
 		totalblocks			INTEGER,
 		totaltransactions 	INTERGER,
 		headers				INTEGER,
@@ -688,7 +702,8 @@ func newDBSqlite(path string, sc int) DBAgent {
 		totalquery			INTEGER,
 		queryfrom			INTEGER,
 		queryto				INTEGER,
-		timestamp			DATETIME
+		totaldelay			INTEGER,
+		totalhop			BLOB
 	);`
 
 	st, err = db.Prepare(create_statustlb)
@@ -699,7 +714,8 @@ func newDBSqlite(path string, sc int) DBAgent {
 
 	st.Exec()
 
-	dba := dbagent{db: db, SClass: sc, dbstatus: DBStatus{}, mutex: sync.Mutex{}}
+	dba := dbagent{db: db, SClass: sc, dbstatus: DBStatus{Timestamp: time.Now()}, mutex: sync.Mutex{}}
 	dba.getLatestDBStatus(&dba.dbstatus)
+	go dba.updateDBStatus()
 	return &dba
 }
