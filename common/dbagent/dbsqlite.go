@@ -447,8 +447,8 @@ func (a *dbagent) GetDBDataSize() uint64 {
 func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	rows, err := a.db.Query(`SELECT id, timestamp, totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, 
-				totaldelay, totalhop, FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
+	//rows, err := a.db.Query(`SELECT id, timestamp, totalblocks, totaltransactions, headers, blocks, transactions, size, totalquery, queryfrom, queryto, totaldelay, totalhop  FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
+	rows, err := a.db.Query(`SELECT *  FROM dbstatus WHERE id = (SELECT MAX(id)  FROM dbstatus);`)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
 		return false
@@ -458,14 +458,17 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 
 	for rows.Next() {
 		var data []byte
+		//data := make([]byte, unsafe.Sizeof(status.TotalHop))
 		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions,
-			&status.Size, &status.TotalQuery, &status.QueryFrom, status.QueryTo, &status.TotalDelay, &data)
-		//serial.Deserialize(data, &status.TotalHop)
-		if err := json.Unmarshal(data, &status.TotalHop); err != nil {
-			log.Panicf("Unmarshal error : %v", err)
+			&status.Size, &status.TotalQuery, &status.QueryFrom, &status.QueryTo, &status.TotalDelay, &data)
+
+		log.Printf("%v", data)
+		if err := json.Unmarshal([]byte(data), &status.TotalHop); err != nil {
+			log.Panicf("Unmarshal error : %v - %v - %v", status, data, err)
 			return false
 		} else {
 			//log.Printf("DB Status : %v", status)
+			log.Printf("%v", status)
 			return true
 		}
 	}
@@ -616,7 +619,7 @@ func (a *dbagent) updateDBStatus() {
 
 			id, _ := rst.LastInsertId()
 			status.ID = int(id)
-			log.Printf("Update dbstatus : %v", status)
+			log.Printf("Update dbstatus : %v", *status)
 		}()
 	}
 }
