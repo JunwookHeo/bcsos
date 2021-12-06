@@ -32,12 +32,12 @@ type scnInfo struct {
 }
 
 func NewSCNInfo(l *dtype.NodeInfo) *scnInfo {
-	// return &scnInfo{local: l, scnodes: make([]scnList, config.MAX_SC+1), mutex: sync.Mutex{}}
+	// return &scnInfo{local: l, scnodes: make([]scnList, config.MAX_SC), mutex: sync.Mutex{}}
 	scn := scnInfo{}
 	scn.local = l
 	scn.mutex = sync.Mutex{}
-	scn.scnodes = make([][]dtype.NodeInfo, config.MAX_SC+1)
-	for i := 0; i < config.MAX_SC+1; i++ {
+	scn.scnodes = make([][]dtype.NodeInfo, config.MAX_SC)
+	for i := 0; i < config.MAX_SC; i++ {
 		scn.scnodes[i] = make([]dtype.NodeInfo, config.MAX_SC_PEER)
 		for j := 0; j < config.MAX_SC_PEER; j++ {
 			scn.scnodes[i][j] = zeroNode()
@@ -57,7 +57,7 @@ func xordistance(h1 string, h2 string) *big.Int {
 }
 
 func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
-	if n.SC > config.MAX_SC || n.Hash == c.local.Hash {
+	if n.SC >= config.MAX_SC || n.Hash == c.local.Hash {
 		return
 	}
 	c.mutex.Lock()
@@ -101,7 +101,7 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 }
 
 func (c *scnInfo) DeleteSCNNode(n dtype.NodeInfo) {
-	if n.SC > config.MAX_SC {
+	if n.SC >= config.MAX_SC {
 		return
 	}
 
@@ -138,7 +138,7 @@ func (c *scnInfo) DeleteSCNNode(n dtype.NodeInfo) {
 
 // return the copy of node list due to conccurency issues
 func (c *scnInfo) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
-	if sc > config.MAX_SC {
+	if sc >= config.MAX_SC {
 		return false
 	}
 
@@ -160,7 +160,7 @@ func (c *scnInfo) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeIn
 
 // return the copy of node list due to conccurency issues
 func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
-	if sc > config.MAX_SC {
+	if sc >= config.MAX_SC {
 		return false
 	}
 
@@ -191,7 +191,7 @@ func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MA
 	return pos > 0
 }
 
-func (c *scnInfo) GetSCNNodeListAll(nodes *[(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo) {
+func (c *scnInfo) GetSCNNodeListAll(nodes *[(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	//newscn := []dtype.NodeInfo{}

@@ -20,7 +20,7 @@ type DBAgent interface {
 	ShowAllObjets() bool
 	GetDBDataSize() uint64
 	GetDBStatus() *DBStatus
-	GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool
+	GetTransactionwithUniform(num int, hashes *[]RemoverbleObj) bool
 	GetTransactionwithExponential(num int, hashes *[]RemoverbleObj) bool
 	DeleteNoAccedObjects()
 	UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int)

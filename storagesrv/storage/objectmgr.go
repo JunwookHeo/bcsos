@@ -13,9 +13,9 @@ func (c *ObjectMgr) DeleteNoAccedObjects() {
 	c.db.DeleteNoAccedObjects()
 }
 
-func (c *ObjectMgr) AccessWithRandom(num int, rethashes *[]dbagent.RemoverbleObj) bool {
+func (c *ObjectMgr) AccessWithUniform(num int, rethashes *[]dbagent.RemoverbleObj) bool {
 	hashes := []dbagent.RemoverbleObj{}
-	ret := c.db.GetTransactionwithRandom(num, &hashes)
+	ret := c.db.GetTransactionwithUniform(num, &hashes)
 	if !ret {
 		return false
 	}
@@ -27,22 +27,25 @@ func (c *ObjectMgr) AccessWithRandom(num int, rethashes *[]dbagent.RemoverbleObj
 			if c.db.GetBlockHeader(hash.Hash, &bh) == 0 {
 				*rethashes = append(*rethashes, hash)
 				ret = true
+			} else {
+				cnt++ //count if local access
 			}
 		} else {
 			var tr blockchain.Transaction
 			if c.db.GetTransaction(hash.Hash, &tr) == 0 {
 				*rethashes = append(*rethashes, hash)
 				ret = true
+			} else {
+				cnt++ //count if local access
 			}
 		}
-		cnt++
 	}
-	c.db.UpdateDBNetworkQuery(0, 0, cnt)
+	c.db.UpdateDBNetworkQuery(0, 0, cnt) // local access
 
 	return ret
 }
 
-func (c *ObjectMgr) AccessWithTimeWeight(num int, rethashes *[]dbagent.RemoverbleObj) bool {
+func (c *ObjectMgr) AccessWithExponential(num int, rethashes *[]dbagent.RemoverbleObj) bool {
 	hashes := []dbagent.RemoverbleObj{}
 	ret := c.db.GetTransactionwithExponential(num, &hashes)
 	if !ret {
@@ -56,17 +59,20 @@ func (c *ObjectMgr) AccessWithTimeWeight(num int, rethashes *[]dbagent.Removerbl
 			if c.db.GetBlockHeader(hash.Hash, &bh) == 0 {
 				*rethashes = append(*rethashes, hash)
 				ret = true
+			} else {
+				cnt++ //count if local access
 			}
 		} else {
 			var tr blockchain.Transaction
 			if c.db.GetTransaction(hash.Hash, &tr) == 0 {
 				*rethashes = append(*rethashes, hash)
 				ret = true
+			} else {
+				cnt++ //count if local access
 			}
 		}
-		cnt++
 	}
-	c.db.UpdateDBNetworkQuery(0, 0, cnt)
+	c.db.UpdateDBNetworkQuery(0, 0, cnt) // local
 	return ret
 }
 

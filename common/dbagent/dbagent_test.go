@@ -79,7 +79,7 @@ func TestDBSqliteAdd(t *testing.T) {
 
 func TestDBSqliteRandom(t *testing.T) {
 	dba := NewDBAgent("../../storagesrv/bc_dev.db", 0)
-	//hashes := dba.GetTransactionwithRandom(50)
+	//hashes := dba.GetTransactionwithUniform(50)
 	dba.DeleteNoAccedObjects()
 	// csvfile, _ := os.Create("../../rs.csv")
 	// csvwriter := csv.NewWriter(csvfile)

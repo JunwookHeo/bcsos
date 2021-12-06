@@ -15,9 +15,9 @@ const (
 	EXPONENTIAL_ACCESS_PATTERN string = "Exponential_Distribution"
 )
 
-//const ACCESS_FREQUENCY_PATTERN string = RANDOM_ACCESS_PATTERN
+const ACCESS_FREQUENCY_PATTERN string = RANDOM_ACCESS_PATTERN
 
-const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
+//const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
 
 // P = 1 - e^(-lambda*t)
 // Example : Probability of event occure to be 50%
@@ -37,10 +37,10 @@ const ACCESS_FREQUENCY_PATTERN string = EXPONENTIAL_ACCESS_PATTERN
 // 0.99 0.1 	49.05170186
 
 // The basic unit of time (T)
-const BASIC_UNIT_TIME int = 60 // 60 seconds
-const PROBABILITY_FACTOR_50 float32 = 0.69
-const PROBABILITY_FACTOR_70 float32 = 1.20
-const PROBABILITY_FACTOR_90 float32 = 2.30
+const BASIC_UNIT_TIME int = 20                   // 60 seconds
+const PROBABILITY_FACTOR_SC0 float32 = 0.6931472 // P : 0.500000, T : 6.931472
+const PROBABILITY_FACTOR_SC1 float32 = 1.3862944 // P : 0.750000, T : 13.862944
+const PROBABILITY_FACTOR_SC2 float32 = 2.7725887 // P : 0.937500, T : 27.725887
 
 // Time period for Remove data : T x TSC0
 // TSC0 :  After the time, no access data will be removed from local storage.
@@ -56,18 +56,18 @@ const RATE_TSC int = 10 // x BASIC_UNIT_TIME
 const LAMBDA_ED float32 = 0.1
 
 // TSC0 = RATE_TSC x BASIC_UNIT_TIME * (PROBABILITY_FACTOR / LAMBDA_ED)
-const TSC0I int = int(float32(RATE_TSC*BASIC_UNIT_TIME) * (float32(PROBABILITY_FACTOR_50) / LAMBDA_ED))
-const TSC1I int = int(float32(RATE_TSC*BASIC_UNIT_TIME) * (float32(PROBABILITY_FACTOR_70) / LAMBDA_ED))
-const TSC2I int = int(float32(RATE_TSC*BASIC_UNIT_TIME) * (float32(PROBABILITY_FACTOR_90) / LAMBDA_ED))
+const TSC0I float32 = float32(RATE_TSC*BASIC_UNIT_TIME) * PROBABILITY_FACTOR_SC0 / LAMBDA_ED
+const TSC1I float32 = float32(RATE_TSC*BASIC_UNIT_TIME) * PROBABILITY_FACTOR_SC1 / LAMBDA_ED
+const TSC2I float32 = float32(RATE_TSC*BASIC_UNIT_TIME) * PROBABILITY_FACTOR_SC2 / LAMBDA_ED
 
 // Array for TSC0 ~ 3
-var TSCX = [...]int{TSC0I, TSC1I, TSC2I, 0}
+var TSCX = [...]float32{TSC0I, TSC1I, TSC2I, 0}
 
-// Max storage class
-const MAX_SC int = 3
+// Max number of storage class
+const MAX_SC int = 4
 
 // Max the number of peers for each storage class
-const MAX_SC_PEER int = 5
+const MAX_SC_PEER int = 7
 
 // Simulator Storage class : 100
 const SIM_SC int = 100

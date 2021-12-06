@@ -204,7 +204,7 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 //DeleteNoAccedObjects will delete transaction if there is no access more than a hour
 func (a *dbagent) DeleteNoAccedObjects() {
 	//log.Printf("%v", config.TSC0I)
-	ts := time.Now().UnixNano() - int64(config.TSCX[a.SClass]*1e9) // no access for if one hour, delete it
+	ts := time.Now().UnixNano() - int64(config.TSCX[a.SClass]*float32(1e9)) // no access for if one hour, delete it
 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE actime >= ? AND actime < ?;`, a.latestts, ts)
 	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type != 'block' AND hash 
 								IN (SELECT transactionhash FROM blocktrtbl WHERE actime < ?) LIMIT 50;`, ts)
@@ -226,7 +226,7 @@ func (a *dbagent) DeleteNoAccedObjects() {
 	}
 }
 
-func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) bool {
+func (a *dbagent) GetTransactionwithUniform(num int, hashes *[]RemoverbleObj) bool {
 	w := config.TOTAL_TRANSACTIONS + config.TOTAL_TRANSACTIONS/config.NUM_TRANSACTION_BLOCK
 
 	ids := func(w int, num int) string {
@@ -261,7 +261,7 @@ func (a *dbagent) GetTransactionwithRandom(num int, hashes *[]RemoverbleObj) boo
 		}
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 	}
-	log.Printf("GetTransactionwithRandom : %v", hashes)
+	log.Printf("GetTransactionwithUniform : %v", hashes)
 	return true
 }
 
@@ -491,7 +491,6 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	status := &a.dbstatus
-	// update := false
 
 	for rows.Next() {
 		obj := StorageObj{}
@@ -501,23 +500,16 @@ func (a *dbagent) updateRemoveDBStatus(hash string) {
 		case "block":
 			status.Blocks -= 1
 			status.Size -= size
-			// update = true
 		case "transaction":
 			status.Transactions -= 1
 			status.Size -= size
-			// update = true
 		case "blockheader":
 			status.Headers -= 1
 			status.Size -= size
-			// update = true
 		default:
 			log.Printf("Type error %s", obj.Type)
 		}
 	}
-
-	// if update {
-	// 	a.updateMemDBStatus(status)
-	// }
 }
 
 func (a *dbagent) updateAddDBStatus(id int64) {
@@ -535,7 +527,6 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	status := &a.dbstatus
-	// update := false
 
 	for rows.Next() {
 		var obj StorageObj
@@ -545,23 +536,16 @@ func (a *dbagent) updateAddDBStatus(id int64) {
 		case "block":
 			status.Blocks += 1
 			status.Size += size
-			// update = true
 		case "transaction":
 			status.Transactions += 1
 			status.Size += size
-			// update = true
 		case "blockheader":
 			status.Headers += 1
 			status.Size += size
-			// update = true
 		default:
 			log.Printf("Type error %s", obj.Type)
 		}
 	}
-
-	// if update {
-	// 	a.updateMemDBStatus(status)
-	// }
 }
 
 // func (a *dbagent) updateMemDBStatus(status *DBStatus) {
@@ -639,7 +623,7 @@ func (a *dbagent) UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int) {
 func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	status := &a.dbstatus
 	status.TotalDelay += (addtime / 1000000) //milli second
-	if 0 < hop && hop <= config.MAX_SC {
+	if 0 < hop && hop < config.MAX_SC {
 		status.TotalHop[hop-1] += 1
 	}
 }

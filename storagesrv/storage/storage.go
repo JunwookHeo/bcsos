@@ -88,7 +88,7 @@ func (h *Handler) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 	if reqData.ObjType == "transaction" {
 		tr := blockchain.Transaction{}
 		if h.db.GetTransaction(reqData.ObjHash, &tr) == 0 {
-			if h.getObjectQuery(&reqData, &tr) {
+			if h.getObjectQuery(h.local.SC+1, &reqData, &tr) {
 				h.db.AddTransaction(&tr)
 			}
 		}
@@ -96,7 +96,7 @@ func (h *Handler) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 	} else if reqData.ObjType == "blockheader" {
 		bh := blockchain.BlockHeader{}
 		if h.db.GetBlockHeader(reqData.ObjHash, &bh) == 0 {
-			if h.getObjectQuery(&reqData, &bh) {
+			if h.getObjectQuery(h.local.SC+1, &reqData, &bh) {
 				h.db.AddBlockHeader(reqData.ObjHash, &bh)
 			}
 		}
@@ -107,6 +107,7 @@ func (h *Handler) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 
 	reqData.Addr = fmt.Sprintf("%v:%v", h.local.IP, h.local.Port)
 	reqData.Hop += 1
+
 	ws.WriteJSON(reqData)
 	ws.WriteJSON(obj)
 	log.Printf("<==Query write reqData: %v", reqData)
@@ -126,7 +127,7 @@ func (h *Handler) newReqData(objtype string, hash string) dtype.ReqData {
 // getTransactionQuery queries a transaction ot other nodes with highr Storage Class
 // Request : hash of transaction
 // Response : transaction
-func (h *Handler) getObjectQuery(reqData *dtype.ReqData, obj interface{}) bool {
+func (h *Handler) getObjectQuery(startSC int, reqData *dtype.ReqData, obj interface{}) bool {
 	queryObject := func(ip string, port int, reqData *dtype.ReqData, obj interface{}) bool {
 		url := fmt.Sprintf("ws://%v:%v/getobject", ip, port)
 		//log.Printf("getTransactionQuery : %v", url)
@@ -160,177 +161,22 @@ func (h *Handler) getObjectQuery(reqData *dtype.ReqData, obj interface{}) bool {
 		return true
 	}
 
-	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
+	for i := startSC; i < config.MAX_SC; i++ {
 		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
 		if h.nm.GetSCNNodeListbyDistance(i, reqData.ObjHash, &nodes) {
 			for _, node := range nodes {
 				if node.IP == "" {
 					continue
 				}
+				if node.Hash == h.local.Hash { // If the node is itself, skip
+					continue
+				}
+
 				if queryObject(node.IP, node.Port, reqData, obj) {
 					return true
 				}
 				//time.Sleep(time.Duration(200 * time.Microsecond.Seconds()))
 				log.Printf("queryObject fail : query other nodes")
-			}
-		}
-	}
-
-	return false
-}
-
-// getTransactionHandler is called when transaction query from other nodes is received
-// if the node does not have the transaction, the node will query it to other nodes with highr SC
-// Request : hash of transaction
-// Response : transaction
-func (h *Handler) getTransactionHandler2(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println("getTransactionHandler transaction error : ", err)
-		return
-	}
-	defer ws.Close()
-
-	defer h.db.UpdateDBNetworkQuery(1, 0, 1)
-	var hash string
-	if err := ws.ReadJSON(&hash); err != nil {
-		log.Printf("Read json error : %v", err)
-		return
-	}
-
-	transaction := blockchain.Transaction{}
-	if h.db.GetTransaction(hash, &transaction) == 0 {
-		// log.Printf("Not having it, so request the transaction to other node")
-		if h.getTransactionQuery2(hash, &transaction) {
-			h.db.AddTransaction(&transaction)
-		}
-	}
-
-	ws.WriteJSON(transaction)
-}
-
-// getTransactionQuery queries a transaction ot other nodes with highr Storage Class
-// Request : hash of transaction
-// Response : transaction
-func (h *Handler) getTransactionQuery2(hash string, tr *blockchain.Transaction) bool {
-	queryTransaction2 := func(ip string, port int, hash string, tr *blockchain.Transaction) bool {
-		url := fmt.Sprintf("ws://%v:%v/gettransaction", ip, port)
-		//log.Printf("getTransactionQuery : %v", url)
-
-		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
-		if err != nil {
-			log.Printf("getTransactionQuery Dial error : %v", err)
-			return false
-		}
-		defer ws.Close()
-
-		// the number of query to other nodes
-		defer h.db.UpdateDBNetworkQuery(0, 1, 1)
-
-		if err := ws.WriteJSON(hash); err != nil {
-			log.Printf("Write json error : %v", err)
-			return false
-		}
-
-		if err := ws.ReadJSON(tr); err != nil {
-			log.Printf("Read json error : %v", err)
-			return false
-		}
-
-		return true
-	}
-
-	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
-		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
-		if h.nm.GetSCNNodeListbyDistance(i, hash, &nodes) {
-			for _, node := range nodes {
-				if node.IP == "" {
-					continue
-				}
-				if queryTransaction2(node.IP, node.Port, hash, tr) {
-					return true
-				}
-				//time.Sleep(time.Duration(200 * time.Microsecond.Seconds()))
-				log.Printf("queryTransaction fail : query other nodes")
-			}
-		}
-	}
-
-	return false
-}
-
-// getBlockHeaderHandler is called when block header query from other nodes is received
-// if the node does not have the block header, the node will query it to other nodes with highr SC
-// Request : hash of block header
-// Response : block header
-func (h *Handler) getBlockHeaderHandler2(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println("getBlockHeaderHandler transaction error : ", err)
-		return
-	}
-	defer ws.Close()
-	defer h.db.UpdateDBNetworkQuery(1, 0, 1)
-
-	var hash string
-	if err := ws.ReadJSON(&hash); err != nil {
-		log.Printf("Read json error : %v", err)
-	}
-
-	bh := blockchain.BlockHeader{}
-	if h.db.GetBlockHeader(hash, &bh) == 0 {
-		//log.Printf("Not having it, so request the transaction to other node")
-		if h.getBlockHeaderQuery2(hash, &bh) {
-			h.db.AddBlockHeader(hash, &bh)
-		}
-	}
-
-	ws.WriteJSON(bh)
-}
-
-// getBlockHeaderQuery queries a block header ot other nodes with highr Storage Class
-// Request : hash of block header
-// Response : block header
-func (h *Handler) getBlockHeaderQuery2(hash string, bh *blockchain.BlockHeader) bool {
-	queryBlockHeader2 := func(ip string, port int, hash string, bh *blockchain.BlockHeader) bool {
-		url := fmt.Sprintf("ws://%v:%v/getblockheader", ip, port)
-		//log.Printf("getBlockHeaderQuery : %v", url)
-
-		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
-		if err != nil {
-			log.Printf("getBlockHeaderQuery Dial error : %v", err)
-			return false
-		}
-		defer ws.Close()
-		defer h.db.UpdateDBNetworkQuery(0, 1, 1)
-
-		if err := ws.WriteJSON(hash); err != nil {
-			log.Printf("Write json error : %v", err)
-			return false
-		}
-
-		if err := ws.ReadJSON(bh); err != nil {
-			log.Printf("Read json error : %v", err)
-			return false
-		}
-
-		return true
-	}
-
-	for i := h.local.SC + 1; i <= config.MAX_SC; i++ {
-		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
-		if h.nm.GetSCNNodeListbyDistance(i, hash, &nodes) {
-			for _, node := range nodes {
-				if node.IP == "" {
-					continue
-				}
-				if queryBlockHeader2(node.IP, node.Port, hash, bh) {
-					return true
-				}
-				//time.Sleep(time.Duration(100 * time.Microsecond.Seconds()))
-				log.Printf("queryBlockHeader fail : query other nodes")
 			}
 		}
 	}
@@ -374,7 +220,7 @@ func (h *Handler) pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send peers info to the connector
-	var nodes [(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
 	h.nm.GetSCNNodeListAll(&nodes)
 	if err := ws.WriteJSON(nodes); err != nil {
 		log.Printf("Write json error : %v", err)
@@ -416,9 +262,9 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 			ret := false
 
 			if config.ACCESS_FREQUENCY_PATTERN == config.RANDOM_ACCESS_PATTERN {
-				ret = h.om.AccessWithRandom(config.NUM_AP_GEN, &hashes)
+				ret = h.om.AccessWithUniform(config.NUM_AP_GEN, &hashes)
 			} else {
-				ret = h.om.AccessWithTimeWeight(config.NUM_AP_GEN, &hashes)
+				ret = h.om.AccessWithExponential(config.NUM_AP_GEN, &hashes)
 			}
 
 			if ret {
@@ -426,7 +272,7 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 					if hash.HashType == 0 {
 						bh := blockchain.BlockHeader{}
 						req := h.newReqData("blockheader", hash.Hash)
-						if h.getObjectQuery(&req, &bh) {
+						if h.getObjectQuery(h.local.SC, &req, &bh) {
 							h.db.AddBlockHeader(hash.Hash, &bh)
 							if hash.Hash != hex.EncodeToString(bh.GetHash()) {
 								log.Panicf("%v header Hash not equal %v", hash.Hash, hex.EncodeToString(bh.GetHash()))
@@ -435,7 +281,7 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 					} else {
 						tr := blockchain.Transaction{}
 						req := h.newReqData("transaction", hash.Hash)
-						if h.getObjectQuery(&req, &tr) {
+						if h.getObjectQuery(h.local.SC, &req, &tr) {
 							h.db.AddTransaction(&tr)
 							if hash.Hash != hex.EncodeToString(tr.Hash) {
 								log.Panicf("%v Tr Hash not equal %v", hash.Hash, hex.EncodeToString(tr.Hash))
@@ -444,7 +290,7 @@ func (h *Handler) ObjectbyAccessPatternProc() {
 					}
 				}
 
-				if h.local.SC < config.MAX_SC {
+				if h.local.SC < config.MAX_SC-1 {
 					h.om.DeleteNoAccedObjects()
 				}
 			}
@@ -487,8 +333,6 @@ func NewHandler(path string, local dtype.NodeInfo) *Handler {
 
 	m.Handle("/", http.FileServer(http.Dir("static")))
 	m.HandleFunc("/newblock", h.newBlockHandler)
-	m.HandleFunc("/gettransaction", h.getTransactionHandler2)
-	m.HandleFunc("/getblockheader", h.getBlockHeaderHandler2)
 	m.HandleFunc("/getobject", h.getObjectHandler)
 	m.HandleFunc("/nodeinfo", h.nodeInfoHandler)
 	m.HandleFunc("/ping", h.pingHandler)

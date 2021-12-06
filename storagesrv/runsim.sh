@@ -35,13 +35,13 @@ then
     tmux split-window -h -t MLDC:1.2
     tmux split-window -h -t MLDC:1.4
     tmux split-window -h -t MLDC:1.6
-    tmux send-keys -t MLDC:1.0 'go run storagesrv.go -mode=pan -type=0 -port=7011' C-m
-    tmux send-keys -t MLDC:1.1 'go run storagesrv.go -mode=pan -type=0 -port=7012' C-m
-    tmux send-keys -t MLDC:1.2 'go run storagesrv.go -mode=pan -type=0 -port=7013' C-m
-    tmux send-keys -t MLDC:1.3 'go run storagesrv.go -mode=pan -type=0 -port=7014' C-m
-    tmux send-keys -t MLDC:1.4 'go run storagesrv.go -mode=pan -type=0 -port=7021' C-m
-    tmux send-keys -t MLDC:1.5 'go run storagesrv.go -mode=pan -type=0 -port=7022' C-m
-    tmux send-keys -t MLDC:1.6 'go run storagesrv.go -mode=pan -type=0 -port=7031' C-m 
+    tmux send-keys -t MLDC:1.0 'go run storagesrv.go -mode=pan -type=1 -port=7011' C-m
+    tmux send-keys -t MLDC:1.1 'go run storagesrv.go -mode=pan -type=1 -port=7012' C-m
+    tmux send-keys -t MLDC:1.2 'go run storagesrv.go -mode=pan -type=1 -port=7013' C-m
+    tmux send-keys -t MLDC:1.3 'go run storagesrv.go -mode=pan -type=1 -port=7014' C-m
+    tmux send-keys -t MLDC:1.4 'go run storagesrv.go -mode=pan -type=2 -port=7021' C-m
+    tmux send-keys -t MLDC:1.5 'go run storagesrv.go -mode=pan -type=2 -port=7022' C-m
+    tmux send-keys -t MLDC:1.6 'go run storagesrv.go -mode=pan -type=3 -port=7031' C-m 
     tmux send-keys -t MLDC:1.7 'cd ../blockchainsim' C-m
     tmux send-keys -t MLDC:1.7 'rm bc_dummy.db' C-m
     tmux send-keys -t MLDC:1.7 'go run blockchainsim.go' C-m

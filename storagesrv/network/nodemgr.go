@@ -50,7 +50,7 @@ func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
 	}
 
 	checked := false
-	for i := 0; i <= config.MAX_SC; i++ {
+	for i := 0; i < config.MAX_SC; i++ {
 		var nodes [config.MAX_SC_PEER]dtype.NodeInfo
 		if n.scn.GetSCNNodeList(i, &nodes) {
 			for _, node := range nodes {
@@ -71,15 +71,11 @@ func (n *NodeMgr) AddNSCNNode(node dtype.NodeInfo) {
 	n.scn.AddNSCNNode(node)
 }
 
-// func (n *NodeMgr) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
-// 	return n.scn.GetSCNNodeList(sc, nodes)
-// }
-
 func (n *NodeMgr) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
 	return n.scn.GetSCNNodeListbyDistance(sc, oid, nodes)
 }
 
-func (n *NodeMgr) GetSCNNodeListAll(nodes *[(config.MAX_SC + 1) * config.MAX_SC_PEER]dtype.NodeInfo) {
+func (n *NodeMgr) GetSCNNodeListAll(nodes *[(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo) {
 	n.scn.GetSCNNodeListAll(nodes)
 }
 
