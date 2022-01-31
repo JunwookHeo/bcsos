@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"log"
+
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/dbagent"
 )
@@ -41,7 +43,7 @@ func (c *ObjectMgr) AccessWithUniform(num int, rethashes *[]dbagent.RemoverbleOb
 		}
 	}
 	c.db.UpdateDBNetworkQuery(0, 0, cnt) // local access
-
+	log.Printf("===> number of gen : %v, %v", len(hashes), cnt)
 	return ret
 }
 

@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -207,7 +206,7 @@ func (a *dbagent) DeleteNoAccedObjects() {
 	ts := time.Now().UnixNano() - int64(config.TSCX[a.SClass]*float32(1e9)) // no access for if one hour, delete it
 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE actime >= ? AND actime < ?;`, a.latestts, ts)
 	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type != 'block' AND hash 
-								IN (SELECT transactionhash FROM blocktrtbl WHERE actime < ?) LIMIT 50;`, ts)
+								IN (SELECT transactionhash FROM blocktrtbl WHERE actime < ?) ;`, ts)
 	if err != nil {
 		log.Printf("Object Not found : %v", err)
 		return
@@ -457,20 +456,10 @@ func (a *dbagent) getLatestDBStatus(status *DBStatus) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		var data []byte
-		//data := make([]byte, unsafe.Sizeof(status.TotalHop))
 		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalTransactoins, &status.Headers, &status.Blocks, &status.Transactions,
-			&status.Size, &status.TotalQuery, &status.QueryFrom, &status.QueryTo, &status.TotalDelay, &data)
+			&status.Size, &status.TotalQuery, &status.QueryFrom, &status.QueryTo, &status.TotalDelay, &status.Hop0, &status.Hop1, &status.Hop2, &status.Hop3)
 
-		log.Printf("%v", data)
-		if err := json.Unmarshal([]byte(data), &status.TotalHop); err != nil {
-			log.Panicf("Unmarshal error : %v - %v - %v", status, data, err)
-			return false
-		} else {
-			//log.Printf("DB Status : %v", status)
-			log.Printf("%v", status)
-			return true
-		}
+		return true
 	}
 
 	return false
@@ -580,22 +569,15 @@ func (a *dbagent) updateDBStatus() {
 			last_hash = hash_status
 
 			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totaltransactions, headers, blocks, transactions, size, 
-			totalquery, queryfrom, queryto, totaldelay, totalhop) VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			totalquery, queryfrom, queryto, totaldelay, hop0, hop1, hop2, hop3) VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 			if err != nil {
 				log.Printf("Prepare adding dbstatus error : %v", err)
 				return
 			}
 			defer st.Close()
 
-			//data := serial.Serialize(status.TotalHop)
-			data, err := json.Marshal(status.TotalHop)
-			if err != nil {
-				log.Panicf("Marshal error : %v", err)
-				return
-			}
-
 			rst, err := st.Exec(status.TotalBlocks, status.TotalTransactoins, status.Headers, status.Blocks, status.Transactions, status.Size,
-				status.TotalQuery, status.QueryFrom, status.QueryTo, status.TotalDelay, data)
+				status.TotalQuery, status.QueryFrom, status.QueryTo, status.TotalDelay, status.Hop0, status.Hop1, status.Hop2, status.Hop3)
 			if err != nil {
 				log.Panicf("Exec adding dbstatus error : %v", err)
 				return
@@ -623,8 +605,15 @@ func (a *dbagent) UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int) {
 func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	status := &a.dbstatus
 	status.TotalDelay += (addtime / 1000000) //milli second
-	if 0 < hop && hop < config.MAX_SC {
-		status.TotalHop[hop-1] += 1
+	switch hop {
+	case 0:
+		status.Hop0 += 1
+	case 1:
+		status.Hop1 += 1
+	case 2:
+		status.Hop2 += 1
+	case 3:
+		status.Hop3 += 1
 	}
 }
 
@@ -690,7 +679,10 @@ func newDBSqlite(path string, sc int) DBAgent {
 		queryfrom			INTEGER,
 		queryto				INTEGER,
 		totaldelay			INTEGER,
-		totalhop			BLOB
+		hop0				INTEGER,
+		hop1				INTEGER,
+		hop2				INTEGER,
+		hop3				INTEGER
 	);`
 
 	st, err = db.Prepare(create_statustlb)

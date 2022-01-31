@@ -77,13 +77,14 @@ func (h *Handler) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	defer h.db.UpdateDBNetworkQuery(1, 0, 1)
 	var reqData dtype.ReqData
 	if err := ws.ReadJSON(&reqData); err != nil {
 		log.Printf("Read json error : %v", err)
 		return
 	}
 
+	h.db.UpdateDBNetworkQuery(1, 0, 0)
+	reqData.SC = h.local.SC
 	var obj interface{}
 	if reqData.ObjType == "transaction" {
 		tr := blockchain.Transaction{}
@@ -91,6 +92,8 @@ func (h *Handler) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 			if h.getObjectQuery(h.local.SC+1, &reqData, &tr) {
 				h.db.AddTransaction(&tr)
 			}
+		} else {
+			h.db.UpdateDBNetworkQuery(0, 0, 1)
 		}
 		obj = tr
 	} else if reqData.ObjType == "blockheader" {
@@ -99,6 +102,8 @@ func (h *Handler) getObjectHandler(w http.ResponseWriter, r *http.Request) {
 			if h.getObjectQuery(h.local.SC+1, &reqData, &bh) {
 				h.db.AddBlockHeader(reqData.ObjHash, &bh)
 			}
+		} else {
+			h.db.UpdateDBNetworkQuery(0, 0, 1)
 		}
 		obj = bh
 	} else {
@@ -117,6 +122,7 @@ func (h *Handler) newReqData(objtype string, hash string) dtype.ReqData {
 	req := dtype.ReqData{}
 	req.Addr = fmt.Sprintf("%v:%v", h.local.IP, h.local.Port)
 	req.Timestamp = time.Now().UnixNano()
+	req.SC = h.local.SC
 	req.Hop = 0
 	req.ObjType = objtype
 	req.ObjHash = hash
@@ -139,9 +145,6 @@ func (h *Handler) getObjectQuery(startSC int, reqData *dtype.ReqData, obj interf
 		}
 		defer ws.Close()
 
-		// the number of query to other nodes
-		defer h.db.UpdateDBNetworkQuery(0, 1, 1)
-
 		if err := ws.WriteJSON(*reqData); err != nil {
 			log.Printf("Write json error : %v", err)
 			return false
@@ -156,10 +159,14 @@ func (h *Handler) getObjectQuery(startSC int, reqData *dtype.ReqData, obj interf
 			return false
 		}
 
-		h.db.UpdateDBNetworkDelay(int(time.Now().UnixNano()-reqData.Timestamp), reqData.Hop)
-		log.Printf("==>Query read reqData: %v", reqData)
+		hop := reqData.SC - h.local.SC
+		h.db.UpdateDBNetworkDelay(int(time.Now().UnixNano()-reqData.Timestamp), hop)
+		log.Printf("==>Query read reqData: %v[hop], %v", hop, reqData)
 		return true
 	}
+
+	// the number of query to other nodes
+	defer h.db.UpdateDBNetworkQuery(0, 1, 1)
 
 	for i := startSC; i < config.MAX_SC; i++ {
 		var nodes [config.MAX_SC_PEER]dtype.NodeInfo

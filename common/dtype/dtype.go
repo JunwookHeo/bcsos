@@ -11,6 +11,7 @@ type NodeInfo struct {
 type ReqData struct {
 	Addr      string `json:"Addr"`
 	Timestamp int64  `json:"Timestamp"`
+	SC        int    `json:"storage_class"`
 	Hop       int    `json:"Hop"`
 	ObjType   string `json:"ObjType"`
 	ObjHash   string `json:"ObjHash"`

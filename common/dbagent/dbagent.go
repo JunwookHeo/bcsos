@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
-	"github.com/junwookheo/bcsos/common/config"
 )
 
 type DBAgent interface {
@@ -55,7 +54,10 @@ type DBStatus struct {
 	QueryFrom         int // the number of received query
 	QueryTo           int // the number of send query
 	TotalDelay        int
-	TotalHop          [config.MAX_SC]int
+	Hop0              int
+	Hop1              int
+	Hop2              int
+	Hop3              int
 }
 
 type RemoverbleObj struct {

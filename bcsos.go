@@ -1,9 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"time"
+	"math/rand"
 )
 
 func init() {
@@ -29,9 +28,6 @@ type Student struct {
 // 		return
 // 	}
 // }
-type timetest struct {
-	ts time.Time
-}
 
 func main() {
 	log.Print("Print log")
@@ -46,27 +42,14 @@ func main() {
 	// 	return
 	// }
 
-	ts := timetest{time.Now()}
-
-	for i := 0; i < 5; i++ {
-		log.Printf("call test : %v", i)
-		ts.ts = time.Now()
-		go ts.time_test(fmt.Sprintf("test # %v", i))
-		time.Sleep(300 * time.Millisecond)
-	}
-	time.Sleep(3 * time.Second)
-}
-
-func (t *timetest) time_test(title string) {
-	log.Printf("test start : %v", title)
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-	<-ticker.C
-	if time.Now().UnixNano()-t.ts.UnixNano() > 1*1000000000 {
-		log.Printf("test end: %v", title)
-	} else {
-		log.Printf("test cancel: %v", title)
+	cnt := 0
+	for i := 0; i < 100; i++ {
+		f := rand.ExpFloat64() / 0.1 * 280.
+		log.Printf("%v", f)
+		if f > 6.9*280 {
+			cnt++
+		}
 	}
 
+	log.Printf("%v", cnt)
 }
