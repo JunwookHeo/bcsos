@@ -30,7 +30,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/gob"
+	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/ripemd160"
@@ -38,7 +41,7 @@ import (
 
 const (
 	checksumLength = 4
-	version        = byte(0x00)
+	version        = byte(0x80)
 )
 
 type Wallet struct {
@@ -46,7 +49,12 @@ type Wallet struct {
 	PublicKey  []byte
 }
 
-func NewWallet() *Wallet {
+func NewWallet(path string) *Wallet {
+	w, err := LoadFile(path)
+	if err == nil {
+		return w
+	}
+
 	curve := elliptic.P256()
 
 	priKey, err := ecdsa.GenerateKey(curve, rand.Reader)
@@ -56,7 +64,10 @@ func NewWallet() *Wallet {
 
 	pubK := append(priKey.PublicKey.X.Bytes(), priKey.PublicKey.Y.Bytes()...)
 
-	return &Wallet{priKey, pubK}
+	w = &Wallet{priKey, pubK}
+
+	saveFile(w, path)
+	return w
 }
 
 func getChecksum(payload []byte) []byte {
@@ -77,7 +88,7 @@ func HashPubKey(pubKey []byte) []byte {
 	return ripemd160Hasher.Sum(nil)
 }
 
-func (w *Wallet) getAddress() []byte {
+func (w *Wallet) GetAddress() []byte {
 	payload := HashPubKey(w.PublicKey)
 
 	verPayload := append([]byte{version}, payload...)
@@ -128,4 +139,44 @@ func Base58Decode(input []byte) []byte {
 	}
 
 	return decode
+}
+
+func LoadFile(path string) (*Wallet, error) {
+	walletFile := path
+	if _, err := os.Stat(walletFile); os.IsNotExist(err) {
+		return nil, err
+	}
+
+	fileContent, err := ioutil.ReadFile(walletFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var w Wallet
+	gob.Register(elliptic.P256())
+	decoder := gob.NewDecoder(bytes.NewReader(fileContent))
+	err = decoder.Decode(&w)
+	if err != nil {
+		return nil, err
+	}
+
+	return &w, nil
+}
+
+func saveFile(w *Wallet, path string) {
+	var content bytes.Buffer
+	walletFile := path
+
+	gob.Register(elliptic.P256())
+
+	encoder := gob.NewEncoder(&content)
+	err := encoder.Encode(w)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	err = ioutil.WriteFile(walletFile, content.Bytes(), 0644)
+	if err != nil {
+		log.Panic(err)
+	}
 }

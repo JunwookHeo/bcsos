@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,15 +21,17 @@ func TestDBSqlite(t *testing.T) {
 
 func TestDBSqliteAdd(t *testing.T) {
 	path := "test2.db"
+	wallet_path := "./wallet_test.wallet"
 	dba := NewDBAgent(path, 0)
 	assert.FileExists(t, path)
+	w := wallet.NewWallet(wallet_path)
 
 	crbl := func(pre string) *blockchain.Block {
 		var trs []*blockchain.Transaction
 		sss := []string{pre + "11111111111111111111", pre + "22222222222222222222222", pre + "333333333333333333"}
 		for i := 0; i < 3; i++ {
 			s := sss[i]
-			tr := blockchain.CreateTransaction([]byte(s))
+			tr := blockchain.CreateTransaction(w, []byte(s))
 			assert.Equal(t, []byte(s), tr.Data)
 			trs = append(trs, tr)
 		}
@@ -49,6 +52,7 @@ func TestDBSqliteAdd(t *testing.T) {
 	assert.Equal(t, b1.Header, b2.Header)
 	for i := 0; i < len(b2.Transactions); i++ {
 		assert.Equal(t, b1.Transactions[i], b2.Transactions[i])
+		log.Printf("==> %v, %v", b1.Transactions[i].Signature, b2.Transactions[i].Signature)
 	}
 
 	b1 = crbl("bbbbb-")
@@ -75,6 +79,7 @@ func TestDBSqliteAdd(t *testing.T) {
 	//dba.ShowAllObjets()
 	dba.Close()
 	os.Remove(path)
+	os.Remove(wallet_path)
 }
 
 func TestDBSqliteRandom(t *testing.T) {

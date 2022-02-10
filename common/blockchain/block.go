@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/junwookheo/bcsos/common/wallet"
 )
 
 type BlockHeader struct {
@@ -40,8 +41,8 @@ func genesis(t *Transaction) *Block {
 	return CreateBlock([]*Transaction{t}, []byte{})
 }
 
-func CreateGenesis() *Block {
-	tr := CreateTransaction([]byte("This is Genesis Block"))
+func CreateGenesis(w *wallet.Wallet) *Block {
+	tr := CreateTransaction(w, []byte("This is Genesis Block"))
 	return genesis(tr)
 }
 

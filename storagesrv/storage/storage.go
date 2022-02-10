@@ -15,19 +15,21 @@ import (
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
+	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/junwookheo/bcsos/storagesrv/network"
 	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
 )
 
 type Handler struct {
 	http.Handler
-	db    dbagent.DBAgent
-	sim   dtype.NodeInfo
-	local dtype.NodeInfo
-	tmc   *testmgrcli.TestMgrCli
-	nm    *network.NodeMgr
-	om    *ObjectMgr
-	mutex sync.Mutex
+	wallet *wallet.Wallet
+	db     dbagent.DBAgent
+	sim    dtype.NodeInfo
+	local  dtype.NodeInfo
+	tmc    *testmgrcli.TestMgrCli
+	nm     *network.NodeMgr
+	om     *ObjectMgr
+	mutex  sync.Mutex
 }
 
 var upgrader = websocket.Upgrader{
@@ -321,11 +323,13 @@ func (h *Handler) PeerListProc() {
 	}()
 }
 
-func NewHandler(path string, local dtype.NodeInfo) *Handler {
+func NewHandler(db_path string, wallet_path string, local dtype.NodeInfo) *Handler {
 	m := mux.NewRouter()
+	w, _ := wallet.LoadFile(wallet_path)
 	h := &Handler{
 		Handler: m,
-		db:      dbagent.NewDBAgent(path, local.SC),
+		wallet:  w,
+		db:      dbagent.NewDBAgent(db_path, local.SC),
 		sim:     dtype.NodeInfo{Mode: "", SC: config.SIM_SC, IP: "", Port: 0, Hash: ""},
 		local:   local,
 		tmc:     nil,

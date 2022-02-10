@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -15,11 +13,12 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/common/dtype"
-	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/junwookheo/bcsos/storagesrv/storage"
 )
 
 var db_path string = "./bc_dev.db"
+var wallet_path string = "./bc_dev.wallet"
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
@@ -62,11 +61,15 @@ func GetLocalAddress() dtype.NodeInfo {
 		}
 	} else {
 		db_path = fmt.Sprintf("./db_nodes/%v.db", port)
+		wallet_path = fmt.Sprintf("./db_nodes/%v.wallet", port)
 	}
 
 	local.Port = port
-	hash := sha256.Sum256(serial.Serialize(local))
-	local.Hash = hex.EncodeToString(hash[:])
+	// hash := sha256.Sum256(serial.Serialize(local))
+	// local.Hash = hex.EncodeToString(hash[:])
+	w := wallet.NewWallet(wallet_path)
+	local.Hash = string(w.GetAddress()[:])
+	log.Printf("==>%v", local.Hash)
 	return local
 }
 
@@ -78,7 +81,7 @@ func main() {
 	defer signal.Reset()
 
 	local := GetLocalAddress()
-	s := storage.NewHandler(db_path, local)
+	s := storage.NewHandler(db_path, wallet_path, local)
 	s.PeerListProc()
 	s.ObjectbyAccessPatternProc()
 

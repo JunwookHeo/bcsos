@@ -4,22 +4,27 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewWallet(t *testing.T) {
+	path := "./wallet_test.wallet"
 	log.Println("TestNewWallet ==>")
-	w := NewWallet()
+	w := NewWallet(path)
 	log.Printf("Private Key : 0x%X", w.PrivateKey.D)
 	log.Printf("Public Key (0x%X, 0x%X)", w.PrivateKey.X, w.PrivateKey.Y)
 
-	address := w.getAddress()
+	address := w.GetAddress()
 	log.Printf("Address : %s", address)
 
 	assert.True(t, ValidateAddress(address))
 
+	w2, _ := LoadFile(path)
+	assert.Equal(t, w, w2)
+	os.Remove(path)
 }
 
 func TestValidateAddress(t *testing.T) {

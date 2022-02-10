@@ -12,6 +12,7 @@ import (
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
+	"github.com/junwookheo/bcsos/common/wallet"
 )
 
 type Handler struct {
@@ -80,11 +81,15 @@ func (h *Handler) broadcastEndTest() {
 
 func (h *Handler) Start() {
 	// Send Genesis Block
+	wallet_path := "./bc_dummy.wallet"
+	w := wallet.NewWallet(wallet_path)
+	log.Printf("wallet : %v", w)
+
 	cnt := 0
 	hash := h.db.GetLatestBlockHash()
 	if len(hash) == 0 {
 		log.Printf("Create Genesis due to hash : %v", hash)
-		b := blockchain.CreateGenesis()
+		b := blockchain.CreateGenesis(w)
 		h.db.AddBlock(b)
 		h.broadcastNewBlock(b)
 		log.Printf("Broadcast a new block : %v", cnt)
@@ -120,7 +125,7 @@ func (h *Handler) Start() {
 					return
 				}
 				// log.Printf("==>%s", d)
-				tr := blockchain.CreateTransaction([]byte(d))
+				tr := blockchain.CreateTransaction(w, []byte(d))
 				trs = append(trs, tr)
 			}
 			b := blockchain.CreateBlock(trs, []byte(h.db.GetLatestBlockHash()))
