@@ -27,6 +27,14 @@ type Test struct {
 	Start bool `json:"start"`
 }
 
+type Command struct {
+	Cmd    string `json:"cmd"`
+	Subcmd string `json:"subcmd"`
+	Arg1   string `json:"arg1"`
+	Arg2   string `json:"arg2"`
+	Arg3   string `json:"arg3"`
+}
+
 type Handler struct {
 	http.Handler
 	db      dbagent.DBAgent
@@ -142,6 +150,36 @@ func (h *Handler) pingHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// commandHandler deals with commands from web app
+// Web app --> blockchain simulator --> storage nodes
+func (h *Handler) commandHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("nodesHandler", err)
+		return
+	}
+	defer ws.Close()
+	done := make(chan struct{})
+	func() {
+		defer close(done)
+		for {
+			var cmd Command
+			if err := ws.ReadJSON(&cmd); err != nil {
+				log.Printf("Read json error : %v", err)
+				return
+			}
+			log.Printf("Test command receive : %v", cmd)
+
+			cmd.Arg2 = "OK"
+			if err := ws.WriteJSON(cmd); err != nil {
+				log.Printf("Write json error : %v", err)
+				return
+			}
+		}
+	}()
+}
+
 func (h *Handler) UpdateTestStatus(ready bool) {
 	h.Ready = ready
 	h.BCDummy.Ready = ready
@@ -189,12 +227,12 @@ func NewHandler(path string) *Handler {
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/static/", http.StripPrefix("/static", fs))
 	m.Handle("/", fs)
-	m.Handle("/left.html", fs)
-	m.Handle("/right.html", fs)
+	m.Handle("/styles.css", fs)
 
 	m.HandleFunc("/register", h.registerHandler)
 	m.HandleFunc("/nodes", h.nodesHandler)
 	m.HandleFunc("/ping", h.pingHandler)
+	m.HandleFunc("/command", h.commandHandler)
 
 	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
 	h.TC = NewTestConfig(h.db, &h.Nodes)

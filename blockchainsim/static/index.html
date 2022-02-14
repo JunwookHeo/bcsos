@@ -4,10 +4,130 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <link rel="stylesheet" href="/styles.css">
     <title>Test Simulator</title>
   </head>
-  <frameset cols="30%, *">
-     <frame src="/left.html">
-     <frame src="/right.html">
-  </frameset>    
+  <body>    
+    <header>
+      <h2>Simulator Server</h2>
+    </header>
+
+    <section>      
+      <nav>       
+        <div class="btn-group">          
+          <button id="btn_start">Start Test</button>
+          <button id="btn_stop">Stop Test</button>  
+        </div>
+      </nav>
+    
+
+    <article>
+    <div id="item_nodes"></div>
+
+    <script>
+        let wscommand = new WebSocket("ws://" + window.location.host +"/command");
+        console.log("Attempting Connection... : command");
+
+        wscommand.onopen = () => {
+            console.log("Successfully Connected : command");
+        };
+        
+        wscommand.onclose = event => {
+            console.log("Socket Closed Connection: ", event);
+            //socket.send("Client Closed!")
+        };
+
+        wscommand.onmessage = event => {
+            res = JSON.parse(event.data);
+            console.log("Socket message: ", res);
+            writeToScreen(res);
+        };
+
+        wscommand.onerror = error => {
+            console.log("Socket Error: ", error);
+        };
+
+        function writeToScreen(res){
+          var s = document.getElementById("status");
+          s.value = JSON.stringify(res);
+        }
+
+        document.getElementById("btn_start").onclick = function(){ 
+            if(wscommand.readyState === wscommand.OPEN){ 
+              wscommand.send(JSON.stringify({
+                    cmd:"SET",
+                    subcmd : "Test",
+                    arg1:"Start",
+                    arg2:"",
+                    arg3:""
+                }));
+                console.log("send test true")
+            }else{ 
+                alert("no socket"); 
+            } 
+        }
+
+        document.getElementById("btn_stop").onclick = function(){ 
+            if(wscommand.readyState === wscommand.OPEN){ 
+              wscommand.send(JSON.stringify({
+                  cmd:"SET",
+                  subcmd : "Test",
+                  arg1:"Stop",
+                  arg2:"",
+                  arg3:""
+                }));
+                console.log("send test false")
+            }else{ 
+                alert("no socket"); 
+            } 
+        } 
+
+      let wsnodes = new WebSocket("ws://" + window.location.host +"/nodes");
+      console.log("Attempting Connection... : nodes");
+
+      wsnodes.onopen = () => {
+          console.log("Successfully Connected : nodes");
+      };
+      
+      wsnodes.onclose = event => {
+          console.log("Socket Closed Connection: ", event);
+          //socket.send("Client Closed!")
+      };
+
+      wsnodes.onmessage = event => {
+          res = JSON.parse(event.data);
+          console.log("Socket message: ", res);
+          nodesinfo(res);
+      };
+
+      wsnodes.onerror = error => {
+          console.log("Socket Error: ", error);
+      };
+
+      function nodesinfo(nodes){
+          item_nodes.innerHTML = ''
+          if(nodes === null) return
+
+          nodes.forEach((e) => {
+              var a = document.createElement("a");
+              var newItem = document.createElement("li");
+              a.textContent = JSON.stringify(e);
+              //pre.style.wordWrap = "break-word";
+              //let msg = '<span style="color: blue;">' + JSON.stringify(e) + '</span>';
+              //pre.innerHTML = msg;
+              a.setAttribute('href', "http://"+ e.ip + ":"+ e.port)
+              newItem.appendChild(a);
+              item_nodes.appendChild(newItem);
+          });
+      }
+
+  </script>
+  </article>
+</section>
+
+<footer>  
+  <textarea id="status"></textarea>
+</footer>
+
+  </body>   
 </html>
