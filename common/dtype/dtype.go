@@ -16,3 +16,11 @@ type ReqData struct {
 	ObjType   string `json:"ObjType"`
 	ObjHash   string `json:"ObjHash"`
 }
+
+type Command struct {
+	Cmd    string `json:"cmd"`
+	Subcmd string `json:"subcmd"`
+	Arg1   string `json:"arg1"`
+	Arg2   string `json:"arg2"`
+	Arg3   string `json:"arg3"`
+}

@@ -2,54 +2,94 @@ package main
 
 import (
 	"log"
-	"math/rand"
+	"sync"
+	"time"
+
+	"github.com/junwookheo/bcsos/common/listener"
 )
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
 
-type Student struct {
-	Name       string
-	College    string
-	RollNumber int
+var i int
+
+func work() {
+	time.Sleep(250 * time.Millisecond)
+	i++
+	log.Println(i)
 }
 
-// func renderTemplate(w http.ResponseWriter, r *http.Request) {
-// 	student := Student{
-// 		Name:       "GB",
-// 		College:    "GolangBlogs",
-// 		RollNumber: 1,
-// 	}
-// 	parsedTemplate, _ := template.ParseFiles("./blockchainsim/static/index.html")
-// 	err := parsedTemplate.Execute(w, student)
-// 	if err != nil {
-// 		log.Println("Error executing template :", err)
-// 		return
-// 	}
-// }
-
-func main() {
-	log.Print("Print log")
-	// wallet.ValidateAddress([]byte("5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"))
-
-	// fileServer := http.FileServer(http.Dir("./blockchainsim/static"))
-	// http.Handle("/static/", http.StripPrefix("/static", fileServer))
-	// http.Handle("/", fileServer)
-	// err := http.ListenAndServe(":5050", nil)
-	// if err != nil {
-	// 	log.Fatal("Error Starting the HTTP Server :", err)
-	// 	return
-	// }
-
-	cnt := 0
-	for i := 0; i < 100; i++ {
-		f := rand.ExpFloat64() / 0.1 * 280.
-		log.Printf("%v", f)
-		if f > 6.9*280 {
-			cnt++
+func routine(command <-chan string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var status = "Play"
+	for {
+		select {
+		case cmd := <-command:
+			log.Println(cmd)
+			switch cmd {
+			case "Stop":
+				return
+			case "Pause":
+				status = "Pause"
+			default:
+				status = "Play"
+			}
+		default:
+			if status == "Play" {
+				work()
+			}
 		}
 	}
+}
 
-	log.Printf("%v", cnt)
+func routine2(command <-chan string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	var status = "Play"
+	for {
+		select {
+		case cmd := <-command:
+			log.Println("222", cmd)
+			switch cmd {
+			case "Stop":
+				return
+			case "Pause":
+				status = "Pause"
+			default:
+				status = "Play"
+			}
+		default:
+			if status == "Play" {
+				work()
+			}
+		}
+	}
+}
+
+func main() {
+	l := listener.EventListener{}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	command := make(chan string)
+	wg.Add(1)
+	command2 := make(chan string)
+	l.AddListener(command)
+	l.AddListener(command2)
+
+	go routine(command, &wg)
+	go routine2(command2, &wg)
+
+	time.Sleep(1 * time.Second)
+	//command <- "Pause"
+	l.Notify("Pause")
+
+	time.Sleep(1 * time.Second)
+	//command <- "Play"
+	l.Notify("Play")
+
+	time.Sleep(1 * time.Second)
+	//command <- "Stop"
+	l.Notify("Stop")
+
+	wg.Wait()
 }

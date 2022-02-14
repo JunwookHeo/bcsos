@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -68,7 +69,7 @@ func GetLocalAddress() dtype.NodeInfo {
 	// hash := sha256.Sum256(serial.Serialize(local))
 	// local.Hash = hex.EncodeToString(hash[:])
 	w := wallet.NewWallet(wallet_path)
-	local.Hash = string(w.GetAddress()[:])
+	local.Hash = hex.EncodeToString(w.GetAddress()[:])
 	log.Printf("==>%v", local.Hash)
 	return local
 }
@@ -84,6 +85,7 @@ func main() {
 	s := storage.NewHandler(db_path, wallet_path, local)
 	s.PeerListProc()
 	s.ObjectbyAccessPatternProc()
+	s.EndTestProc()
 
 	log.Printf("Server start : %v", local.Port)
 	go http.ListenAndServe(fmt.Sprintf(":%v", local.Port), s.Handler)
@@ -93,6 +95,7 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
+	log.Println("End wait")
 	<-interrupt
 	log.Println("interrupt")
 }

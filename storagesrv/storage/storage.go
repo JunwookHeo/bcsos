@@ -15,6 +15,7 @@ import (
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
+	"github.com/junwookheo/bcsos/common/listener"
 	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/junwookheo/bcsos/storagesrv/network"
 	"github.com/junwookheo/bcsos/storagesrv/testmgrcli"
@@ -22,14 +23,15 @@ import (
 
 type Handler struct {
 	http.Handler
-	wallet *wallet.Wallet
-	db     dbagent.DBAgent
-	sim    dtype.NodeInfo
-	local  dtype.NodeInfo
-	tmc    *testmgrcli.TestMgrCli
-	nm     *network.NodeMgr
-	om     *ObjectMgr
-	mutex  sync.Mutex
+	wallet    *wallet.Wallet
+	db        dbagent.DBAgent
+	sim       dtype.NodeInfo
+	local     dtype.NodeInfo
+	tmc       *testmgrcli.TestMgrCli
+	nm        *network.NodeMgr
+	om        *ObjectMgr
+	mutex     sync.Mutex
+	listeners *listener.EventListener
 }
 
 var upgrader = websocket.Upgrader{
@@ -261,81 +263,195 @@ func (h *Handler) endTestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) ObjectbyAccessPatternProc() {
-	go func() {
-		ticker := time.NewTicker(time.Duration(config.TIME_AP_GEN) * time.Second)
-		defer ticker.Stop()
+func (h *Handler) EndTestProc() {
+	command := make(chan string)
+	h.listeners.AddListener(command)
+
+	go func(command <-chan string) {
 		for {
-			<-ticker.C
-			hashes := []dbagent.RemoverbleObj{}
-			ret := false
-
-			if config.ACCESS_FREQUENCY_PATTERN == config.RANDOM_ACCESS_PATTERN {
-				ret = h.om.AccessWithUniform(config.NUM_AP_GEN, &hashes)
-			} else {
-				ret = h.om.AccessWithExponential(config.NUM_AP_GEN, &hashes)
+			select {
+			case cmd := <-command:
+				log.Println(cmd)
+				switch cmd {
+				case "Stop":
+					log.Println("Received End test")
+					h.db.Close()
+					time.Sleep(3 * time.Second)
+					syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+					return
+				}
+			default:
+				log.Println("=========EndTestProc")
+				time.Sleep(time.Duration(config.TIME_AP_GEN) * time.Second)
 			}
+		}
+	}(command)
+}
 
-			if ret {
-				for _, hash := range hashes {
-					if hash.HashType == 0 {
-						bh := blockchain.BlockHeader{}
-						req := h.newReqData("blockheader", hash.Hash)
-						if h.getObjectQuery(h.local.SC, &req, &bh) {
-							h.db.AddBlockHeader(hash.Hash, &bh)
-							if hash.Hash != hex.EncodeToString(bh.GetHash()) {
-								log.Panicf("%v header Hash not equal %v", hash.Hash, hex.EncodeToString(bh.GetHash()))
-							}
-						}
-					} else {
-						tr := blockchain.Transaction{}
-						req := h.newReqData("transaction", hash.Hash)
-						if h.getObjectQuery(h.local.SC, &req, &tr) {
-							h.db.AddTransaction(&tr)
-							if hash.Hash != hex.EncodeToString(tr.Hash) {
-								log.Panicf("%v Tr Hash not equal %v", hash.Hash, hex.EncodeToString(tr.Hash))
-							}
-						}
+func (h *Handler) commandProc(cmd *dtype.Command) {
+	log.Printf("commandProc : %v", cmd)
+	if cmd.Cmd == "SET" {
+		switch cmd.Subcmd {
+		case "Test":
+			if cmd.Arg1 == "Start" {
+				h.listeners.Notify("Start")
+			} else if cmd.Arg1 == "Stop" {
+				h.listeners.Notify("Stop")
+			} else if cmd.Arg1 == "Pause" {
+				h.listeners.Notify("Pause")
+			} else if cmd.Arg1 == "Resume" {
+				h.listeners.Notify("Resume")
+			}
+		}
+	}
+}
+
+func (h *Handler) commandHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("nodesHandler", err)
+		return
+	}
+	defer ws.Close()
+	var cmd dtype.Command
+	if err := ws.ReadJSON(&cmd); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+	log.Printf("Test command receive : %v", cmd)
+
+	h.commandProc(&cmd)
+
+	cmd.Arg2 = "OK"
+	if err := ws.WriteJSON(cmd); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+}
+
+func (h *Handler) ObjectbyAccessPattern() {
+	hashes := []dbagent.RemoverbleObj{}
+	ret := false
+
+	if config.ACCESS_FREQUENCY_PATTERN == config.RANDOM_ACCESS_PATTERN {
+		ret = h.om.AccessWithUniform(config.NUM_AP_GEN, &hashes)
+	} else {
+		ret = h.om.AccessWithExponential(config.NUM_AP_GEN, &hashes)
+	}
+
+	if ret {
+		for _, hash := range hashes {
+			if hash.HashType == 0 {
+				bh := blockchain.BlockHeader{}
+				req := h.newReqData("blockheader", hash.Hash)
+				if h.getObjectQuery(h.local.SC, &req, &bh) {
+					h.db.AddBlockHeader(hash.Hash, &bh)
+					if hash.Hash != hex.EncodeToString(bh.GetHash()) {
+						log.Panicf("%v header Hash not equal %v", hash.Hash, hex.EncodeToString(bh.GetHash()))
 					}
 				}
-
-				if h.local.SC < config.MAX_SC-1 {
-					h.om.DeleteNoAccedObjects()
+			} else {
+				tr := blockchain.Transaction{}
+				req := h.newReqData("transaction", hash.Hash)
+				if h.getObjectQuery(h.local.SC, &req, &tr) {
+					h.db.AddTransaction(&tr)
+					if hash.Hash != hex.EncodeToString(tr.Hash) {
+						log.Panicf("%v Tr Hash not equal %v", hash.Hash, hex.EncodeToString(tr.Hash))
+					}
 				}
 			}
-
-			status := h.om.db.GetDBStatus()
-			log.Printf("Status : %v", status)
 		}
-	}()
+
+		if h.local.SC < config.MAX_SC-1 {
+			h.om.DeleteNoAccedObjects()
+		}
+	}
+
+	status := h.om.db.GetDBStatus()
+	log.Printf("Status : %v", status)
+}
+
+func (h *Handler) ObjectbyAccessPatternProc() {
+	command := make(chan string)
+	h.listeners.AddListener(command)
+
+	go func(command <-chan string) {
+		var status = "Pause"
+		for {
+			select {
+			case cmd := <-command:
+				log.Println(cmd)
+				switch cmd {
+				case "Stop":
+					return
+				case "Pause":
+					status = "Pause"
+				case "Resume":
+					status = "Running"
+				case "Start":
+					status = "Running"
+				}
+			default:
+				if status == "Running" {
+					h.ObjectbyAccessPattern()
+					log.Println("=========ObjectbyAccessPatternProc")
+					time.Sleep(time.Duration(config.TIME_AP_GEN) * time.Second)
+				}
+			}
+		}
+
+	}(command)
 }
 
 func (h *Handler) PeerListProc() {
-	go func() {
-		ticker := time.NewTicker(time.Duration(config.TIME_UPDATE_NEITHBOUR) * time.Second)
-		defer ticker.Stop()
+	command := make(chan string)
+	h.listeners.AddListener(command)
+
+	go func(command <-chan string) {
+		var status = "Pause"
 		for {
-			<-ticker.C
-			if h.sim.IP != "" && h.sim.Port != 0 && h.local.Hash != "" {
-				h.nm.UpdatePeerList(h.sim, h.local)
+			select {
+			case cmd := <-command:
+				log.Println(cmd)
+				switch cmd {
+				case "Stop":
+					return
+				case "Pause":
+					status = "Pause"
+				case "Resume":
+					status = "Running"
+				case "Start":
+					status = "Running"
+				}
+			default:
+				if status == "Running" {
+					if h.sim.IP != "" && h.sim.Port != 0 && h.local.Hash != "" {
+						h.nm.UpdatePeerList(h.sim, h.local)
+					}
+					log.Println("=========PeerListProc")
+					time.Sleep(time.Duration(config.TIME_UPDATE_NEITHBOUR) * time.Second)
+				}
 			}
 		}
-	}()
+
+	}(command)
 }
 
 func NewHandler(db_path string, wallet_path string, local dtype.NodeInfo) *Handler {
 	m := mux.NewRouter()
 	w, _ := wallet.LoadFile(wallet_path)
 	h := &Handler{
-		Handler: m,
-		wallet:  w,
-		db:      dbagent.NewDBAgent(db_path, local.SC),
-		sim:     dtype.NodeInfo{Mode: "", SC: config.SIM_SC, IP: "", Port: 0, Hash: ""},
-		local:   local,
-		tmc:     nil,
-		nm:      nil,
-		om:      nil,
-		mutex:   sync.Mutex{},
+		Handler:   m,
+		wallet:    w,
+		db:        dbagent.NewDBAgent(db_path, local.SC),
+		sim:       dtype.NodeInfo{Mode: "", SC: config.SIM_SC, IP: "", Port: 0, Hash: ""},
+		local:     local,
+		tmc:       nil,
+		nm:        nil,
+		om:        nil,
+		mutex:     sync.Mutex{},
+		listeners: &listener.EventListener{},
 	}
 
 	h.tmc = testmgrcli.NewTMC(h.db, &h.sim, &h.local)
@@ -348,5 +464,6 @@ func NewHandler(db_path string, wallet_path string, local dtype.NodeInfo) *Handl
 	m.HandleFunc("/nodeinfo", h.nodeInfoHandler)
 	m.HandleFunc("/ping", h.pingHandler)
 	m.HandleFunc("/endtest", h.endTestHandler)
+	m.HandleFunc("/command", h.commandHandler)
 	return h
 }

@@ -27,14 +27,6 @@ type Test struct {
 	Start bool `json:"start"`
 }
 
-type Command struct {
-	Cmd    string `json:"cmd"`
-	Subcmd string `json:"subcmd"`
-	Arg1   string `json:"arg1"`
-	Arg2   string `json:"arg2"`
-	Arg3   string `json:"arg3"`
-}
-
 type Handler struct {
 	http.Handler
 	db      dbagent.DBAgent
@@ -149,6 +141,52 @@ func (h *Handler) pingHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+func (h *Handler) commandProc(cmd *dtype.Command) {
+
+	log.Printf("commandProc : %v", cmd)
+	if cmd.Cmd == "SET" {
+		switch cmd.Subcmd {
+		case "Test":
+			if cmd.Arg1 == "Start" {
+				h.UpdateTestStatus(true)
+			} else if cmd.Arg1 == "Stop" {
+				h.UpdateTestStatus(false)
+			}
+		}
+	}
+
+}
+
+func (h *Handler) sendCommand(cmd dtype.Command, ip string, port int) {
+	url := fmt.Sprintf("ws://%v:%v/command", ip, port)
+	//log.Printf("Send new block to %v", url)
+
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Printf("dial: %v", err)
+		return
+	}
+	defer ws.Close()
+	//log.Printf("DefaultDialer Send command to %v", url)
+
+	if err := ws.WriteJSON(cmd); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+
+	var res dtype.Command
+	if err := ws.ReadJSON(&res); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+}
+
+func (h *Handler) broadcastCommand(cmd dtype.Command) {
+	log.Printf("broadcast command : %v", h.Nodes)
+	for _, node := range h.Nodes {
+		h.sendCommand(cmd, node.IP, node.Port)
+	}
+}
 
 // commandHandler deals with commands from web app
 // Web app --> blockchain simulator --> storage nodes
@@ -160,15 +198,17 @@ func (h *Handler) commandHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer ws.Close()
-	done := make(chan struct{})
+	//done := make(chan struct{})
 	func() {
-		defer close(done)
+		//defer close(done)
 		for {
-			var cmd Command
+			var cmd dtype.Command
 			if err := ws.ReadJSON(&cmd); err != nil {
 				log.Printf("Read json error : %v", err)
 				return
 			}
+
+			h.broadcastCommand(cmd)
 			log.Printf("Test command receive : %v", cmd)
 
 			cmd.Arg2 = "OK"
