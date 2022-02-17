@@ -13,7 +13,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainsim/bcdummy"
-	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 )
@@ -256,7 +255,7 @@ func NewHandler(path string) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
-		db:      dbagent.NewDBAgent(path, config.SIM_SC), // simulator use storage class 100
+		db:      dbagent.NewDBAgent(path), // simulator use storage class 100
 		Nodes:   make(map[string]dtype.NodeInfo),
 		BCDummy: nil,
 		TC:      nil,

@@ -65,6 +65,6 @@ type RemoverbleObj struct {
 	Hash     string
 }
 
-func NewDBAgent(path string, sc int) DBAgent {
-	return newDBSqlite(path, sc)
+func NewDBAgent(path string) DBAgent {
+	return newDBSqlite(path)
 }

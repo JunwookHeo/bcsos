@@ -4,21 +4,22 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/grandcat/zeroconf"
-	"github.com/junwookheo/bcsos/common/dbagent"
+	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/dtype"
 )
 
 type TestMgrCli struct {
-	sim   *dtype.NodeInfo
-	local *dtype.NodeInfo
-	db    dbagent.DBAgent
 }
+
+var (
+	tmc  *TestMgrCli
+	once sync.Once
+)
 
 func (t *TestMgrCli) registerNode(ip string, port int) {
 	url := fmt.Sprintf("ws://%v:%v/register", ip, port)
@@ -30,7 +31,10 @@ func (t *TestMgrCli) registerNode(ip string, port int) {
 	}
 	defer ws.Close()
 
-	if err := ws.WriteJSON(t.local); err != nil {
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	if err := ws.WriteJSON(local); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
@@ -41,61 +45,21 @@ func (t *TestMgrCli) registerNode(ip string, port int) {
 		return
 	}
 
-	t.local.IP = node.IP
-	t.local.Hash = node.Hash
-	log.Printf("Got response: %v\n", t.local)
+	ni.SetLocalddrIP(node.IP)
+	log.Printf("Got response: %v\n", local)
 	log.Printf("Recevied node : %v", node)
 }
 
-type Test struct {
-	Start bool `json:"start"`
-}
-
-func (t *TestMgrCli) NodeInfoHandler(ws *websocket.Conn, w http.ResponseWriter, r *http.Request) {
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			var test Test
-			if err := ws.ReadJSON(&test); err != nil {
-				log.Printf("Read json error : %v", err)
-				return
-			}
-			log.Printf("receive : %v", test)
-		}
-	}()
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				//var status dbagent.DBStatus
-				status := t.db.GetDBStatus()
-				if err := ws.WriteJSON(status); err != nil {
-					log.Printf("Write json error : %v", err)
-					return
-				}
-			}
-		}
-	}()
-}
-
-func (t *TestMgrCli) setServerInfo(ip string, port int) {
-	t.sim.IP = ip
-	t.sim.Port = port
-}
-
 func (t *TestMgrCli) startResolver() {
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
 	resolver, err := zeroconf.NewResolver(nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("TestMgr Info : %v", t.local)
+	log.Printf("TestMgr Info : %v", local)
 
 	// Channel to receive discovered service entries
 	entries := make(chan *zeroconf.ServiceEntry)
@@ -105,7 +69,8 @@ func (t *TestMgrCli) startResolver() {
 			log.Println("Found service:", entry.ServiceInstanceName(), entry.Text)
 			names := strings.Split(entry.ServiceInstanceName(), ".")
 			if names[0] == "bcsos-tms" {
-				t.setServerInfo(entry.AddrIPv4[0].String(), entry.Port)
+				ni.SetSimAddr(entry.AddrIPv4[0].String(), entry.Port)
+				//t.setServerInfo(entry.AddrIPv4[0].String(), entry.Port)
 				t.registerNode(entry.AddrIPv4[0].String(), entry.Port)
 			}
 		}
@@ -120,9 +85,19 @@ func (t *TestMgrCli) startResolver() {
 	<-ctx.Done()
 }
 
-func NewTMC(db dbagent.DBAgent, sim *dtype.NodeInfo, local *dtype.NodeInfo) *TestMgrCli {
-	log.Println("start Testmgr Client")
-	tmc := TestMgrCli{sim: sim, local: local, db: db}
-	go tmc.startResolver()
-	return &tmc
+// func NewTMC(db dbagent.DBAgent, sim *dtype.NodeInfo, local *dtype.NodeInfo) *TestMgrCli {
+// 	log.Println("start Testmgr Client")
+// 	tmc := TestMgrCli{sim: sim, local: local, db: db}
+// 	go tmc.startResolver()
+// 	return &tmc
+// }
+
+func TestMgrCliInst() *TestMgrCli {
+	once.Do(func() {
+		tmc = &TestMgrCli{}
+		log.Println("start Testmgr Client")
+		go tmc.startResolver()
+	})
+
+	return tmc
 }

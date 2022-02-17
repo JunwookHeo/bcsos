@@ -22,7 +22,7 @@ func TestLoadFromJson(t *testing.T) {
 }
 
 func TestDBAgent(t *testing.T) {
-	dba := dbagent.NewDBAgent(DB_PATH_TEST, 0)
+	dba := dbagent.NewDBAgent(DB_PATH_TEST)
 	dba.ShowAllObjets()
 	dba.GetLatestBlockHash()
 	status := dba.GetDBStatus()

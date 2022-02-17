@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/serial"
@@ -622,7 +623,7 @@ func (a *dbagent) GetDBStatus() *DBStatus {
 	return &a.dbstatus
 }
 
-func newDBSqlite(path string, sc int) DBAgent {
+func newDBSqlite(path string) DBAgent {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		log.Panicf("Open sqlite db error : %v", err)
@@ -693,7 +694,10 @@ func newDBSqlite(path string, sc int) DBAgent {
 
 	st.Exec()
 
-	dba := dbagent{db: db, SClass: sc, dbstatus: DBStatus{Timestamp: time.Now()}, mutex: sync.Mutex{}}
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	dba := dbagent{db: db, SClass: local.SC, dbstatus: DBStatus{Timestamp: time.Now()}, mutex: sync.Mutex{}}
 	dba.getLatestDBStatus(&dba.dbstatus)
 	go dba.updateDBStatus()
 	return &dba

@@ -13,7 +13,7 @@
     <div id="item_nodes"></dev>
 
     <script>
-        let socket = new WebSocket("ws://" + window.location.host +"/nodeinfo");
+        let socket = new WebSocket("ws://" + window.location.host +"/statusinfo");
         console.log("Attempting Connection...");
 
         socket.onopen = () => {

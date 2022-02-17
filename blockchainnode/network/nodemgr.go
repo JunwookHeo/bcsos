@@ -3,8 +3,10 @@ package network
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dtype"
@@ -15,8 +17,18 @@ type NodeMgr struct {
 	mutex sync.Mutex
 }
 
+var (
+	nm   *NodeMgr
+	once sync.Once
+)
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
 // Update peers list
-func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
+func (n *NodeMgr) UpdatePeerList(sim *dtype.NodeInfo, local *dtype.NodeInfo) {
 	sendPing := func(node dtype.NodeInfo) {
 		url := fmt.Sprintf("ws://%v:%v/ping", node.IP, node.Port)
 		//log.Printf("Send ping with local info : %v", url)
@@ -61,10 +73,45 @@ func (n *NodeMgr) UpdatePeerList(sim dtype.NodeInfo, local dtype.NodeInfo) {
 	}
 
 	if !checked {
-		sendPing(sim)
+		sendPing(*sim)
 	}
 
 	//n.scn.ShowSCNNodeList()
+}
+
+// Send response to connector with its local information
+func (n *NodeMgr) PingHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("pingHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	peer := dtype.NodeInfo{}
+	if err := ws.ReadJSON(&peer); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+	//log.Printf("receive peer addr : %v", peer)
+
+	// Received peer info so add it to peer list
+	ni := NodeInfoInst()
+	local := ni.GetLocalddr()
+	nm := NodeMgrInst()
+
+	if peer.Hash != "" && peer.Hash != local.Hash {
+		nm.AddNSCNNode(peer)
+	}
+
+	// Send peers info to the connector
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
+	nm.GetSCNNodeListAll(&nodes)
+	if err := ws.WriteJSON(nodes); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
 }
 
 func (n *NodeMgr) AddNSCNNode(node dtype.NodeInfo) {
@@ -79,8 +126,17 @@ func (n *NodeMgr) GetSCNNodeListAll(nodes *[(config.MAX_SC) * config.MAX_SC_PEER
 	n.scn.GetSCNNodeListAll(nodes)
 }
 
-func NewNodeMgr(local *dtype.NodeInfo) *NodeMgr {
-	nm := NodeMgr{scn: *NewSCNInfo(local), mutex: sync.Mutex{}}
+func (n *NodeMgr) SetHttpRouter(m *mux.Router) {
+	m.HandleFunc("/ping", n.PingHandler)
+}
 
-	return &nm
+func NodeMgrInst() *NodeMgr {
+	once.Do(func() {
+		nm = &NodeMgr{
+			scn:   *NewSCNInfo(),
+			mutex: sync.Mutex{},
+		}
+	})
+
+	return nm
 }

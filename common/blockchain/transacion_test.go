@@ -53,7 +53,7 @@ func TestSignVerifyTransaction(t *testing.T) {
 	assert.NotEmpty(t, tr.Hash)
 
 	tr.sign(w)
-	tr.verify()
+	tr.Verify()
 
 	os.Remove(wallet_path)
 }

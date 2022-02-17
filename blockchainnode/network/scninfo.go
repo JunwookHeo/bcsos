@@ -26,15 +26,13 @@ import (
 // }
 
 type scnInfo struct {
-	local   *dtype.NodeInfo
 	scnodes [][]dtype.NodeInfo
 	mutex   sync.Mutex
 }
 
-func NewSCNInfo(l *dtype.NodeInfo) *scnInfo {
+func NewSCNInfo() *scnInfo {
 	// return &scnInfo{local: l, scnodes: make([]scnList, config.MAX_SC), mutex: sync.Mutex{}}
 	scn := scnInfo{}
-	scn.local = l
 	scn.mutex = sync.Mutex{}
 	scn.scnodes = make([][]dtype.NodeInfo, config.MAX_SC)
 	for i := 0; i < config.MAX_SC; i++ {
@@ -57,7 +55,10 @@ func xordistance(h1 string, h2 string) *big.Int {
 }
 
 func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
-	if n.SC >= config.MAX_SC || n.Hash == c.local.Hash {
+	ni := NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	if n.SC >= config.MAX_SC || n.Hash == local.Hash {
 		return
 	}
 	c.mutex.Lock()
@@ -70,8 +71,8 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 		if peer.Hash == "" {
 			break
 		}
-		d1 := xordistance(c.local.Hash, n.Hash)
-		d2 := xordistance(c.local.Hash, peer.Hash)
+		d1 := xordistance(local.Hash, n.Hash)
+		d2 := xordistance(local.Hash, peer.Hash)
 		if d1.Cmp(d2) < 0 { // if new node is closer than cur node, insert new node
 			break
 		}
@@ -201,6 +202,7 @@ func (c *scnInfo) GetSCNNodeListAll(nodes *[(config.MAX_SC) * config.MAX_SC_PEER
 			if peer.Hash != "" {
 				//newscn = append(newscn, []dtype.NodeInfo{peer}...)
 				nodes[pos] = peer
+				pos++
 			}
 		}
 	}

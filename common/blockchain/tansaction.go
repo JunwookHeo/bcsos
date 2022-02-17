@@ -55,7 +55,7 @@ func (t *Transaction) sign(w *wallet.Wallet) bool {
 	return true
 }
 
-func (t *Transaction) verify() bool {
+func (t *Transaction) Verify() bool {
 	r := big.Int{}
 	s := big.Int{}
 
@@ -87,7 +87,7 @@ func (t *Transaction) verify() bool {
 func CreateTransaction(w *wallet.Wallet, d []byte) *Transaction {
 	t := Transaction{nil, time.Now().UnixNano(), d[:], nil, nil}
 	t.sign(w)
-	t.verify()
+	t.Verify()
 	t.Hash = t.GetHash()
 	return &t
 }

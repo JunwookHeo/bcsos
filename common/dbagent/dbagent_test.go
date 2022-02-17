@@ -13,7 +13,7 @@ import (
 
 func TestDBSqlite(t *testing.T) {
 	path := "test1.db"
-	dba := NewDBAgent(path, 0)
+	dba := NewDBAgent(path)
 	assert.FileExists(t, path)
 	dba.Close()
 	os.Remove(path)
@@ -22,7 +22,7 @@ func TestDBSqlite(t *testing.T) {
 func TestDBSqliteAdd(t *testing.T) {
 	path := "test2.db"
 	wallet_path := "./wallet_test.wallet"
-	dba := NewDBAgent(path, 0)
+	dba := NewDBAgent(path)
 	assert.FileExists(t, path)
 	w := wallet.NewWallet(wallet_path)
 
@@ -83,7 +83,7 @@ func TestDBSqliteAdd(t *testing.T) {
 }
 
 func TestDBSqliteRandom(t *testing.T) {
-	dba := NewDBAgent("../../storagesrv/bc_dev.db", 0)
+	dba := NewDBAgent("../../storagesrv/bc_dev.db")
 	//hashes := dba.GetTransactionwithUniform(50)
 	dba.DeleteNoAccedObjects()
 	// csvfile, _ := os.Create("../../rs.csv")
