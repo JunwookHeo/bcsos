@@ -44,6 +44,7 @@ func TestCheckSize(t *testing.T) {
 }
 
 func TestSignVerifyTransaction(t *testing.T) {
+	log.Printf("===start TestSignVerifyTransaction")
 	wallet_path := "./wallet_test.wallet"
 	w := wallet.NewWallet(wallet_path)
 
@@ -52,8 +53,9 @@ func TestSignVerifyTransaction(t *testing.T) {
 	assert.Equal(t, []byte(s), tr.Data)
 	assert.NotEmpty(t, tr.Hash)
 
-	tr.sign(w)
-	tr.Verify()
+	//tr.sign(w)
+	//tr.Timestamp = time.Now().UnixNano()
+	assert.Equal(t, true, tr.Verify())
 
 	os.Remove(wallet_path)
 }

@@ -298,6 +298,8 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 					h.ObjectbyAccessPattern()
 					// log.Println("=========ObjectbyAccessPatternProc")
 					time.Sleep(time.Duration(config.TIME_AP_GEN) * time.Second)
+				} else {
+					time.Sleep(time.Second)
 				}
 			}
 		}
@@ -305,10 +307,12 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 	}(command)
 }
 
-// Response to web app with dbstatus information
-// keep sending dbstatus to the web app
 func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 	h.db.AddBlock(b)
+}
+
+func (h *StorageMgr) GetLatestBlockHash() string {
+	return h.db.GetLatestBlockHash()
 }
 
 func (sm *StorageMgr) SetHttpRouter(m *mux.Router) {

@@ -1,7 +1,6 @@
 package mining
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -53,7 +52,7 @@ func generateTransactionFromRandom(id int) *blockchain.Transaction {
 func sendTransactionwithLocal(t *blockchain.Transaction) {
 	sendTransaction := func(node *dtype.NodeInfo) {
 		url := fmt.Sprintf("ws://%v:%v/broadcastransaction", node.IP, node.Port)
-		log.Printf("Send sendTransactionwithLocal with local info : %v", url)
+		log.Printf("broadcastransaction to Localhost : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {
@@ -75,12 +74,10 @@ func sendTransactionwithLocal(t *blockchain.Transaction) {
 
 func SimulateTransaction(id int) {
 	t := rand.Intn(config.BLOCK_CREATE_PERIOD * 1000)
-	log.Printf("time : %v", t)
 	time.Sleep(time.Duration(t) * time.Millisecond)
 
 	if rand.Intn(2) != 0 {
 		tr := generateTransactionFromRandom(id)
-		log.Printf("===Local : %v", hex.EncodeToString(tr.Hash))
 		sendTransactionwithLocal(tr)
 	}
 

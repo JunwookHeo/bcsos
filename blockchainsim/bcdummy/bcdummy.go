@@ -24,7 +24,7 @@ type Handler struct {
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
 
 func (h *Handler) sendNewBlock(b *blockchain.Block, ip string, port int) {
-	url := fmt.Sprintf("ws://%v:%v/newblock", ip, port)
+	url := fmt.Sprintf("ws://%v:%v/broadcastnewblock", ip, port)
 	//log.Printf("Send new block to %v", url)
 
 	ws, _, err := websocket.DefaultDialer.Dial(url, nil)

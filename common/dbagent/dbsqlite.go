@@ -123,7 +123,7 @@ func (a *dbagent) GetObject(obj *StorageObj) int64 {
 
 func (a *dbagent) AddObject(obj *StorageObj) int64 {
 	if id := a.GetObject(obj); id != 0 {
-		log.Printf("Replicatoin exists : %v - %v", id, obj)
+		// log.Printf("Replicatoin exists : %v - %v", id, obj)
 		return id
 	}
 
@@ -387,6 +387,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 
 	// Add only block information without data, the data is stored in block-transaction matching table
 	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, []byte{}}
+
 	if id := a.AddObject(&obj); id != 0 {
 		a.mutex.Lock()
 		defer a.mutex.Unlock()

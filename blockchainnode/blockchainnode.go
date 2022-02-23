@@ -229,6 +229,8 @@ func PeerListProc() {
 					}
 					// log.Println("=========PeerListProc")
 					time.Sleep(time.Duration(config.TIME_UPDATE_NEITHBOUR) * time.Second)
+				} else {
+					time.Sleep(time.Second)
 				}
 			}
 		}
@@ -258,6 +260,8 @@ func TransactionProc() {
 					status = "Running"
 				case "Start":
 					status = "Running"
+					log.Println("start mining ===")
+					go mi.StartMiningNewBlock(nil)
 				}
 			default:
 				if status == "Running" {
@@ -266,6 +270,8 @@ func TransactionProc() {
 					id++
 					// log.Println("=========TransactionProc")
 					// time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+				} else {
+					time.Sleep(time.Second)
 				}
 			}
 		}
