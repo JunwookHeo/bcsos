@@ -253,6 +253,7 @@ func TransactionProc() {
 				log.Println(cmd)
 				switch cmd {
 				case "Stop":
+					mining.SimulateTransaction(-1)
 					return
 				case "Pause":
 					status = "Pause"

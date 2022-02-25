@@ -76,6 +76,12 @@ func (mi *Mining) DeleteTransactionsFromPool(keys []string) {
 	}
 }
 
+func (mi *Mining) ShowTransactionsFromPool() {
+	mi.mutex.Lock()
+	defer mi.mutex.Unlock()
+	log.Printf("Tr Pool : %v", mi.tp)
+}
+
 func (mi *Mining) sendBlock(b *blockchain.Block, node *dtype.NodeInfo) {
 	url := fmt.Sprintf("ws://%v:%v/broadcastnewblock", node.IP, node.Port)
 	// log.Printf("Send ping with local info : %v", url)
@@ -105,20 +111,23 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 	}
 }
 
-func (mi *Mining) StartMiningNewBlock(preblock *blockchain.Block) {
+func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
 	// Remove transactions in the thransaction pool
-	if preblock != nil {
+	if block != nil {
 		var trhashes []string
-		for _, tr := range preblock.Transactions {
+		for _, tr := range block.Transactions {
 			trhashes = append(trhashes, hex.EncodeToString(tr.Hash))
 		}
 
 		mi.DeleteTransactionsFromPool(trhashes)
+		mi.ShowTransactionsFromPool()
 	}
+}
 
+func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
 	sm := storage.StorageMgrInst("")
 	//prehash := sm.GetLatestBlockHash()
-	prehash := mi.cm.GetHighestBlockHash()
+	_, prehash := mi.cm.GetHighestBlockHash()
 
 	// waithing some time instead of using high difficulty
 	t := rand.Intn(2000)
@@ -127,28 +136,33 @@ func (mi *Mining) StartMiningNewBlock(preblock *blockchain.Block) {
 
 	<-ticker.C
 
-	if prehash != mi.cm.GetHighestBlockHash() {
-		//if prehash != sm.GetLatestBlockHash() {
-		log.Printf("===============Terminating mining")
-		return
+	for {
+		height, curhash := mi.cm.GetHighestBlockHash()
+		if prehash != curhash {
+			//if prehash != sm.GetLatestBlockHash() {
+			log.Printf("===============Terminating mining")
+			return
+		}
+
+		log.Printf("===============Start mining")
+		// Statrt PoW
+		trs := mi.GetTransactionsFromPool()
+
+		if len(trs) == 0 {
+			// log.Printf("===============Start mining : trs (%v) : %v", height, trs)
+			time.Sleep(time.Second)
+		} else {
+			hash, _ := hex.DecodeString(sm.GetLatestBlockHash())
+			b := blockchain.CreateBlock(trs, hash)
+
+			log.Printf("===============create block(%v):%v", height, hex.EncodeToString(b.Header.Hash))
+			// Send block to local node
+			ni := network.NodeInfoInst()
+			local := ni.GetLocalddr()
+			mi.sendBlock(b, local)
+			return
+		}
 	}
-
-	log.Printf("===============Start mining")
-	// Statrt PoW
-	trs := mi.GetTransactionsFromPool()
-
-	if len(trs) == 0 {
-		log.Printf("===============Start mining : trs : %v", trs)
-		mi.StartMiningNewBlock(preblock)
-	}
-	hash, _ := hex.DecodeString(sm.GetLatestBlockHash())
-	b := blockchain.CreateBlock(trs, hash)
-
-	log.Printf("===============create block : %v", b)
-	// Send block to local node
-	ni := network.NodeInfoInst()
-	local := ni.GetLocalddr()
-	mi.sendBlock(b, local)
 }
 
 // newBlockHandler is called when a new block is received from miners
@@ -178,6 +192,8 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 
 	mi.sb.Push(hex.EncodeToString(block.Header.Hash))
 	mi.mutex.Unlock()
+
+	mi.UpdateTransactionPool(&block)
 
 	log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
 	go mi.BroadcastNewBlock(&block)

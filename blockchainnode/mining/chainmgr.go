@@ -15,16 +15,16 @@ func (cm *ChainMgr) AddedNewBlock(h *blockchain.BlockHeader) {
 	block := datalib.BlockData{Height: 0, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
 	cm.tree.AddTreeNode(&block)
 	cm.tree.UpdateRoot()
-	//cm.tree.PrintAll()
+	cm.tree.PrintAll()
 }
 
-func (cm *ChainMgr) GetHighestBlockHash() string {
+func (cm *ChainMgr) GetHighestBlockHash() (int, string) {
 	block := cm.tree.GetHighestBlock()
 	if block == nil {
-		return ""
+		return 0, ""
 	}
 
-	return block.Hash
+	return block.Height, block.Hash
 }
 
 func NewChainMgr() *ChainMgr {

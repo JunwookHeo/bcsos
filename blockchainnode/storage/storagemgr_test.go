@@ -31,6 +31,7 @@ func TestBlockchainConsistency(t *testing.T) {
 	bh := blockchain.BlockHeader{}
 	prv := ""
 	i := 0
+
 	for rows.Next() {
 		err := rows.Scan(&data)
 		if err != nil {

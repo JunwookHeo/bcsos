@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"syscall"
 	"time"
 
@@ -79,6 +80,16 @@ func (h *Handler) broadcastEndTest() {
 	}
 }
 
+func (h *Handler) KillProcess() {
+	p, err := os.FindProcess(os.Getpid())
+
+	if err != nil {
+		return
+	}
+
+	p.Signal(syscall.SIGTERM)
+}
+
 func (h *Handler) Start() {
 	// Send Genesis Block
 	wallet_path := "./bc_dummy.wallet"
@@ -121,7 +132,8 @@ func (h *Handler) Start() {
 				if d == config.END_TEST {
 					h.broadcastEndTest()
 					h.db.Close()
-					syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+					//syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+					h.KillProcess()
 					return
 				}
 				// log.Printf("==>%s", d)

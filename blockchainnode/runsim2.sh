@@ -39,7 +39,7 @@ then
     tmux send-keys -t MLDC:1.1 'go run blockchainnode.go -mode=pan -type=1 -port=7012' C-m
     # tmux send-keys -t MLDC:1.2 'go run blockchainnode.go -mode=pan -type=1 -port=7013' C-m
     # tmux send-keys -t MLDC:1.3 'go run blockchainnode.go -mode=pan -type=1 -port=7014' C-m
-    tmux send-keys -t MLDC:1.2 'go run blockchainnode.go -mode=pan -type=2 -port=7021' C-m
+    tmux send-keys -t MLDC:1.2 'go run blockchainnode.go -mode=pan -type=3 -port=7021' C-m
     # tmux send-keys -t MLDC:1.5 'go run blockchainnode.go -mode=pan -type=2 -port=7022' C-m
     # tmux send-keys -t MLDC:1.6 'go run blockchainnode.go -mode=pan -type=3 -port=7031' C-m 
     tmux send-keys -t MLDC:1.3 'cd ../blockchainsim' C-m

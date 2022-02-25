@@ -124,6 +124,7 @@ func (tc *TreeChain) AddTreeNode(block *BlockData) {
 				tmp := NewTreeNode(block)
 				tmp.SetParent(node.GetParent())
 				node.SetSibling(tmp)
+				
 				return
 			}
 			node = sibling

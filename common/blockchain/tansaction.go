@@ -50,7 +50,11 @@ func (t *Transaction) sign(w *wallet.Wallet) bool {
 		log.Panicf("Signing Transaction Error : %v", err)
 		return false
 	}
-
+	tmp1 := r.Bytes()
+	tmp2 := s.Bytes()
+	if 32 < len(tmp1) || 32 < len(tmp2) {
+		log.Panicf("size error : %v, %v", len(tmp1), len(tmp2))
+	}
 	//signature := append(r.Bytes(), s.Bytes()...)
 	buf1 := make([]byte, 32)
 	buf2 := make([]byte, 32)
