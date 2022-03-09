@@ -50,6 +50,7 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Read json error : %v", err)
 	}
 
+	log.Printf("ws remote addr : %v", ws.RemoteAddr().String())
 	ip := strings.Split(ws.RemoteAddr().String(), ":")
 	node.IP = ip[0]
 	h.mutex.Lock()

@@ -16,3 +16,7 @@
 *.db
 *.db-journal
 *.wallet
+blockchainnode
+blockchainnode.exe
+blockchainsim
+blockchainsim.exe

@@ -62,7 +62,10 @@ func NewWallet(path string) *Wallet {
 		log.Panic(err)
 	}
 
-	pubK := append(priKey.PublicKey.X.Bytes(), priKey.PublicKey.Y.Bytes()...)
+	buf1 := make([]byte, 32)
+	buf2 := make([]byte, 32)
+	pubK := append(priKey.PublicKey.X.FillBytes(buf1), priKey.PublicKey.Y.FillBytes(buf2)...)
+	// pubK := append(priKey.PublicKey.X.Bytes(), priKey.PublicKey.Y.Bytes()...)
 
 	w = &Wallet{priKey, pubK}
 

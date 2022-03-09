@@ -148,6 +148,16 @@ func commandProc(cmd *dtype.Command) {
 	}
 }
 
+func KillProcess() {
+	p, err := os.FindProcess(os.Getpid())
+
+	if err != nil {
+		return
+	}
+
+	p.Signal(syscall.SIGTERM)
+}
+
 // Response to web app with dbstatus information
 // keep sending dbstatus to the web app
 func endTestHandler(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +178,8 @@ func endTestHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println("Received End test")
 		sm.Stop()
 		time.Sleep(3 * time.Second)
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		//syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		KillProcess()
 	}
 }
 
@@ -186,7 +197,8 @@ func EndTestProc() {
 					log.Println("Received End test")
 					sm.Stop()
 					time.Sleep(3 * time.Second)
-					syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+					//syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+					KillProcess()
 					return
 				}
 			default:

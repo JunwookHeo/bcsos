@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/grandcat/zeroconf"
@@ -20,6 +22,19 @@ var (
 	tmc  *TestMgrCli
 	once sync.Once
 )
+
+func (t *TestMgrCli) checkPortAvailavle(ips []net.IP, p int) string {
+	port := fmt.Sprintf("%v", p)
+	for _, ip := range ips {
+		log.Printf("...connecting to %v", ip)
+		conn, _ := net.DialTimeout("tcp", net.JoinHostPort(ip.String(), port), time.Second)
+		if conn != nil {
+			conn.Close()
+			return ip.String()
+		}
+	}
+	return ""
+}
 
 func (t *TestMgrCli) registerNode(ip string, port int) {
 	url := fmt.Sprintf("ws://%v:%v/register", ip, port)
@@ -69,9 +84,15 @@ func (t *TestMgrCli) startResolver() {
 			log.Println("Found service:", entry.ServiceInstanceName(), entry.Text)
 			names := strings.Split(entry.ServiceInstanceName(), ".")
 			if names[0] == "bcsos-tms" {
-				ni.SetSimAddr(entry.AddrIPv4[0].String(), entry.Port)
+				log.Printf("ip addrs : %v", entry.AddrIPv4)
+				ip := t.checkPortAvailavle(entry.AddrIPv4, entry.Port)
+				log.Printf("Sim Server IP : %v", ip)
+				ni.SetSimAddr(ip, entry.Port)
+				t.registerNode(ip, entry.Port)
+
+				//ni.SetSimAddr(entry.AddrIPv4[0].String(), entry.Port)
 				//t.setServerInfo(entry.AddrIPv4[0].String(), entry.Port)
-				t.registerNode(entry.AddrIPv4[0].String(), entry.Port)
+				//t.registerNode(entry.AddrIPv4[0].String(), entry.Port)
 			}
 		}
 	}(entries)
