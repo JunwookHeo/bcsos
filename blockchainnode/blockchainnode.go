@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -265,7 +266,7 @@ func TransactionProc() {
 				log.Println(cmd)
 				switch cmd {
 				case "Stop":
-					mining.SimulateTransaction(-1)
+					//mining.SimulateTransaction(-1)
 					return
 				case "Pause":
 					status = "Pause"
@@ -320,14 +321,32 @@ func main() {
 	local := ni.GetLocalddr()
 	log.Printf("Server start : %v", local.Port)
 
-	go http.ListenAndServe(fmt.Sprintf(":%v", local.Port), m)
-	//go http.ListenAndServe(":8080", s.Handler)
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%v", local.Port),
+		Handler: m,
+	}
 
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
 	}()
+
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
 
 	log.Println("End wait")
 	<-interrupt
 	log.Println("interrupt")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		// extra handling here
+		cancel()
+	}()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server Shutdown Failed:%+v", err)
+	}
+	log.Print("Server Exited Properly")
 }
