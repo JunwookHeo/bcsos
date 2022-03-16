@@ -52,7 +52,7 @@ func generateTransactionFromRandom(id int) *blockchain.Transaction {
 func sendTransactionwithLocal(t *blockchain.Transaction) {
 	sendTransaction := func(node *dtype.NodeInfo) {
 		url := fmt.Sprintf("ws://%v:%v/broadcastransaction", node.IP, node.Port)
-		log.Printf("broadcastransaction to Localhost : %v", url)
+		// log.Printf("broadcastransaction to Localhost : %v", url)
 
 		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
 		if err != nil {

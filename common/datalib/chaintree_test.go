@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func TestNewTreeChain(t *testing.T) {
-	tc := NewTreeChain()
-	log.Printf("Start TestNewTreeChain")
+func TestNewChainTree(t *testing.T) {
+	tc := NewChainTree()
+	log.Printf("Start TestNewChainTree")
 	b1 := BlockData{0, "a", ""}
 	tc.AddTreeNode(&b1)
 	//tc.PrintAll()
@@ -25,7 +25,7 @@ func TestNewTreeChain(t *testing.T) {
 	log.Printf("Highest Node : %v", *tc.GetHighestBlock())
 
 	b6 := BlockData{0, "d", "c2"}
-	tc.AddTreeNode(&b6)	
+	tc.AddTreeNode(&b6)
 	b7 := BlockData{0, "e", "d"}
 	tc.AddTreeNode(&b7)
 	b8 := BlockData{0, "f", "e"}

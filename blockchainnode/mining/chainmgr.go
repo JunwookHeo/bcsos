@@ -8,14 +8,14 @@ import (
 )
 
 type ChainMgr struct {
-	tree *datalib.TreeChain
+	tree *datalib.ChainTree
 }
 
 func (cm *ChainMgr) AddedNewBlock(h *blockchain.BlockHeader) {
 	block := datalib.BlockData{Height: 0, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
 	cm.tree.AddTreeNode(&block)
 	cm.tree.UpdateRoot()
-	cm.tree.PrintAll()
+	// cm.tree.PrintAll()
 }
 
 func (cm *ChainMgr) GetHighestBlockHash() (int, string) {
@@ -29,6 +29,6 @@ func (cm *ChainMgr) GetHighestBlockHash() (int, string) {
 
 func NewChainMgr() *ChainMgr {
 	return &ChainMgr{
-		tree: datalib.NewTreeChain(),
+		tree: datalib.NewChainTree(),
 	}
 }

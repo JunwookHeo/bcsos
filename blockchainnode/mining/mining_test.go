@@ -2,6 +2,7 @@ package mining
 
 import (
 	"database/sql"
+	"encoding/hex"
 	"log"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/junwookheo/bcsos/common/serial"
 )
 
-const DB_PATH_TEST = "../db_nodes/7002.db"
+const DB_PATH_TEST = "../db_nodes/7031.db"
 
 func TestBlockchainConsistency(t *testing.T) {
 	db, err := sql.Open("sqlite3", DB_PATH_TEST)
@@ -38,6 +39,7 @@ func TestBlockchainConsistency(t *testing.T) {
 
 		serial.Deserialize(data, &bh)
 		log.Printf("add block : %v", i)
+		log.Printf("%v - %v", hex.EncodeToString(bh.Hash), hex.EncodeToString(bh.PrvHash))
 		cm.AddedNewBlock(&bh)
 		i++
 		if i == 243 {

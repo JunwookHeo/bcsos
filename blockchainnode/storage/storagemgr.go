@@ -268,8 +268,8 @@ func (h *StorageMgr) ObjectbyAccessPattern() {
 		}
 	}
 
-	status := h.om.db.GetDBStatus()
-	log.Printf("Status : %v", status)
+	// status := h.om.db.GetDBStatus()
+	// log.Printf("Status : %v", status)
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {

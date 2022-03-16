@@ -587,7 +587,7 @@ func (a *dbagent) updateDBStatus() {
 
 			id, _ := rst.LastInsertId()
 			status.ID = int(id)
-			log.Printf("Update dbstatus : %v", *status)
+			// log.Printf("Update dbstatus : %v", *status)
 		}()
 	}
 }

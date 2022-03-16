@@ -125,7 +125,7 @@ func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
 }
 
 func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
-	sm := storage.StorageMgrInst("")
+	// sm := storage.StorageMgrInst("")
 	//prehash := sm.GetLatestBlockHash()
 	_, prehash := mi.cm.GetHighestBlockHash()
 
@@ -140,7 +140,7 @@ func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
 		height, curhash := mi.cm.GetHighestBlockHash()
 		if prehash != curhash {
 			//if prehash != sm.GetLatestBlockHash() {
-			log.Printf("===============Terminating mining")
+			// log.Printf("===============Terminating mining")
 			return
 		}
 
@@ -152,10 +152,11 @@ func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
 			// log.Printf("===============Start mining : trs (%v) : %v", height, trs)
 			time.Sleep(time.Second)
 		} else {
-			hash, _ := hex.DecodeString(sm.GetLatestBlockHash())
+			// hash, _ := hex.DecodeString(sm.GetLatestBlockHash())
+			hash, _ := hex.DecodeString(curhash)
 			b := blockchain.CreateBlock(trs, hash)
 
-			log.Printf("===============create block(%v):%v", height, hex.EncodeToString(b.Header.Hash))
+			log.Printf("===============create block(%v):%v %v", height, hex.EncodeToString(b.Header.Hash), curhash)
 			// Send block to local node
 			ni := network.NodeInfoInst()
 			local := ni.GetLocalddr()
@@ -195,7 +196,7 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 
 	mi.UpdateTransactionPool(&block)
 
-	log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
+	// log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
 	go mi.BroadcastNewBlock(&block)
 
 	sm := storage.StorageMgrInst("")
