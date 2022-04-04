@@ -128,7 +128,7 @@ func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
 	// sm := storage.StorageMgrInst("")
 	//prehash := sm.GetLatestBlockHash()
 	_, prehash := mi.cm.GetHighestBlockHash()
-
+	// log.Printf("===============prev hash : %v", prehash)
 	// waithing some time instead of using high difficulty
 	t := rand.Intn(2000)
 	ticker := time.NewTicker(time.Millisecond * time.Duration(config.BLOCK_CREATE_PERIOD*1000+t))
@@ -144,7 +144,7 @@ func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
 			return
 		}
 
-		log.Printf("===============Start mining")
+		// log.Printf("===============Start mining")
 		// Statrt PoW
 		trs := mi.GetTransactionsFromPool()
 
