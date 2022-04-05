@@ -6,9 +6,10 @@ import (
 )
 
 type BlockData struct {
-	Height int
-	Hash   string
-	Prev   string
+	Height    int
+	Timestamp int64
+	Hash      string
+	Prev      string
 }
 
 type TreeNode struct {
@@ -61,12 +62,20 @@ type ChainTree struct {
 	mutex     sync.Mutex
 	root      *TreeNode
 	hnode     *TreeNode
-	danglings []BlockData
+	danglings *BcSortedList
 }
 
 func (tc *ChainTree) newRoot(block *BlockData) {
 	tc.root = NewTreeNode(block)
 	tc.hnode = tc.root
+}
+
+func (tc *ChainTree) getRootTimestamp() int64 {
+	if tc.root == nil || tc.root.block == nil {
+		return 0
+	}
+
+	return tc.root.block.Timestamp
 }
 
 func (tc *ChainTree) setRoot(node *TreeNode) {
@@ -105,19 +114,23 @@ func (tc *ChainTree) UpdateRoot() {
 		tmp = tmp.GetParent()
 	}
 }
-func (tc *ChainTree) AddTreeNode(block *BlockData) {
+
+func (tc *ChainTree) AddTreeNode(block *BlockData, isnew bool) bool {
 	tc.mutex.Lock()
 	defer tc.mutex.Unlock()
 
 	if tc.root == nil {
 		block.Height = 0
 		tc.newRoot(block)
-		return
+		return true
 	} else {
 		node := tc.findNode(block.Prev)
 		if node == nil {
-			log.Panicf("Not found previous hash block")
-			return
+			log.Printf("Not found previous hash block : %v", block)
+			if isnew == true { // Add block if it is a new block.
+				tc.danglings.Add(block)
+			}
+			return false
 		}
 
 		child := node.GetChild()
@@ -127,7 +140,7 @@ func (tc *ChainTree) AddTreeNode(block *BlockData) {
 			tmp.SetParent(node)
 			node.SetChild(tmp)
 			tc.hnode = node.GetChild()
-			return
+			return true
 		}
 
 		node = child
@@ -138,13 +151,11 @@ func (tc *ChainTree) AddTreeNode(block *BlockData) {
 				tmp := NewTreeNode(block)
 				tmp.SetParent(node.GetParent())
 				node.SetSibling(tmp)
-
-				return
+				return true
 			}
 			node = sibling
 		}
 	}
-
 }
 
 func (tc *ChainTree) findChildNode(hash string, node *TreeNode) *TreeNode {
@@ -178,6 +189,22 @@ func (tc *ChainTree) findNode(hash string) *TreeNode {
 	return tc.findChildNode(hash, tc.root)
 }
 
+func (tc *ChainTree) UpdateDanglings() {
+	for {
+		i, d := tc.danglings.Next()
+		if i < 0 {
+			break
+		}
+
+		// call it with false because this block is dangling.
+		if tc.AddTreeNode(d, false) {
+			log.Printf("add dangling block to the list : %v", d)
+		}
+	}
+
+	tc.danglings.Update(tc.getRootTimestamp())
+}
+
 func (tc *ChainTree) PrintNode(node *TreeNode) {
 	if node == nil {
 		return
@@ -200,7 +227,11 @@ func (tc *ChainTree) PrintAll() {
 	tc.PrintNode(node)
 }
 
+func (tc *ChainTree) ShowDanglings() {
+	tc.danglings.ShowAll()
+}
+
 func NewChainTree() *ChainTree {
-	tc := ChainTree{root: nil, hnode: nil, danglings: make([]BlockData, 0)}
+	tc := ChainTree{root: nil, hnode: nil, danglings: NewBcSortedList()}
 	return &tc
 }

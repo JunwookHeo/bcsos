@@ -10,7 +10,7 @@ import (
 	"github.com/junwookheo/bcsos/common/serial"
 )
 
-const DB_PATH_TEST = "../db_nodes/7031.db"
+const DB_PATH_TEST = "../db_nodes/7001.db"
 
 func TestBlockchainConsistency(t *testing.T) {
 	db, err := sql.Open("sqlite3", DB_PATH_TEST)

@@ -12,16 +12,19 @@ type ChainMgr struct {
 }
 
 func (cm *ChainMgr) AddedNewBlock(h *blockchain.BlockHeader) {
-	block := datalib.BlockData{Height: 0, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
-	cm.tree.AddTreeNode(&block)
+	block := datalib.BlockData{Height: -1, Timestamp: h.Timestamp, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
+	if cm.tree.AddTreeNode(&block, true) {
+		cm.tree.UpdateDanglings() // update dangling blocks
+	}
 	cm.tree.UpdateRoot()
-	// cm.tree.PrintAll()
+	cm.tree.PrintAll()
+	cm.tree.ShowDanglings()
 }
 
 func (cm *ChainMgr) GetHighestBlockHash() (int, string) {
 	block := cm.tree.GetHighestBlock()
 	if block == nil {
-		return 0, ""
+		return -1, ""
 	}
 
 	return block.Height, block.Hash
