@@ -48,7 +48,7 @@ func TestNewBcSortedList(t *testing.T) {
 		log.Printf("index %v, %v", i, d)
 	}
 
-	tc.Update()
+	tc.Update(0)
 	tc.ShowAll()
 }
 
@@ -91,7 +91,7 @@ func TestUpdateBcSortedList(t *testing.T) {
 	}
 
 	tc.ShowAll()
-	tc.Update()
+	tc.Update(time.Now().UnixNano())
 	tc.ShowAll()
 }
 
@@ -121,6 +121,6 @@ func TestUpdate2BcSortedList(t *testing.T) {
 	tc.Add(&b8)
 	tc.ShowAll()
 
-	tc.Update()
+	tc.Update(time.Now().UnixNano())
 	tc.ShowAll()
 }

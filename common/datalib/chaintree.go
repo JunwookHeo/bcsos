@@ -60,6 +60,7 @@ func NewTreeNode(b *BlockData) *TreeNode {
 
 type ChainTree struct {
 	mutex     sync.Mutex
+	resetth   int // When a node receives n(resetth) consecutive danglings, it resets the chaintree.
 	root      *TreeNode
 	hnode     *TreeNode
 	danglings *BcSortedList
@@ -120,6 +121,7 @@ func (tc *ChainTree) AddTreeNode(block *BlockData, isnew bool) bool {
 	defer tc.mutex.Unlock()
 
 	if tc.root == nil {
+		tc.resetth = 0
 		block.Height = 0
 		tc.newRoot(block)
 		return true
@@ -128,13 +130,21 @@ func (tc *ChainTree) AddTreeNode(block *BlockData, isnew bool) bool {
 		if node == nil {
 			log.Printf("Not found previous hash block : %v", block)
 			if isnew == true { // Add block if it is a new block.
-				tc.danglings.Add(block)
+				if tc.resetth > 6 { //  more 6 consecutive danglings received
+					tc.resetth = 0
+					block.Height = 0
+					tc.newRoot(block)
+				} else {
+					tc.resetth++
+					tc.danglings.Add(block)
+				}
 			}
 			return false
 		}
 
 		child := node.GetChild()
 		if child == nil {
+			tc.resetth = 0
 			block.Height = node.block.Height + 1
 			tmp := NewTreeNode(block)
 			tmp.SetParent(node)
@@ -147,6 +157,7 @@ func (tc *ChainTree) AddTreeNode(block *BlockData, isnew bool) bool {
 		for {
 			sibling := node.GetSibling()
 			if sibling == nil {
+				tc.resetth = 0
 				block.Height = node.block.Height
 				tmp := NewTreeNode(block)
 				tmp.SetParent(node.GetParent())
@@ -232,6 +243,6 @@ func (tc *ChainTree) ShowDanglings() {
 }
 
 func NewChainTree() *ChainTree {
-	tc := ChainTree{root: nil, hnode: nil, danglings: NewBcSortedList()}
+	tc := ChainTree{root: nil, resetth: 0, hnode: nil, danglings: NewBcSortedList()}
 	return &tc
 }
