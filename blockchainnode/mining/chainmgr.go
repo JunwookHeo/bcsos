@@ -17,8 +17,8 @@ func (cm *ChainMgr) AddedNewBlock(h *blockchain.BlockHeader) {
 		cm.tree.UpdateDanglings() // update dangling blocks
 	}
 	cm.tree.UpdateRoot()
-	cm.tree.PrintAll()
-	cm.tree.ShowDanglings()
+	// cm.tree.PrintAll()
+	// cm.tree.ShowDanglings()
 }
 
 func (cm *ChainMgr) GetHighestBlockHash() (int, string) {
@@ -28,6 +28,14 @@ func (cm *ChainMgr) GetHighestBlockHash() (int, string) {
 	}
 
 	return block.Height, block.Hash
+}
+
+func (cm *ChainMgr) GetNewBlockInfo() *datalib.BcNewList {
+	if cm.tree == nil {
+		return nil
+	}
+
+	return cm.tree.GetNewBlockInfo()
 }
 
 func NewChainMgr() *ChainMgr {

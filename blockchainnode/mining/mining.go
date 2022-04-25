@@ -37,6 +37,10 @@ var (
 	oncemining sync.Once
 )
 
+type ChainInfoCmd struct {
+	Cmd string `json:"cmd"`
+}
+
 // Add transaction to the pool
 // true : If new transaction
 // false : the transaction already exists in the pool
@@ -276,9 +280,75 @@ func (mi *Mining) broadcastTrascationHandler(w http.ResponseWriter, r *http.Requ
 	mi.BroadcasTransaction(&tr)
 }
 
+// chainInfoHandler sends blockchain connection information to the webapp.
+// So, the webapp displays the connection of chain.
+// Request : a new transaction
+// Response : none
+func (mi *Mining) chainInfoHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("chainInfoHandler", err)
+		return
+	}
+
+	log.Println("chainInfoHandler")
+
+	defer ws.Close()
+	done := make(chan struct{})
+	var cmd ChainInfoCmd
+
+	go func() {
+		defer close(done)
+		for {
+			if err := ws.ReadJSON(&cmd); err != nil {
+				log.Printf("Read json error : %v", err)
+				return
+			}
+			log.Printf("Test resume/pause receive : %v", cmd)
+		}
+	}()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	func() {
+		var block *datalib.BlockData
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				newlist := mi.cm.GetNewBlockInfo()
+
+				if newlist != nil {
+					start := newlist.Find(block)
+					for {
+						i, b := newlist.Next()
+						if b == nil {
+							break
+						}
+						if start < i {
+							log.Printf("new block %v, %v", i, b)
+							block = b
+							if err := ws.WriteJSON(block); err != nil {
+								log.Printf("Write json error : %v", err)
+								return
+							}
+						}
+					}
+
+				}
+
+			}
+		}
+	}()
+}
+
 func (mi *Mining) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/broadcastnewblock", mi.newBlockHandler)
 	m.HandleFunc("/broadcastransaction", mi.broadcastTrascationHandler)
+	m.HandleFunc("/chaininfo", mi.chainInfoHandler)
 }
 
 func MiningInst() *Mining {

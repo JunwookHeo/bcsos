@@ -80,7 +80,7 @@ func (n *NodeMgr) UpdatePeerList(sim *dtype.NodeInfo, local *dtype.NodeInfo) {
 }
 
 // Send response to connector with its local information
-func (n *NodeMgr) PingHandler(w http.ResponseWriter, r *http.Request) {
+func (n *NodeMgr) pingHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -127,7 +127,7 @@ func (n *NodeMgr) GetSCNNodeListAll(nodes *[(config.MAX_SC) * config.MAX_SC_PEER
 }
 
 func (n *NodeMgr) SetHttpRouter(m *mux.Router) {
-	m.HandleFunc("/ping", n.PingHandler)
+	m.HandleFunc("/ping", n.pingHandler)
 }
 
 func NodeMgrInst() *NodeMgr {
