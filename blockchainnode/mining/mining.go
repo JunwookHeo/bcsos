@@ -132,9 +132,9 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 	for {
 		_, prehash := mi.cm.GetHighestBlockHash()
 
-		delay := 5000000 - time.Now().UnixMicro()%5000000
+		delay := 5000000000 - time.Now().Nanosecond()%5000000000
 		// log.Printf("cur : %v, %v", sec.UnixMicro(), delay)
-		time.Sleep(time.Microsecond * time.Duration(delay))
+		time.Sleep(time.Nanosecond * time.Duration(delay))
 
 		if *status == "Stop" {
 			log.Println("StartMiningNewBlock() : end")
