@@ -30,30 +30,34 @@ func (a *dbagent) Close() {
 	a.db.Close()
 }
 
-func (a *dbagent) GetLatestBlockHash() string {
+func (a *dbagent) GetLatestBlockHash() (string, int) {
 	var id int = 0
+	var height int = -1
+	var data []byte
 	var dtype, hash string = "", ""
 	var ts int64
 
-	rows, err := a.db.Query(`SELECT id, type, hash, timestamp FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
+	rows, err := a.db.Query(`SELECT id, type, hash, timestamp, data FROM bcobjects WHERE id = (SELECT MAX(id) FROM bcobjects WHERE type = 'block');`)
 
 	if err != nil {
 		log.Printf("Show latest objects Error : %v", err)
-		return hash
+		return hash, -1
 	}
 
 	defer rows.Close()
 
 	for rows.Next() {
-		err := rows.Scan(&id, &dtype, &hash, &ts)
+		err := rows.Scan(&id, &dtype, &hash, &ts, &data)
+		serial.Deserialize(data, &height)
+
 		if err != nil {
 			log.Printf("Read rows Error : %v", err)
-			return hash
+			return hash, height
 		}
 		//log.Printf("latest block : %d, %s, %v, %s", id, dtype, ts, hash)
 	}
 
-	return hash
+	return hash, height
 }
 
 func (a *dbagent) RemoveObject(hash string) bool {
@@ -366,14 +370,14 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 
 func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 	hash := hex.EncodeToString(b.Header.Hash)
-	obj := StorageObj{"block", hash, b.Header.Timestamp, nil}
+	obj := StorageObj{"block", hash, b.Header.Timestamp, b.Header.Height} // store height in data field.
 	if id := a.GetObject(&obj); id != 0 {
 		log.Printf("Replicatoin exists : %v - %v", id, hex.EncodeToString(b.Header.Hash))
 		return id
 	}
 
-	data := b.Header.GetHash()
-	header_hash := hex.EncodeToString(data[:])
+	bhash := b.Header.GetHash()
+	header_hash := hex.EncodeToString(bhash[:])
 	a.AddBlockHeader(header_hash, &b.Header)
 
 	// Add block - transactions list in the table
@@ -386,7 +390,7 @@ func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
 	}
 
 	// Add only block information without data, the data is stored in block-transaction matching table
-	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, []byte{}}
+	obj = StorageObj{"block", hex.EncodeToString(b.Header.Hash), b.Header.Timestamp, b.Header.Height}
 
 	if id := a.AddObject(&obj); id != 0 {
 		a.mutex.Lock()

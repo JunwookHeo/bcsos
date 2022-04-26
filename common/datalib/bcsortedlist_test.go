@@ -9,26 +9,26 @@ import (
 func TestNewBcSortedList(t *testing.T) {
 	tc := NewBcSortedList()
 	log.Printf("Start TestNewBcSortedList")
-	b1 := BlockData{-1, 1, "a", ""}
+	b1 := BlockData{0, 1, "a", ""}
 	tc.Add(&b1)
 	//tc.PrintAll()
-	b2 := BlockData{-1, 0, "b", "a"}
+	b2 := BlockData{1, 0, "b", "a"}
 	tc.Add(&b2)
 	//tc.PrintAll()
-	b3 := BlockData{-1, 3, "c", "b"}
+	b3 := BlockData{2, 3, "c", "b"}
 	tc.Add(&b3)
 	//tc.PrintAll()
-	b4 := BlockData{-1, 4, "c2", "b"}
+	b4 := BlockData{3, 4, "c2", "b"}
 	tc.Add(&b4)
 	//tc.PrintAll()
-	b5 := BlockData{-1, 2, "c3", "b"}
+	b5 := BlockData{4, 2, "c3", "b"}
 	tc.Add(&b5)
 
-	b6 := BlockData{-1, 5, "d", "c2"}
+	b6 := BlockData{5, 5, "d", "c2"}
 	tc.Add(&b6)
-	b7 := BlockData{-1, 7, "e", "d"}
+	b7 := BlockData{6, 7, "e", "d"}
 	tc.Add(&b7)
-	b8 := BlockData{-1, 6, "f", "e"}
+	b8 := BlockData{7, 6, "f", "e"}
 	tc.Add(&b8)
 	tc.ShowAll()
 
@@ -55,26 +55,26 @@ func TestNewBcSortedList(t *testing.T) {
 func TestUpdateBcSortedList(t *testing.T) {
 	tc := NewBcSortedList()
 	log.Printf("Start TestUpdateBcSortedList")
-	b1 := BlockData{-1, time.Now().UnixNano(), "a", ""}
+	b1 := BlockData{0, time.Now().UnixNano(), "a", ""}
 	tc.Add(&b1)
 	//tc.PrintAll()
-	b2 := BlockData{-1, time.Now().UnixNano(), "b", "a"}
+	b2 := BlockData{1, time.Now().UnixNano(), "b", "a"}
 	tc.Add(&b2)
 	//tc.PrintAll()
-	b3 := BlockData{-1, time.Now().UnixNano(), "c", "b"}
+	b3 := BlockData{2, time.Now().UnixNano(), "c", "b"}
 	tc.Add(&b3)
 	//tc.PrintAll()
-	b4 := BlockData{-1, time.Now().UnixNano(), "c2", "b"}
+	b4 := BlockData{3, time.Now().UnixNano(), "c2", "b"}
 	tc.Add(&b4)
 	//tc.PrintAll()
-	b5 := BlockData{-1, time.Now().UnixNano(), "c3", "b"}
+	b5 := BlockData{4, time.Now().UnixNano(), "c3", "b"}
 	tc.Add(&b5)
 
-	b6 := BlockData{-1, time.Now().UnixNano(), "d", "c2"}
+	b6 := BlockData{5, time.Now().UnixNano(), "d", "c2"}
 	tc.Add(&b6)
-	b7 := BlockData{-1, time.Now().UnixNano(), "e", "d"}
+	b7 := BlockData{6, time.Now().UnixNano(), "e", "d"}
 	tc.Add(&b7)
-	b8 := BlockData{-1, time.Now().UnixNano(), "f", "e"}
+	b8 := BlockData{7, time.Now().UnixNano(), "f", "e"}
 	tc.Add(&b8)
 	tc.ShowAll()
 
@@ -98,26 +98,26 @@ func TestUpdateBcSortedList(t *testing.T) {
 func TestUpdate2BcSortedList(t *testing.T) {
 	tc := NewBcSortedList()
 	log.Printf("Start TestUpdate2BcSortedList")
-	b1 := BlockData{-1, time.Now().UnixNano(), "a", ""}
+	b1 := BlockData{0, time.Now().UnixNano(), "a", ""}
 	tc.Add(&b1)
 	//tc.PrintAll()
-	b2 := BlockData{-1, time.Now().UnixNano() - 50000000000, "b", "a"}
+	b2 := BlockData{1, time.Now().UnixNano() - 50000000000, "b", "a"}
 	tc.Add(&b2)
 	//tc.PrintAll()
-	b3 := BlockData{-1, time.Now().UnixNano() - 54000000000, "c", "b"}
+	b3 := BlockData{2, time.Now().UnixNano() - 54000000000, "c", "b"}
 	tc.Add(&b3)
 	//tc.PrintAll()
-	b4 := BlockData{-1, time.Now().UnixNano(), "c2", "b"}
+	b4 := BlockData{3, time.Now().UnixNano(), "c2", "b"}
 	tc.Add(&b4)
 	//tc.PrintAll()
-	b5 := BlockData{-1, time.Now().UnixNano(), "c3", "b"}
+	b5 := BlockData{4, time.Now().UnixNano(), "c3", "b"}
 	tc.Add(&b5)
 
-	b6 := BlockData{-1, time.Now().UnixNano() - 61000000000, "d", "c2"}
+	b6 := BlockData{5, time.Now().UnixNano() - 61000000000, "d", "c2"}
 	tc.Add(&b6)
-	b7 := BlockData{-1, time.Now().UnixNano() - 60000000000, "e", "d"}
+	b7 := BlockData{6, time.Now().UnixNano() - 60000000000, "e", "d"}
 	tc.Add(&b7)
-	b8 := BlockData{-1, time.Now().UnixNano(), "f", "e"}
+	b8 := BlockData{7, time.Now().UnixNano(), "f", "e"}
 	tc.Add(&b8)
 	tc.ShowAll()
 

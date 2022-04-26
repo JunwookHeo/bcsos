@@ -38,7 +38,7 @@ func TestBlockchainConsistency(t *testing.T) {
 		}
 
 		serial.Deserialize(data, &bh)
-		log.Printf("add block : %v", i)
+		log.Printf("add block : %v, %v", i, bh.Height)
 		log.Printf("%v - %v", hex.EncodeToString(bh.Hash), hex.EncodeToString(bh.PrvHash))
 		cm.AddedNewBlock(&bh)
 		i++

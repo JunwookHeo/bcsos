@@ -26,7 +26,7 @@ func TestDBSqliteAdd(t *testing.T) {
 	assert.FileExists(t, path)
 	w := wallet.NewWallet(wallet_path)
 
-	crbl := func(pre string) *blockchain.Block {
+	crbl := func(pre string, height int) *blockchain.Block {
 		var trs []*blockchain.Transaction
 		sss := []string{pre + "11111111111111111111", pre + "22222222222222222222222", pre + "333333333333333333"}
 		for i := 0; i < 3; i++ {
@@ -36,15 +36,16 @@ func TestDBSqliteAdd(t *testing.T) {
 			trs = append(trs, tr)
 		}
 
-		return blockchain.CreateBlock(trs, nil)
+		return blockchain.CreateBlock(trs, nil, height)
 	}
 
 	dba.GetLatestBlockHash()
-	b1 := crbl("aaaaa-")
+	b1 := crbl("aaaaa-", 0)
 	dba.AddBlock(b1)
 	status := dba.GetDBStatus()
 	log.Println(status)
-	dba.GetLatestBlockHash()
+	phash, height := dba.GetLatestBlockHash()
+	log.Println(phash, height)
 
 	hash := hex.EncodeToString(b1.Header.Hash)
 	b2 := blockchain.Block{}
@@ -55,11 +56,12 @@ func TestDBSqliteAdd(t *testing.T) {
 		log.Printf("==> %v, %v", b1.Transactions[i].Signature, b2.Transactions[i].Signature)
 	}
 
-	b1 = crbl("bbbbb-")
+	b1 = crbl("bbbbb-", 1)
 	dba.AddBlock(b1)
 	status = dba.GetDBStatus()
 	log.Println(status)
-	dba.GetLatestBlockHash()
+	phash, height = dba.GetLatestBlockHash()
+	log.Println(phash, height)
 	//dba.ShowAllObjets()
 
 	log.Println(dba.GetDBDataSize())

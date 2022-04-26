@@ -28,6 +28,7 @@ func initData(b *Block, nonce int) []byte {
 			toHex(b.Header.Timestamp),
 			toHex(int64(DIFFICULTY)),
 			toHex(int64(nonce)),
+			toHex(int64(b.Header.Height)),
 		},
 		[]byte{},
 	)

@@ -83,7 +83,7 @@ func (mi *Mining) DeleteTransactionsFromPool(keys []string) {
 func (mi *Mining) ShowTransactionsFromPool() {
 	mi.mutex.Lock()
 	defer mi.mutex.Unlock()
-	log.Printf("Tr Pool : %v", mi.tp)
+	// log.Printf("Tr Pool : %v", mi.tp)
 }
 
 func (mi *Mining) sendBlock(b *blockchain.Block, node *dtype.NodeInfo) {
@@ -128,7 +128,46 @@ func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
 	}
 }
 
-func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
+func (mi *Mining) StartMiningNewBlock(status *string) {
+	for {
+		_, prehash := mi.cm.GetHighestBlockHash()
+
+		sec := time.Now()
+		delay := 5000000 - sec.UnixMicro()%5000000
+		// log.Printf("cur : %v, %v", sec.UnixMicro(), delay)
+		time.Sleep(time.Microsecond * time.Duration(delay))
+
+		if *status == "Stop" {
+			log.Println("StartMiningNewBlock() : end")
+			return
+		}
+		height, curhash := mi.cm.GetHighestBlockHash()
+		if prehash != curhash {
+			continue
+		}
+
+		trs := mi.GetTransactionsFromPool()
+
+		if len(trs) != 0 {
+			hash, _ := hex.DecodeString(curhash)
+			b := blockchain.CreateBlock(trs, hash, height+1)
+
+			// Send block to local node
+			ni := network.NodeInfoInst()
+			local := ni.GetLocalddr()
+			height, curhash := mi.cm.GetHighestBlockHash()
+			if prehash != curhash {
+				continue
+			}
+
+			log.Printf("===============create block(%v):%v %v", height+1, hex.EncodeToString(b.Header.Hash), curhash)
+			mi.sendBlock(b, local)
+		}
+
+	}
+}
+
+func (mi *Mining) StartMiningNewBlock2(block *blockchain.Block) {
 	// sm := storage.StorageMgrInst("")
 	//prehash := sm.GetLatestBlockHash()
 	_, prehash := mi.cm.GetHighestBlockHash()
@@ -158,9 +197,9 @@ func (mi *Mining) StartMiningNewBlock(block *blockchain.Block) {
 		} else {
 			// hash, _ := hex.DecodeString(sm.GetLatestBlockHash())
 			hash, _ := hex.DecodeString(curhash)
-			b := blockchain.CreateBlock(trs, hash)
+			b := blockchain.CreateBlock(trs, hash, height+1)
 
-			log.Printf("===============create block(%v):%v %v", height, hex.EncodeToString(b.Header.Hash), curhash)
+			log.Printf("===============create block(%v):%v %v", height+1, hex.EncodeToString(b.Header.Hash), curhash)
 			// Send block to local node
 			ni := network.NodeInfoInst()
 			local := ni.GetLocalddr()
@@ -207,7 +246,7 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 	mi.cm.AddedNewBlock(&block.Header)
 	sm.AddNewBlock(&block)
 
-	go mi.StartMiningNewBlock(&block)
+	// go mi.StartMiningNewBlock(&block)
 }
 
 // Update peers list

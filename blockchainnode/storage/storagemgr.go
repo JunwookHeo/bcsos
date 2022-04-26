@@ -311,7 +311,7 @@ func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 	h.db.AddBlock(b)
 }
 
-func (h *StorageMgr) GetLatestBlockHash() string {
+func (h *StorageMgr) GetLatestBlockHash() (string, int) {
 	return h.db.GetLatestBlockHash()
 }
 

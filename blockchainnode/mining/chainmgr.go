@@ -12,7 +12,7 @@ type ChainMgr struct {
 }
 
 func (cm *ChainMgr) AddedNewBlock(h *blockchain.BlockHeader) {
-	block := datalib.BlockData{Height: -1, Timestamp: h.Timestamp, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
+	block := datalib.BlockData{Height: h.Height, Timestamp: h.Timestamp, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
 	if cm.tree.AddTreeNode(&block, true) {
 		cm.tree.UpdateDanglings() // update dangling blocks
 	}

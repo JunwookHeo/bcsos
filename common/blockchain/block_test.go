@@ -21,7 +21,7 @@ func TestCreateBlock(t *testing.T) {
 		trs = append(trs, tr)
 	}
 
-	b := CreateBlock(trs, nil)
+	b := CreateBlock(trs, nil, 0)
 	//assert.Greater(t, b.Header.Timestamp, int64(0))
 	assert.NotEmpty(t, b.Header.Hash)
 	assert.Equal(t, trs, b.Transactions)
@@ -44,7 +44,7 @@ func TestSeializeBlock(t *testing.T) {
 		trs = append(trs, tr)
 	}
 
-	b1 := CreateBlock(trs, nil)
+	b1 := CreateBlock(trs, nil, 0)
 	//assert.Greater(t, b1.Header.Timestamp, int64(0))
 	assert.NotEmpty(t, b1.Header.Hash)
 	assert.Equal(t, trs, b1.Transactions)
@@ -75,7 +75,7 @@ func TestHashBlock(t *testing.T) {
 		trs = append(trs, tr)
 	}
 
-	b1 := CreateBlock(trs, nil)
+	b1 := CreateBlock(trs, nil, 0)
 	difficulty, nonce, hash := ProofWork(b1)
 	assert.Equal(t, difficulty, b1.Header.Difficulty)
 	assert.Equal(t, nonce, b1.Header.Nonce)

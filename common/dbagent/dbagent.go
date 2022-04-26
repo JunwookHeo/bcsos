@@ -8,7 +8,7 @@ import (
 
 type DBAgent interface {
 	Close()
-	GetLatestBlockHash() string
+	GetLatestBlockHash() (string, int)
 	RemoveObject(hash string) bool
 	AddBlockHeader(hash string, h *blockchain.BlockHeader) int64
 	GetBlockHeader(hash string, h *blockchain.BlockHeader) int64

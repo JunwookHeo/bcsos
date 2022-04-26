@@ -97,9 +97,9 @@ func (h *Handler) Start() {
 	log.Printf("wallet : %v", w)
 
 	cnt := 0
-	hash := h.db.GetLatestBlockHash()
+	hash, height := h.db.GetLatestBlockHash()
 	if len(hash) == 0 {
-		log.Printf("Create Genesis due to hash : %v", hash)
+		log.Printf("Create Genesis due to hash : (%v) - %v", height, hash)
 		b := blockchain.CreateGenesis(w)
 		h.db.AddBlock(b)
 		h.broadcastNewBlock(b)
@@ -140,7 +140,8 @@ func (h *Handler) Start() {
 				tr := blockchain.CreateTransaction(w, []byte(d))
 				trs = append(trs, tr)
 			}
-			b := blockchain.CreateBlock(trs, []byte(h.db.GetLatestBlockHash()))
+			hash, height := h.db.GetLatestBlockHash()
+			b := blockchain.CreateBlock(trs, []byte(hash), height)
 			h.db.AddBlock(b)
 			h.broadcastNewBlock(b)
 			log.Printf("Broadcast a new block : %v", cnt)

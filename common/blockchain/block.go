@@ -16,6 +16,7 @@ type BlockHeader struct {
 	Timestamp  int64
 	Difficulty int
 	Nonce      int
+	Height     int
 }
 
 type Block struct {
@@ -23,8 +24,8 @@ type Block struct {
 	Transactions []*Transaction
 }
 
-func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
-	h := BlockHeader{nil, prevhash, nil, time.Now().UnixNano(), 0, 0}
+func CreateBlock(trs []*Transaction, prevhash []byte, height int) *Block {
+	h := BlockHeader{nil, prevhash, nil, time.Now().UnixNano(), 0, 0, height}
 	block := &Block{h, trs}
 	block.Header.MerkleRoot = block.MerkleRoot()
 
@@ -38,7 +39,7 @@ func CreateBlock(trs []*Transaction, prevhash []byte) *Block {
 }
 
 func genesis(t *Transaction) *Block {
-	return CreateBlock([]*Transaction{t}, []byte{})
+	return CreateBlock([]*Transaction{t}, []byte{}, 0)
 }
 
 func CreateGenesis(w *wallet.Wallet) *Block {
@@ -55,6 +56,7 @@ func (bh *BlockHeader) GetHash() []byte {
 			toHex(bh.Timestamp),
 			toHex(int64(bh.Difficulty)),
 			toHex(int64(bh.Nonce)),
+			toHex(int64(bh.Height)),
 		},
 		[]byte{},
 	)

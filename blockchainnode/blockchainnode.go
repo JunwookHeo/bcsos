@@ -266,6 +266,7 @@ func TransactionProc() {
 				log.Println(cmd)
 				switch cmd {
 				case "Stop":
+					status = "Stop"
 					//mining.SimulateTransaction(-1)
 					return
 				case "Pause":
@@ -275,7 +276,7 @@ func TransactionProc() {
 				case "Start":
 					status = "Running"
 					log.Println("start mining ===")
-					go mi.StartMiningNewBlock(nil)
+					go mi.StartMiningNewBlock(&status)
 				}
 			default:
 				if status == "Running" {

@@ -132,30 +132,45 @@ func (tc *ChainTree) _addTreeNode(block *BlockData, isnew bool) bool {
 
 	if tc.root == nil {
 		tc.threshold = 0
-		block.Height = 0
 		tc.newRoot(block)
 		return true
 	} else {
 		node := tc.findNode(block.Prev)
 		if node == nil {
-			log.Printf("Not found previous hash block : %v", block)
-			if isnew == true { // Add block if it is a new block.
-				if tc.threshold > 6 { //  more 6 consecutive danglings received
-					tc.threshold = 0
-					block.Height = 0
-					tc.newRoot(block)
-				} else {
-					tc.threshold++
-					tc.danglings.Add(block)
+			if block.Prev == tc.root.block.Prev { // Multiple Genesis
+				node = tc.root
+				for {
+					sibling := node.GetSibling()
+					if sibling == nil {
+						tc.threshold = 0
+						tmp := NewTreeNode(block)
+						tmp.SetParent(node.GetParent())
+						node.SetSibling(tmp)
+						return true
+					}
+					node = sibling
 				}
+			} else {
+
+				log.Printf("Not found previous hash block : %v", block)
+				if isnew == true { // Add block if it is a new block.
+					if tc.threshold > 6 { //  more 6 consecutive danglings received
+						tc.threshold = 0
+						// block.Height = 0
+						tc.newRoot(block)
+					} else {
+						tc.threshold++
+						tc.danglings.Add(block)
+					}
+				}
+				return false
 			}
-			return false
 		}
 
 		child := node.GetChild()
 		if child == nil {
 			tc.threshold = 0
-			block.Height = node.block.Height + 1
+			// block.Height = node.block.Height + 1
 			tmp := NewTreeNode(block)
 			tmp.SetParent(node)
 			node.SetChild(tmp)
@@ -168,7 +183,60 @@ func (tc *ChainTree) _addTreeNode(block *BlockData, isnew bool) bool {
 			sibling := node.GetSibling()
 			if sibling == nil {
 				tc.threshold = 0
-				block.Height = node.block.Height
+				// block.Height = node.block.Height
+				tmp := NewTreeNode(block)
+				tmp.SetParent(node.GetParent())
+				node.SetSibling(tmp)
+				return true
+			}
+			node = sibling
+		}
+	}
+}
+
+func (tc *ChainTree) _addTreeNode2(block *BlockData, isnew bool) bool {
+	tc.mutex.Lock()
+	defer tc.mutex.Unlock()
+
+	if tc.root == nil {
+		tc.threshold = 0
+		// block.Height = 0
+		tc.newRoot(block)
+		return true
+	} else {
+		node := tc.findNode(block.Prev)
+		if node == nil {
+			log.Printf("Not found previous hash block : %v", block)
+			if isnew == true { // Add block if it is a new block.
+				if tc.threshold > 6 { //  more 6 consecutive danglings received
+					tc.threshold = 0
+					// block.Height = 0
+					tc.newRoot(block)
+				} else {
+					tc.threshold++
+					tc.danglings.Add(block)
+				}
+			}
+			return false
+		}
+
+		child := node.GetChild()
+		if child == nil {
+			tc.threshold = 0
+			// block.Height = node.block.Height + 1
+			tmp := NewTreeNode(block)
+			tmp.SetParent(node)
+			node.SetChild(tmp)
+			tc.hnode = node.GetChild()
+			return true
+		}
+
+		node = child
+		for {
+			sibling := node.GetSibling()
+			if sibling == nil {
+				tc.threshold = 0
+				// block.Height = node.block.Height
 				tmp := NewTreeNode(block)
 				tmp.SetParent(node.GetParent())
 				node.SetSibling(tmp)
