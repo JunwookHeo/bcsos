@@ -19,6 +19,8 @@ import (
 	"github.com/junwookheo/bcsos/common/dtype"
 )
 
+const TPERIOD int = config.BLOCK_CREATE_PERIOD * 1000000000
+
 type Mining struct {
 	tp    map[string]*blockchain.Transaction
 	st    *datalib.BcQueue // list of broadcast new transactions
@@ -132,8 +134,7 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 	for {
 		_, prehash := mi.cm.GetHighestBlockHash()
 
-		delay := 5000000000 - time.Now().Nanosecond()%5000000000
-		// log.Printf("cur : %v, %v", sec.UnixMicro(), delay)
+		delay := TPERIOD - time.Now().Nanosecond()%TPERIOD
 		time.Sleep(time.Nanosecond * time.Duration(delay))
 
 		if *status == "Stop" {
