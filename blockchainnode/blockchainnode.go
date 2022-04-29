@@ -274,9 +274,11 @@ func TransactionProc() {
 				case "Resume":
 					status = "Running"
 				case "Start":
-					status = "Running"
-					log.Println("start mining ===")
-					go mi.StartMiningNewBlock(&status)
+					if status != "Running" {
+						status = "Running"
+						log.Println("start mining ===")
+						go mi.StartMiningNewBlock(&status)
+					}
 				}
 			default:
 				if status == "Running" {
