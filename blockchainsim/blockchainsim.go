@@ -1,9 +1,12 @@
 package main
 
 import (
+	"flag"
 	"log"
+	"net"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/grandcat/zeroconf"
 	"github.com/junwookheo/bcsos/blockchainsim/testmgrsrv"
@@ -16,12 +19,55 @@ func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
 
+func flagParse() string {
+	ip := flag.String("ip", "", "IP for simulation server")
+	iface := flag.String("iface", "", "IP Interface for simulation server, 'eth0', 'wi-fi'")
+	flag.Parse()
+
+	log.Printf("=== ip : %v", *ip)
+	if *ip == "" && *iface != "" {
+		*ip = localAddresses(iface)
+	}
+	log.Printf("=== ip : %v", *ip)
+	return *ip
+}
+
+func localAddresses(target *string) string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("iface error : %v", err)
+		return ""
+	}
+	for _, i := range ifaces {
+		if strings.ToLower(i.Name) == strings.ToLower(*target) {
+			addrs, err := i.Addrs()
+			if err != nil {
+				log.Printf("Net Addrs error : %v", err)
+				break
+			}
+			log.Printf("iface : %v", i)
+			for _, a := range addrs {
+				ips := strings.Split(a.String(), "/")
+				nip := net.ParseIP(ips[0])
+
+				if nip.To4() != nil {
+					log.Printf("IP : %v", nip.String())
+					return nip.String()
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
 func main() {
 	log.Println("Start blockchain simulator")
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Reset()
 
+	ip := flagParse()
 	s := testmgrsrv.NewHandler(DB_PATH)
 	go s.StartService(PORT)
 	//go bcdummy.Start()
@@ -30,10 +76,11 @@ func main() {
 	meta := []string{
 		"version=0.1.0",
 		"bctestmgr",
+		"sim_ip=",
 	}
 
 	service, err := zeroconf.Register(
-		"bcsos-tms",       // service instance name
+		"mldc_sim:"+ip,    // service instance name
 		"_omxremote._tcp", // service type and protocl
 		"local.",          // service domain
 		PORT,              // service port

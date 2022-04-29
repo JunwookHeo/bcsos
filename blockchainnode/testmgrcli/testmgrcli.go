@@ -82,10 +82,20 @@ func (t *TestMgrCli) startResolver() {
 	go func(results <-chan *zeroconf.ServiceEntry) {
 		for entry := range results {
 			log.Println("Found service:", entry.ServiceInstanceName(), entry.Text)
-			names := strings.Split(entry.ServiceInstanceName(), ".")
-			if names[0] == "bcsos-tms" {
+			names := strings.Split(entry.Instance, ":")
+			if names[0] == "mldc_sim" {
+				log.Printf("entry.Domain : %v", entry.Domain)
+				log.Printf("entry.HostName : %v", entry.HostName)
+				log.Printf("entry.Instance : %v", entry.Instance)
+				log.Printf("entry.Service : %v", entry.Service)
+				log.Printf("entry.Text : %v", entry.Text)
 				log.Printf("ip addrs : %v", entry.AddrIPv4)
-				ip := t.checkPortAvailavle(entry.AddrIPv4, entry.Port)
+				var ip string = ""
+				if names[1] != "" {
+					ip = names[1]
+				} else {
+					ip = t.checkPortAvailavle(entry.AddrIPv4, entry.Port)
+				}
 				log.Printf("Sim Server IP : %v", ip)
 				ni.SetSimAddr(ip, entry.Port)
 				t.registerNode(ip, entry.Port)
