@@ -59,6 +59,17 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	ws.WriteJSON(node)
 	log.Printf("From client : %v", node)
+
+	for {
+		if err := ws.ReadJSON(&node); err != nil {
+			log.Printf("Node is disconnected : %v, %v", err, h.Nodes)
+			h.mutex.Lock()
+			delete(h.Nodes, node.Hash)
+			h.mutex.Unlock()
+			log.Printf("Client node list : %v", h.Nodes)
+			break
+		}
+	}
 }
 
 // Send nodes information connected to simulator.

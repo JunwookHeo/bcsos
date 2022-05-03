@@ -55,14 +55,16 @@ func (t *TestMgrCli) registerNode(ip string, port int) {
 	}
 
 	var node dtype.NodeInfo
-	if err := ws.ReadJSON(&node); err != nil {
-		log.Printf("Read json error : %v", err)
-		return
-	}
+	for {
+		if err := ws.ReadJSON(&node); err != nil {
+			log.Printf("Read json error : %v", err)
+			return
+		}
 
-	ni.SetLocalddrIP(node.IP)
-	log.Printf("Got response: %v\n", local)
-	log.Printf("Recevied node : %v", node)
+		ni.SetLocalddrIP(node.IP)
+		log.Printf("Got response: %v\n", local)
+		log.Printf("Recevied node : %v", node)
+	}
 }
 
 func (t *TestMgrCli) startResolver() {
