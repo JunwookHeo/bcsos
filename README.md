@@ -7,7 +7,8 @@ This is a simulator for Multi-Level Distributed Caching on the Blockchain for St
 * tmux 3.0a
 
 # Run
-* run blockchainnode/runsim2.sh
+* cd blockchainnode
+* run simxx.sh
 * connect http://localhost:8080/ and click "Start Test" button
 
 ## Runing individual nodes

@@ -265,7 +265,7 @@ func (a *dbagent) GetTransactionwithUniform(num int, hashes *[]RemoverbleObj) bo
 		}
 		*hashes = append(*hashes, RemoverbleObj{idx, hash})
 	}
-	log.Printf("GetTransactionwithUniform : %v", hashes)
+	// log.Printf("GetTransactionwithUniform : %v", hashes)
 	return true
 }
 

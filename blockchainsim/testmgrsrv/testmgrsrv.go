@@ -1,18 +1,22 @@
 package testmgrsrv
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"text/template"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
+	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
@@ -65,11 +69,11 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		if err := ws.ReadJSON(&node); err != nil {
-			log.Printf("Node is disconnected : %v, %v", err, h.Nodes)
+			// log.Printf("Node is disconnected : %v, %v", err, h.Nodes)
 			h.mutex.Lock()
 			delete(h.Nodes, node.Hash)
 			h.mutex.Unlock()
-			log.Printf("Client node list : %v", h.Nodes)
+			// log.Printf("Client node list : %v", h.Nodes)
 			break
 		}
 	}
@@ -163,10 +167,8 @@ func (h *Handler) commandProc(cmd *dtype.Command) {
 		case "Test":
 			if cmd.Arg1 == "Start" {
 				h.el.Notify("Start")
-				// h.UpdateTestStatus(true)
 			} else if cmd.Arg1 == "Stop" {
 				h.el.Notify("Stop")
-				//h.UpdateTestStatus(false)
 			}
 		}
 	}
@@ -236,9 +238,30 @@ func (h *Handler) commandHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+// newBlockHandler is called when a new block is received from miners
+// When a node receive this, it stores the block on its local db
+// Request : a new block
+// Response : none
+func (h *Handler) newBlockHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("newBlockHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	var block blockchain.Block
+	if err := ws.ReadJSON(&block); err != nil {
+		log.Printf("Read json error : %v", err)
+	}
+
+	log.Printf("Rcv new block(%v) : %v", block.Header.Height, hex.EncodeToString(block.Header.Hash))
+	h.db.AddBlock(&block)
+}
+
 func (h *Handler) UpdateTestStatus(ready bool) {
 	h.Ready = ready
-	// h.BCDummy.Ready = ready
 }
 
 func (h *Handler) StartService(port int) {
@@ -248,7 +271,7 @@ func (h *Handler) StartService(port int) {
 	}
 }
 
-func (h *Handler) GenerateTransactionProc() {
+func (h *Handler) SimulateAccessPatternProc() {
 	command := make(chan string)
 	h.el.AddListener(command)
 	id := 0
@@ -262,13 +285,13 @@ func (h *Handler) GenerateTransactionProc() {
 				switch cmd {
 				case "Stop":
 					status = "Stop"
+					log.Printf("access pattern stoping")
 				case "Start":
 					status = "Running"
 				}
 			default:
 				if status == "Running" {
-					h.bcsim.SimulateTransaction(id)
-					id++
+					h.bcsim.SimulateAccessPattern(&id)
 					time.Sleep(time.Second)
 				} else {
 					time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
@@ -278,25 +301,61 @@ func (h *Handler) GenerateTransactionProc() {
 	}(command)
 }
 
-// func (h *Handler) StartDummy() {
-// 	// Wait until clients join
-// 	func() {
-// 		ticker := time.NewTicker(1 * time.Second)
-// 		defer ticker.Stop()
-// 		for {
-// 			<-ticker.C
-// 			if h.Ready {
-// 				return
-// 			}
-// 		}
-// 	}()
+func (h *Handler) KillProcess() {
+	p, err := os.FindProcess(os.Getpid())
 
-// 	for _, n := range h.Nodes {
-// 		log.Printf("Test Start : %v", n)
-// 	}
+	if err != nil {
+		return
+	}
 
-// 	h.BCDummy.Start()
-// }
+	p.Signal(syscall.SIGTERM)
+}
+
+func (h *Handler) SimulateTransactionProc() {
+	command := make(chan string)
+	h.el.AddListener(command)
+	id := 0
+
+	go func(command <-chan string) {
+		var status = "Pause"
+
+		for {
+			select {
+			case cmd := <-command:
+				switch cmd {
+				case "Stop":
+					status = "Stop"
+					log.Printf("Stop running")
+					// Wait untile client nodes terminate
+					time.Sleep(time.Duration(20) * time.Second)
+					h.db.Close()
+					h.KillProcess()
+				case "Start":
+					status = "Running"
+				}
+			default:
+				if status == "Running" {
+					if id < config.TOTAL_TRANSACTIONS {
+						h.bcsim.SimulateTransaction(id)
+						id++
+						time.Sleep(time.Second)
+					} else {
+						//Stop generating access pattern proc
+						h.el.Notify("Stop")
+						// Sleep for a while for client nodes
+						time.Sleep(time.Duration(10) * time.Second)
+						// Send test stop to client nodes
+						cmd := dtype.Command{Cmd: "SET", Subcmd: "Test", Arg1: "Stop", Arg2: "", Arg3: ""}
+						h.broadcastCommand(cmd)
+						log.Printf("sendiing stop")
+					}
+				} else {
+					time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+				}
+			}
+		}
+	}(command)
+}
 
 func NewHandler(mode string, path string) *Handler {
 	m := mux.NewRouter()
@@ -320,15 +379,15 @@ func NewHandler(mode string, path string) *Handler {
 	m.HandleFunc("/nodes", h.nodesHandler)
 	m.HandleFunc("/ping", h.pingHandler)
 	m.HandleFunc("/command", h.commandHandler)
+	m.HandleFunc("/broadcastnewblock", h.newBlockHandler)
 
 	h.el = listener.EventListenerInst()
 
-	h.bcsim = simulation.NewBCDummy(h.db, &h.Nodes)
+	h.bcsim = simulation.NewSimAgent(h.db, &h.Nodes)
 	h.TC = NewTestConfig(h.db, &h.Nodes)
 
-	h.GenerateTransactionProc()
-
-	// go h.StartDummy()
+	h.SimulateTransactionProc()
+	h.SimulateAccessPatternProc()
 
 	return h
 }

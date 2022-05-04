@@ -161,6 +161,7 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 			// Send block to local node
 			ni := network.NodeInfoInst()
 			local := ni.GetLocalddr()
+			server := ni.GetSimAddr()
 			height, curhash := mi.cm.GetHighestBlockHash()
 			if prehash != curhash {
 				continue
@@ -168,50 +169,9 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 
 			log.Printf("==>mining a new block(%v):%v %v", height+1, hex.EncodeToString(b.Header.Hash), curhash)
 			mi.sendBlock(b, local)
+			mi.sendBlock(b, server) // Send a new block to simulation server
 		}
 
-	}
-}
-
-func (mi *Mining) StartMiningNewBlock2(block *blockchain.Block) {
-	// sm := storage.StorageMgrInst("")
-	//prehash := sm.GetLatestBlockHash()
-	_, prehash := mi.cm.GetHighestBlockHash()
-	// log.Printf("===============prev hash : %v", prehash)
-	// waithing some time instead of using high difficulty
-	t := rand.Intn(2000)
-	ticker := time.NewTicker(time.Millisecond * time.Duration(config.BLOCK_CREATE_PERIOD*1000+t))
-	defer ticker.Stop()
-
-	<-ticker.C
-
-	for {
-		height, curhash := mi.cm.GetHighestBlockHash()
-		if prehash != curhash {
-			//if prehash != sm.GetLatestBlockHash() {
-			// log.Printf("===============Terminating mining")
-			return
-		}
-
-		// log.Printf("===============Start mining")
-		// Statrt PoW
-		trs := mi.GetTransactionsFromPool()
-
-		if len(trs) == 0 {
-			// log.Printf("===============Start mining : trs (%v) : %v", height, trs)
-			time.Sleep(time.Second)
-		} else {
-			// hash, _ := hex.DecodeString(sm.GetLatestBlockHash())
-			hash, _ := hex.DecodeString(curhash)
-			b := blockchain.CreateBlock(trs, hash, height+1)
-
-			log.Printf("===============create block(%v):%v %v", height+1, hex.EncodeToString(b.Header.Hash), curhash)
-			// Send block to local node
-			ni := network.NodeInfoInst()
-			local := ni.GetLocalddr()
-			mi.sendBlock(b, local)
-			return
-		}
 	}
 }
 
