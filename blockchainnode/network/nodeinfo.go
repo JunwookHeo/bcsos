@@ -44,8 +44,8 @@ func (ni *NodeInfo) SetLocalddrIP(ip string) {
 func NodeInfoInst() *NodeInfo {
 	oncenodeinfo.Do(func() {
 		ni = &NodeInfo{
-			sim:   dtype.NodeInfo{Mode: "", SC: config.SIM_SC, IP: "", Port: 0, Hash: ""},
-			local: dtype.NodeInfo{Mode: "normal", SC: 0, IP: "", Port: 0, Hash: ""},
+			sim:   dtype.NodeInfo{Mode: "ST", SC: config.SIM_SC, IP: "", Port: 0, Hash: ""},
+			local: dtype.NodeInfo{Mode: "ST", SC: 0, IP: "", Port: 0, Hash: ""},
 		}
 	})
 	return ni

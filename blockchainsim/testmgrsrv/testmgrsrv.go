@@ -12,9 +12,11 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-	"github.com/junwookheo/bcsos/blockchainsim/bcdummy"
+	"github.com/junwookheo/bcsos/blockchainsim/simulation"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
+	"github.com/junwookheo/bcsos/common/listener"
 )
 
 var upgrader = websocket.Upgrader{
@@ -28,12 +30,13 @@ type Test struct {
 
 type Handler struct {
 	http.Handler
-	db      dbagent.DBAgent
-	Nodes   map[string](dtype.NodeInfo)
-	BCDummy *bcdummy.Handler
-	TC      *TestConfig
-	Ready   bool
-	mutex   sync.Mutex
+	db    dbagent.DBAgent
+	Nodes map[string](dtype.NodeInfo)
+	bcsim *simulation.Handler
+	TC    *TestConfig
+	Ready bool
+	el    *listener.EventListener
+	mutex sync.Mutex
 }
 
 func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -159,13 +162,14 @@ func (h *Handler) commandProc(cmd *dtype.Command) {
 		switch cmd.Subcmd {
 		case "Test":
 			if cmd.Arg1 == "Start" {
-				h.UpdateTestStatus(true)
+				h.el.Notify("Start")
+				// h.UpdateTestStatus(true)
 			} else if cmd.Arg1 == "Stop" {
-				h.UpdateTestStatus(false)
+				h.el.Notify("Stop")
+				//h.UpdateTestStatus(false)
 			}
 		}
 	}
-
 }
 
 func (h *Handler) sendCommand(cmd dtype.Command, ip string, port int) {
@@ -227,13 +231,14 @@ func (h *Handler) commandHandler(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Write json error : %v", err)
 				return
 			}
+			h.commandProc(&cmd)
 		}
 	}()
 }
 
 func (h *Handler) UpdateTestStatus(ready bool) {
 	h.Ready = ready
-	h.BCDummy.Ready = ready
+	// h.BCDummy.Ready = ready
 }
 
 func (h *Handler) StartService(port int) {
@@ -243,35 +248,66 @@ func (h *Handler) StartService(port int) {
 	}
 }
 
-func (h *Handler) StartDummy() {
-	// Wait until clients join
-	func() {
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
+func (h *Handler) GenerateTransactionProc() {
+	command := make(chan string)
+	h.el.AddListener(command)
+	id := 0
+
+	go func(command <-chan string) {
+		var status = "Pause"
+
 		for {
-			<-ticker.C
-			if h.Ready {
-				return
+			select {
+			case cmd := <-command:
+				switch cmd {
+				case "Stop":
+					status = "Stop"
+				case "Start":
+					status = "Running"
+				}
+			default:
+				if status == "Running" {
+					h.bcsim.SimulateTransaction(id)
+					id++
+					time.Sleep(time.Second)
+				} else {
+					time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+				}
 			}
 		}
-	}()
-
-	for _, n := range h.Nodes {
-		log.Printf("Test Start : %v", n)
-	}
-
-	h.BCDummy.Start()
+	}(command)
 }
 
-func NewHandler(path string) *Handler {
+// func (h *Handler) StartDummy() {
+// 	// Wait until clients join
+// 	func() {
+// 		ticker := time.NewTicker(1 * time.Second)
+// 		defer ticker.Stop()
+// 		for {
+// 			<-ticker.C
+// 			if h.Ready {
+// 				return
+// 			}
+// 		}
+// 	}()
+
+// 	for _, n := range h.Nodes {
+// 		log.Printf("Test Start : %v", n)
+// 	}
+
+// 	h.BCDummy.Start()
+// }
+
+func NewHandler(mode string, path string) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
 		db:      dbagent.NewDBAgent(path), // simulator use storage class 100
 		Nodes:   make(map[string]dtype.NodeInfo),
-		BCDummy: nil,
+		bcsim:   nil,
 		TC:      nil,
 		Ready:   false,
+		el:      nil,
 		mutex:   sync.Mutex{},
 	}
 
@@ -285,10 +321,14 @@ func NewHandler(path string) *Handler {
 	m.HandleFunc("/ping", h.pingHandler)
 	m.HandleFunc("/command", h.commandHandler)
 
-	h.BCDummy = bcdummy.NewBCDummy(h.db, &h.Nodes)
+	h.el = listener.EventListenerInst()
+
+	h.bcsim = simulation.NewBCDummy(h.db, &h.Nodes)
 	h.TC = NewTestConfig(h.db, &h.Nodes)
 
-	go h.StartDummy()
+	h.GenerateTransactionProc()
+
+	// go h.StartDummy()
 
 	return h
 }

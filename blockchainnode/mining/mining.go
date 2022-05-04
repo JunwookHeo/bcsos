@@ -132,9 +132,12 @@ func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
 
 func (mi *Mining) StartMiningNewBlock(status *string) {
 	for {
+		// This sleep is needed for updating a new block after sending the mining block
+		time.Sleep(time.Nanosecond * time.Duration(TPERIOD/10))
+
 		_, prehash := mi.cm.GetHighestBlockHash()
 
-		delay := TPERIOD - time.Now().Nanosecond()%TPERIOD
+		delay := TPERIOD - int(time.Now().UnixNano())%TPERIOD
 		time.Sleep(time.Nanosecond * time.Duration(delay))
 
 		if *status == "Stop" {
@@ -152,6 +155,9 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 			hash, _ := hex.DecodeString(curhash)
 			b := blockchain.CreateBlock(trs, hash, height+1)
 
+			// Too much forks happen so add random delay
+			ms := rand.Intn(100) * 10
+			time.Sleep(time.Millisecond * time.Duration(ms))
 			// Send block to local node
 			ni := network.NodeInfoInst()
 			local := ni.GetLocalddr()
@@ -160,7 +166,7 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 				continue
 			}
 
-			log.Printf("===============create block(%v):%v %v", height+1, hex.EncodeToString(b.Header.Hash), curhash)
+			log.Printf("==>mining a new block(%v):%v %v", height+1, hex.EncodeToString(b.Header.Hash), curhash)
 			mi.sendBlock(b, local)
 		}
 

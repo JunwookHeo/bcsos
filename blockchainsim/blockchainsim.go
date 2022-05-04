@@ -12,14 +12,15 @@ import (
 	"github.com/junwookheo/bcsos/blockchainsim/testmgrsrv"
 )
 
-const DB_PATH = "./bc_dummy.db"
+const DB_PATH = "./bc_sim.db"
 const PORT = 8080
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
 
-func flagParse() string {
+func flagParse() (string, string) {
+	pmode := flag.String("mode", "ST", "ST: Test storage (Server generates tr and ap object), MI: Test Miner(generate tr and access object in local)")
 	ip := flag.String("ip", "", "IP for simulation server")
 	iface := flag.String("iface", "", "IP Interface for simulation server, 'eth0', 'wi-fi'")
 	flag.Parse()
@@ -29,7 +30,7 @@ func flagParse() string {
 		*ip = localAddresses(iface)
 	}
 	log.Printf("=== ip : %v", *ip)
-	return *ip
+	return *pmode, *ip
 }
 
 func localAddresses(target *string) string {
@@ -67,8 +68,8 @@ func main() {
 	signal.Notify(interrupt, os.Interrupt)
 	defer signal.Reset()
 
-	ip := flagParse()
-	s := testmgrsrv.NewHandler(DB_PATH)
+	mode, ip := flagParse()
+	s := testmgrsrv.NewHandler(mode, DB_PATH)
 	go s.StartService(PORT)
 	//go bcdummy.Start()
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -282,7 +283,6 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 		for {
 			select {
 			case cmd := <-command:
-				log.Println(cmd)
 				switch cmd {
 				case "Stop":
 					return
@@ -295,9 +295,16 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 				}
 			default:
 				if status == "Running" {
-					h.ObjectbyAccessPattern()
-					// log.Println("=========ObjectbyAccessPatternProc")
-					time.Sleep(time.Duration(config.TIME_AP_GEN) * time.Second)
+					ni := network.NodeInfoInst()
+					local := ni.GetLocalddr()
+					if strings.ToUpper(local.Mode) == "MI" {
+						h.ObjectbyAccessPattern()
+						// log.Println("=========ObjectbyAccessPatternProc")
+						time.Sleep(time.Duration(config.TIME_AP_GEN) * time.Second)
+					} else {
+						time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+						// log.Printf("Mode : %v", local.Mode)
+					}
 				} else {
 					time.Sleep(time.Second)
 				}

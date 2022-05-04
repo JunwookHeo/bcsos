@@ -12,9 +12,9 @@ This is a simulator for Multi-Level Distributed Caching on the Blockchain for St
 
 ## Runing individual nodes
 * cd blockchainnode
-* go run blockchainnode.go -mode=pan -type=0 -port=7001'
-  * type is the storage class, 3 is the highest node
-  * mode : dev or pan
+* go run blockchainnode.go -mode=ST -sc=0 -port=7001'
+  * sc is the storage class, 3 is the highest node
+  * mode : ST(Server will generate transactions and access objects) or MI(A node will generate transactions and access objects)
 
 ## Runing Simulator server
 * cd blockchainsim

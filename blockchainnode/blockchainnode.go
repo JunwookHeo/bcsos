@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,8 +33,9 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-var db_path string = "./bc_dev.db"
-var wallet_path string = "./bc_dev.wallet"
+var DATA_DIR string = "./db_nodes"
+var db_path string = DATA_DIR + "/dev.db"
+var wallet_path string = DATA_DIR + "/dev.wallet"
 
 var (
 	ni  *network.NodeInfo
@@ -62,28 +65,34 @@ func getFreePort() (port int, err error) {
 }
 
 func flagParse() (string, int, int) {
-	pmode := flag.String("mode", "dev", "Operation mode : dev or pan")
-	ptype := flag.Int("type", 0, "Storage class : 0 to 4")
+	pmode := flag.String("mode", "ST", "ST: Test storage (Server generates tr and ap object), MI: Test Miner(generate tr and access object in local)")
+	psc := flag.Int("sc", 0, "Storage class : 0 to 4")
 	pport := flag.Int("port", 0, "Port number of local if 0, it will use a free port")
 	flag.Parse()
-	if *pmode == "pan" && *pport == 0 {
-		log.Panicf("This is not allowed : %v, %v", *pmode, *pport)
-	}
-	return *pmode, *ptype, *pport
-}
-
-func initNode() {
-	var err error
-	mode, stype, port := flagParse()
-	if mode == "dev" && port == 0 {
-		port, err = getFreePort()
+	if *pport == 0 {
+		port, err := getFreePort()
 		if err != nil {
 			log.Panicf("Get free port error : %v", err)
 		}
-	} else {
-		db_path = fmt.Sprintf("./db_nodes/%v.db", port)
-		wallet_path = fmt.Sprintf("./db_nodes/%v.wallet", port)
+		*pport = port
 	}
+	return *pmode, *psc, *pport
+}
+
+func initNode() {
+	mode, sc, port := flagParse()
+	mode = strings.ToUpper(mode)
+
+	if _, err := os.Stat(DATA_DIR); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir(DATA_DIR, os.ModePerm)
+		if err != nil {
+			log.Panicln(err)
+			return
+		}
+	}
+
+	db_path = fmt.Sprintf("./db_nodes/%v.db", port)
+	wallet_path = fmt.Sprintf("./db_nodes/%v.wallet", port)
 
 	// init wallet Manager
 	wm = mining.WalletMgrInst(wallet_path)
@@ -95,7 +104,7 @@ func initNode() {
 
 	// init nodeInfo
 	ni = network.NodeInfoInst()
-	ni.SetLocalddrParam(mode, stype, port, hash)
+	ni.SetLocalddrParam(mode, sc, port, hash)
 
 	// init testmgrcli
 	tmc = testmgrcli.TestMgrCliInst()
@@ -192,7 +201,6 @@ func EndTestProc() {
 		for {
 			select {
 			case cmd := <-command:
-				log.Println(cmd)
 				switch cmd {
 				case "Stop":
 					log.Println("Received End test")
@@ -219,7 +227,6 @@ func PeerListProc() {
 		for {
 			select {
 			case cmd := <-command:
-				log.Println(cmd)
 				switch cmd {
 				case "Stop":
 					return
@@ -263,7 +270,6 @@ func TransactionProc() {
 		for {
 			select {
 			case cmd := <-command:
-				log.Println(cmd)
 				switch cmd {
 				case "Stop":
 					status = "Stop"
@@ -282,11 +288,15 @@ func TransactionProc() {
 				}
 			default:
 				if status == "Running" {
-					//h.generateTransactionFromRandom(id)
-					mining.SimulateTransaction(id)
-					id++
-					// log.Println("=========TransactionProc")
-					// time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+					ni := network.NodeInfoInst()
+					local := ni.GetLocalddr()
+					if strings.ToUpper(local.Mode) == "MI" {
+						mining.SimulateTransaction(id)
+						id++
+					} else {
+						time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+						// log.Printf("Mode : %v", local.Mode)
+					}
 				} else {
 					time.Sleep(time.Second)
 				}
