@@ -14,14 +14,16 @@ import (
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
+	"github.com/junwookheo/bcsos/common/datalib"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/listener"
 )
 
 type StorageMgr struct {
-	db dbagent.DBAgent
-	om *ObjectMgr
+	db   dbagent.DBAgent
+	om   *ObjectMgr
+	cand *datalib.CandidateBlocks
 }
 
 var upgrader = websocket.Upgrader{
@@ -315,7 +317,8 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 }
 
 func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
-	h.db.AddBlock(b)
+	h.cand.PushAndSave(b, h.db)
+	// h.cand.ShowAll()
 }
 
 func (h *StorageMgr) GetLatestBlockHash() (string, int) {
@@ -327,16 +330,6 @@ func (sm *StorageMgr) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/statusinfo", sm.statusInfoHandler)
 }
 
-// func StorageMgrInst(db_path string) *StorageMgr {
-// 	sm := &StorageMgr{
-// 		db: dbagent.NewDBAgent(db_path),
-// 		om: nil,
-// 	}
-// 	sm.om = NewObjMgr(sm.db)
-
-// 	return sm
-// }
-
 func StorageMgrInst(db_path string) *StorageMgr {
 	if db_path == "" {
 		return sm
@@ -344,8 +337,9 @@ func StorageMgrInst(db_path string) *StorageMgr {
 
 	once.Do(func() {
 		sm = &StorageMgr{
-			db: dbagent.NewDBAgent(db_path),
-			om: nil,
+			db:   dbagent.NewDBAgent(db_path),
+			om:   nil,
+			cand: datalib.NewCandidateBlocks(),
 		}
 		sm.om = NewObjMgr(sm.db)
 	})

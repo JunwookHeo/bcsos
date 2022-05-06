@@ -3,6 +3,8 @@ package datalib
 import (
 	"log"
 	"sync"
+
+	"github.com/junwookheo/bcsos/common/config"
 )
 
 type BlockData struct {
@@ -19,7 +21,7 @@ type TreeNode struct {
 	sibling *TreeNode
 }
 
-const MAX_TREE_DEPTH int = 10
+const MAX_TREE_DEPTH int = config.FINALITY*2 - 1
 
 func (tn *TreeNode) SetBlockData(b *BlockData) {
 	tn.block = b
@@ -165,59 +167,6 @@ func (tc *ChainTree) _addTreeNode(block *BlockData, isnew bool) bool {
 				}
 				return false
 			}
-		}
-
-		child := node.GetChild()
-		if child == nil {
-			tc.threshold = 0
-			// block.Height = node.block.Height + 1
-			tmp := NewTreeNode(block)
-			tmp.SetParent(node)
-			node.SetChild(tmp)
-			tc.hnode = node.GetChild()
-			return true
-		}
-
-		node = child
-		for {
-			sibling := node.GetSibling()
-			if sibling == nil {
-				tc.threshold = 0
-				// block.Height = node.block.Height
-				tmp := NewTreeNode(block)
-				tmp.SetParent(node.GetParent())
-				node.SetSibling(tmp)
-				return true
-			}
-			node = sibling
-		}
-	}
-}
-
-func (tc *ChainTree) _addTreeNode2(block *BlockData, isnew bool) bool {
-	tc.mutex.Lock()
-	defer tc.mutex.Unlock()
-
-	if tc.root == nil {
-		tc.threshold = 0
-		// block.Height = 0
-		tc.newRoot(block)
-		return true
-	} else {
-		node := tc.findNode(block.Prev)
-		if node == nil {
-			log.Printf("Not found previous hash block : %v", block)
-			if isnew == true { // Add block if it is a new block.
-				if tc.threshold > 6 { //  more 6 consecutive danglings received
-					tc.threshold = 0
-					// block.Height = 0
-					tc.newRoot(block)
-				} else {
-					tc.threshold++
-					tc.danglings.Add(block)
-				}
-			}
-			return false
 		}
 
 		child := node.GetChild()

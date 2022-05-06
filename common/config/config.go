@@ -83,3 +83,5 @@ const TIME_AP_GEN int = 10 // Second
 const TIME_UPDATE_NEITHBOUR int = 10 //60 // Second
 
 const END_TEST string = "END_TEST"
+
+const FINALITY int = 6

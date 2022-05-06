@@ -10,7 +10,7 @@ import (
 	"github.com/junwookheo/bcsos/common/serial"
 )
 
-const DB_PATH_TEST = "../db_nodes/7001.db"
+const DB_PATH_TEST = "../db_nodes/7014.db"
 
 func TestBlockchainConsistency(t *testing.T) {
 	db, err := sql.Open("sqlite3", DB_PATH_TEST)
@@ -40,10 +40,10 @@ func TestBlockchainConsistency(t *testing.T) {
 		serial.Deserialize(data, &bh)
 		log.Printf("add block : %v, %v", i, bh.Height)
 		log.Printf("%v - %v", hex.EncodeToString(bh.Hash), hex.EncodeToString(bh.PrvHash))
-		cm.AddedNewBlock(&bh)
+		cm.AddTreeNode(&bh)
 		i++
-		if i == 243 {
-			return
-		}
+		// if i == 243 {
+		// 	return
+		// }
 	}
 }

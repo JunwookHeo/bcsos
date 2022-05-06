@@ -18,6 +18,7 @@ import (
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
+	"github.com/junwookheo/bcsos/common/datalib"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/listener"
@@ -40,6 +41,7 @@ type Handler struct {
 	TC    *TestConfig
 	Ready bool
 	el    *listener.EventListener
+	cand  *datalib.CandidateBlocks
 	mutex sync.Mutex
 }
 
@@ -257,7 +259,8 @@ func (h *Handler) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Rcv new block(%v) : %v", block.Header.Height, hex.EncodeToString(block.Header.Hash))
-	h.db.AddBlock(&block)
+	//h.db.AddBlock(&block)
+	h.cand.PushAndSave(&block, h.db)
 }
 
 func (h *Handler) UpdateTestStatus(ready bool) {
@@ -367,6 +370,7 @@ func NewHandler(mode string, path string) *Handler {
 		TC:      nil,
 		Ready:   false,
 		el:      nil,
+		cand:    datalib.NewCandidateBlocks(),
 		mutex:   sync.Mutex{},
 	}
 

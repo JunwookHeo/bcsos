@@ -11,14 +11,12 @@ type ChainMgr struct {
 	tree *datalib.ChainTree
 }
 
-func (cm *ChainMgr) AddedNewBlock(h *blockchain.BlockHeader) {
+func (cm *ChainMgr) AddTreeNode(h *blockchain.BlockHeader) {
 	block := datalib.BlockData{Height: h.Height, Timestamp: h.Timestamp, Hash: hex.EncodeToString(h.Hash), Prev: hex.EncodeToString(h.PrvHash)}
 	if cm.tree.AddTreeNode(&block, true) {
 		cm.tree.UpdateDanglings() // update dangling blocks
 	}
 	cm.tree.UpdateRoot()
-	// cm.tree.PrintAll()
-	// cm.tree.ShowDanglings()
 }
 
 func (cm *ChainMgr) GetHighestBlockHash() (int, string) {

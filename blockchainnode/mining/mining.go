@@ -209,10 +209,8 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 	go mi.BroadcastNewBlock(&block)
 
 	sm := storage.StorageMgrInst("")
-	mi.cm.AddedNewBlock(&block.Header)
+	mi.cm.AddTreeNode(&block.Header)
 	sm.AddNewBlock(&block)
-
-	// go mi.StartMiningNewBlock(&block)
 }
 
 // Update peers list
