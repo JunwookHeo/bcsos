@@ -25,7 +25,6 @@ type Mining struct {
 	tp    map[string]*blockchain.Transaction
 	st    *datalib.BcQueue // list of broadcast new transactions
 	sb    *datalib.BcQueue // list of broadcast new blocks
-	cm    *ChainMgr
 	mutex sync.Mutex
 }
 
@@ -135,7 +134,9 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 		// This sleep is needed for updating a new block after sending the mining block
 		time.Sleep(time.Nanosecond * time.Duration(TPERIOD/10))
 
-		_, prehash := mi.cm.GetHighestBlockHash()
+		// _, prehash := mi.cm.GetHighestBlockHash()
+		sm := storage.StorageMgrInst("")
+		_, prehash := sm.GetHighestBlockHash()
 
 		delay := TPERIOD - int(time.Now().UnixNano())%TPERIOD
 		time.Sleep(time.Nanosecond * time.Duration(delay))
@@ -144,7 +145,9 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 			log.Println("StartMiningNewBlock() : end")
 			return
 		}
-		height, curhash := mi.cm.GetHighestBlockHash()
+		// height, curhash := mi.cm.GetHighestBlockHash()
+		height, curhash := sm.GetHighestBlockHash()
+
 		if prehash != curhash {
 			continue
 		}
@@ -162,7 +165,9 @@ func (mi *Mining) StartMiningNewBlock(status *string) {
 			ni := network.NodeInfoInst()
 			local := ni.GetLocalddr()
 			server := ni.GetSimAddr()
-			height, curhash := mi.cm.GetHighestBlockHash()
+			// height, curhash = mi.cm.GetHighestBlockHash()
+			height, curhash = sm.GetHighestBlockHash()
+
 			if prehash != curhash {
 				continue
 			}
@@ -209,7 +214,6 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 	go mi.BroadcastNewBlock(&block)
 
 	sm := storage.StorageMgrInst("")
-	mi.cm.AddTreeNode(&block.Header)
 	sm.AddNewBlock(&block)
 }
 
@@ -287,71 +291,71 @@ func (mi *Mining) broadcastTrascationHandler(w http.ResponseWriter, r *http.Requ
 // So, the webapp displays the connection of chain.
 // Request : a new transaction
 // Response : none
-func (mi *Mining) chainInfoHandler(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println("chainInfoHandler", err)
-		return
-	}
+// func (mi *Mining) chainInfoHandler(w http.ResponseWriter, r *http.Request) {
+// 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+// 	ws, err := upgrader.Upgrade(w, r, nil)
+// 	if err != nil {
+// 		log.Println("chainInfoHandler", err)
+// 		return
+// 	}
 
-	log.Println("chainInfoHandler")
+// 	log.Println("chainInfoHandler")
 
-	defer ws.Close()
-	done := make(chan struct{})
-	var cmd ChainInfoCmd
+// 	defer ws.Close()
+// 	done := make(chan struct{})
+// 	var cmd ChainInfoCmd
 
-	go func() {
-		defer close(done)
-		for {
-			if err := ws.ReadJSON(&cmd); err != nil {
-				log.Printf("Read json error : %v", err)
-				return
-			}
-			log.Printf("Test resume/pause receive : %v", cmd)
-		}
-	}()
+// 	go func() {
+// 		defer close(done)
+// 		for {
+// 			if err := ws.ReadJSON(&cmd); err != nil {
+// 				log.Printf("Read json error : %v", err)
+// 				return
+// 			}
+// 			log.Printf("Test resume/pause receive : %v", cmd)
+// 		}
+// 	}()
 
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+// 	ticker := time.NewTicker(time.Second)
+// 	defer ticker.Stop()
 
-	func() {
-		var block *datalib.BlockData
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				newlist := mi.cm.GetNewBlockInfo()
+// 	func() {
+// 		var block *datalib.BlockData
+// 		for {
+// 			select {
+// 			case <-done:
+// 				return
+// 			case <-ticker.C:
+// 				newlist := mi.cm.GetNewBlockInfo()
 
-				if newlist != nil {
-					start := newlist.Find(block)
-					for {
-						i, b := newlist.Next()
-						if b == nil {
-							break
-						}
-						if start < i {
-							log.Printf("new block %v, %v", i, b)
-							block = b
-							if err := ws.WriteJSON(block); err != nil {
-								log.Printf("Write json error : %v", err)
-								return
-							}
-						}
-					}
+// 				if newlist != nil {
+// 					start := newlist.Find(block)
+// 					for {
+// 						i, b := newlist.Next()
+// 						if b == nil {
+// 							break
+// 						}
+// 						if start < i {
+// 							log.Printf("new block %v, %v", i, b)
+// 							block = b
+// 							if err := ws.WriteJSON(block); err != nil {
+// 								log.Printf("Write json error : %v", err)
+// 								return
+// 							}
+// 						}
+// 					}
 
-				}
+// 				}
 
-			}
-		}
-	}()
-}
+// 			}
+// 		}
+// 	}()
+// }
 
 func (mi *Mining) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/broadcastnewblock", mi.newBlockHandler)
 	m.HandleFunc("/broadcastransaction", mi.broadcastTrascationHandler)
-	m.HandleFunc("/chaininfo", mi.chainInfoHandler)
+	// m.HandleFunc("/chaininfo", mi.chainInfoHandler)
 }
 
 func MiningInst() *Mining {
@@ -360,7 +364,6 @@ func MiningInst() *Mining {
 			tp:    make(map[string]*blockchain.Transaction),
 			st:    datalib.NewBcQueue(config.BLOCK_CREATE_PERIOD * 2),
 			sb:    datalib.NewBcQueue(6 * 2), // Light nodes in Bitcoin has 6
-			cm:    NewChainMgr(),
 			mutex: sync.Mutex{},
 		}
 	})

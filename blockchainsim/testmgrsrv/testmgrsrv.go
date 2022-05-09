@@ -258,9 +258,10 @@ func (h *Handler) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Read json error : %v", err)
 	}
 
-	log.Printf("Rcv new block(%v) : %v", block.Header.Height, hex.EncodeToString(block.Header.Hash))
+	log.Printf("Rcv new block(%v) : %v-%v", block.Header.Height, hex.EncodeToString(block.Header.Hash), hex.EncodeToString(block.Header.PrvHash))
 	//h.db.AddBlock(&block)
 	h.cand.PushAndSave(&block, h.db)
+	h.cand.CheckFinality()
 }
 
 func (h *Handler) UpdateTestStatus(ready bool) {

@@ -8,9 +8,11 @@ import (
 
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/stretchr/testify/assert"
 )
 
-const DB_PATH_TEST = "../db_nodes/7014.db"
+// const DB_PATH_TEST = "../db_nodes/7031.db"
+const DB_PATH_TEST = "../../blockchainsim/bc_sim.db"
 
 func TestBlockchainConsistency(t *testing.T) {
 	db, err := sql.Open("sqlite3", DB_PATH_TEST)
@@ -29,7 +31,7 @@ func TestBlockchainConsistency(t *testing.T) {
 	var data []byte
 	bh := blockchain.BlockHeader{}
 	i := 0
-	cm := NewChainMgr()
+	prev := ""
 
 	for rows.Next() {
 		err := rows.Scan(&data)
@@ -40,7 +42,9 @@ func TestBlockchainConsistency(t *testing.T) {
 		serial.Deserialize(data, &bh)
 		log.Printf("add block : %v, %v", i, bh.Height)
 		log.Printf("%v - %v", hex.EncodeToString(bh.Hash), hex.EncodeToString(bh.PrvHash))
-		cm.AddTreeNode(&bh)
+		assert.Equal(t, prev, hex.EncodeToString(bh.PrvHash))
+		prev = hex.EncodeToString(bh.Hash)
+
 		i++
 		// if i == 243 {
 		// 	return

@@ -317,8 +317,13 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 }
 
 func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
+	log.Printf("Rcv new block(%v) : %v-%v", b.Header.Height, hex.EncodeToString(b.Header.Hash), hex.EncodeToString(b.Header.PrvHash))
 	h.cand.PushAndSave(b, h.db)
 	// h.cand.ShowAll()
+}
+
+func (h *StorageMgr) GetHighestBlockHash() (int, string) {
+	return h.cand.GetHighestBlockHash()
 }
 
 func (h *StorageMgr) GetLatestBlockHash() (string, int) {
