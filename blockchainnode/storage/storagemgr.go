@@ -266,13 +266,20 @@ func (h *StorageMgr) ObjectbyAccessPattern() {
 			}
 		}
 
-		if local.SC < config.MAX_SC-1 {
-			h.om.DeleteNoAccedObjects()
-		}
+		h.RemoveNoAccessObjects()
 	}
 
 	// status := h.om.db.GetDBStatus()
 	// log.Printf("Status : %v", status)
+}
+
+func (h *StorageMgr) RemoveNoAccessObjects() {
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	if local.SC < config.MAX_SC-1 {
+		h.om.DeleteNoAccedObjects()
+	}
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {
@@ -304,7 +311,8 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 						// log.Println("=========ObjectbyAccessPatternProc")
 						time.Sleep(time.Duration(config.TIME_AP_GEN) * time.Second)
 					} else {
-						time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+						h.RemoveNoAccessObjects()
+						time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD*2) * time.Second)
 						// log.Printf("Mode : %v", local.Mode)
 					}
 				} else {
@@ -317,7 +325,7 @@ func (h *StorageMgr) ObjectbyAccessPatternProc() {
 }
 
 func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
-	log.Printf("Rcv new block(%v) : %v-%v", b.Header.Height, hex.EncodeToString(b.Header.Hash), hex.EncodeToString(b.Header.PrvHash))
+	// log.Printf("Rcv new block(%v) : %v-%v", b.Header.Height, hex.EncodeToString(b.Header.Hash), hex.EncodeToString(b.Header.PrvHash))
 	h.cand.PushAndSave(b, h.db)
 	// h.cand.ShowAll()
 }

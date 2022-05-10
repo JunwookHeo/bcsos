@@ -7,6 +7,7 @@ import (
 
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dtype"
+	"github.com/junwookheo/bcsos/common/wallet"
 )
 
 // type scnNode struct {
@@ -71,8 +72,8 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 		if peer.Hash == "" {
 			break
 		}
-		d1 := xordistance(local.Hash, n.Hash)
-		d2 := xordistance(local.Hash, peer.Hash)
+		d1 := wallet.DistanceXor(local.Hash, n.Hash)
+		d2 := wallet.DistanceXor(local.Hash, peer.Hash)
 		if d1.Cmp(d2) < 0 { // if new node is closer than cur node, insert new node
 			break
 		}
@@ -172,7 +173,7 @@ func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MA
 	var dists [config.MAX_SC_PEER]*big.Int
 	for _, peer := range c.scnodes[sc] {
 		if peer.Hash != "" {
-			dists[pos] = xordistance(oid, peer.Hash)
+			dists[pos] = wallet.DistanceXor(oid, peer.Hash)
 			nodes[pos] = peer
 			pos++
 		}

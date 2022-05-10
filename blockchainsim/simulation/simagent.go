@@ -66,18 +66,12 @@ func (h *Handler) getObjectQuery(reqData *dtype.ReqData, obj interface{}) bool {
 	// the number of query to other nodes
 	defer h.db.UpdateDBNetworkQuery(0, 1, 1)
 
-	xordistance := func(h1 string, h2 string) *big.Int {
-		n1, _ := new(big.Int).SetString(h1, 16)
-		n2, _ := new(big.Int).SetString(h2, 16)
-		return new(big.Int).Xor(n1, n2)
-	}
-
 	var maxdist big.Int
 	var tnode dtype.NodeInfo
 
 	for _, node := range *h.Nodes {
 		if node.SC == 0 {
-			dist := xordistance(reqData.ObjHash, node.Hash)
+			dist := wallet.DistanceXor(reqData.ObjHash, node.Hash)
 			if maxdist.Cmp(dist) == -1 {
 				maxdist = *dist
 				tnode = node

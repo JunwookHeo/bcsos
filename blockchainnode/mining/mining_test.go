@@ -11,8 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// const DB_PATH_TEST = "../db_nodes/7031.db"
-const DB_PATH_TEST = "../../blockchainsim/bc_sim.db"
+const DB_PATH_TEST = "../db_nodes/7001.db"
+
+//const DB_PATH_TEST = "../../blockchainsim/bc_sim.db"
 
 func TestBlockchainConsistency(t *testing.T) {
 	db, err := sql.Open("sqlite3", DB_PATH_TEST)
