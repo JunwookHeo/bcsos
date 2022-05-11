@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/big"
 	"math/rand"
 	"time"
 
@@ -66,14 +65,20 @@ func (h *Handler) getObjectQuery(reqData *dtype.ReqData, obj interface{}) bool {
 	// the number of query to other nodes
 	defer h.db.UpdateDBNetworkQuery(0, 1, 1)
 
-	var maxdist big.Int
+	// var maxdist big.Int
+	var maxdist uint64
 	var tnode dtype.NodeInfo
 
 	for _, node := range *h.Nodes {
 		if node.SC == 0 {
-			dist := wallet.DistanceXor(reqData.ObjHash, node.Hash)
-			if maxdist.Cmp(dist) == -1 {
-				maxdist = *dist
+			// dist := wallet.DistanceXor(reqData.ObjHash, node.Hash)
+			// if maxdist.Cmp(dist) == -1 {
+			// 	maxdist = *dist
+			// 	tnode = node
+			// }
+			dist := wallet.DistanceXor2(reqData.ObjHash, node.Hash)
+			if maxdist < dist {
+				maxdist = dist
 				tnode = node
 			}
 		}

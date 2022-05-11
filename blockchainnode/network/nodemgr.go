@@ -56,7 +56,7 @@ func (n *NodeMgr) UpdatePeerList(sim *dtype.NodeInfo, local *dtype.NodeInfo) {
 		//log.Printf("Read json nodes : %v", nodes)
 		for _, nh := range nodes {
 			if nh.Hash != "" && nh.Hash != local.Hash {
-				n.scn.AddNSCNNode(nh)
+				n.scn.AddNSCNNode2(nh)
 			}
 		}
 	}
@@ -115,11 +115,11 @@ func (n *NodeMgr) pingHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (n *NodeMgr) AddNSCNNode(node dtype.NodeInfo) {
-	n.scn.AddNSCNNode(node)
+	n.scn.AddNSCNNode2(node)
 }
 
 func (n *NodeMgr) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
-	return n.scn.GetSCNNodeListbyDistance(sc, oid, nodes)
+	return n.scn.GetSCNNodeListbyDistance2(sc, oid, nodes)
 }
 
 func (n *NodeMgr) GetSCNNodeListAll(nodes *[(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo) {

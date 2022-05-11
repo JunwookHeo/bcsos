@@ -49,12 +49,6 @@ func zeroNode() dtype.NodeInfo {
 	return dtype.NodeInfo{Mode: "", SC: 0, IP: "", Port: 0, Hash: ""}
 }
 
-func xordistance(h1 string, h2 string) *big.Int {
-	n1, _ := new(big.Int).SetString(h1, 16)
-	n2, _ := new(big.Int).SetString(h2, 16)
-	return new(big.Int).Xor(n1, n2)
-}
-
 func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 	ni := NodeInfoInst()
 	local := ni.GetLocalddr()
@@ -82,7 +76,6 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 
 	switch pos {
 	case 0:
-		//c.scnodes[n.SC] = append([]dtype.NodeInfo{n}, c.scnodes[n.SC][1:]...)
 		for i := config.MAX_SC_PEER - 1; 0 < i; i-- {
 			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
 		}
@@ -92,8 +85,50 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 	case config.MAX_SC_PEER:
 		break
 	default:
-		//tmp := append([]dtype.NodeInfo{n}, c.scnodes[n.SC][pos+1:]...)
-		//c.scnodes[n.SC] = append(c.scnodes[n.SC][:pos], tmp...)
+		for i := config.MAX_SC_PEER - 1; pos < i; i-- {
+			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
+		}
+		c.scnodes[n.SC][pos] = n
+
+	}
+}
+
+func (c *scnInfo) AddNSCNNode2(n dtype.NodeInfo) {
+	ni := NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	if n.SC >= config.MAX_SC || n.Hash == local.Hash {
+		return
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	pos := 0
+	for _, peer := range c.scnodes[n.SC] {
+		if peer.Hash == n.Hash {
+			return
+		}
+		if peer.Hash == "" {
+			break
+		}
+		d1 := wallet.DistanceXor2(local.Hash, n.Hash)
+		d2 := wallet.DistanceXor2(local.Hash, peer.Hash)
+		if d1 < d2 { // if new node is closer than cur node, insert new node
+			break
+		}
+		pos++
+	}
+
+	switch pos {
+	case 0:
+		for i := config.MAX_SC_PEER - 1; 0 < i; i-- {
+			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
+		}
+		c.scnodes[n.SC][0] = n
+	case config.MAX_SC_PEER - 1:
+		c.scnodes[n.SC][pos] = n
+	case config.MAX_SC_PEER:
+		break
+	default:
 		for i := config.MAX_SC_PEER - 1; pos < i; i-- {
 			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
 		}
@@ -183,6 +218,38 @@ func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MA
 		for i := 0; i < pos; i++ {
 			for j := 1; j < pos-i; j++ {
 				if dists[j].Cmp(dists[j-1]) < 0 {
+					dists[j], dists[j-1] = dists[j-1], dists[j]
+					nodes[j], nodes[j-1] = nodes[j-1], nodes[j]
+				}
+			}
+		}
+	}
+
+	return pos > 0
+}
+
+func (c *scnInfo) GetSCNNodeListbyDistance2(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
+	if sc >= config.MAX_SC {
+		return false
+	}
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	pos := 0
+	var dists [config.MAX_SC_PEER]uint64
+	for _, peer := range c.scnodes[sc] {
+		if peer.Hash != "" {
+			dists[pos] = wallet.DistanceXor2(oid, peer.Hash)
+			nodes[pos] = peer
+			pos++
+		}
+	}
+	if 1 < pos {
+		// Buble sort by distance
+		for i := 0; i < pos; i++ {
+			for j := 1; j < pos-i; j++ {
+				if dists[j] < dists[j-1] {
 					dists[j], dists[j-1] = dists[j-1], dists[j]
 					nodes[j], nodes[j-1] = nodes[j-1], nodes[j]
 				}
