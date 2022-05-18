@@ -23,4 +23,5 @@ blockchainsim/blockchainsim
 blockchainsim.exe
 .DS_Store
 AccessPatterns.png
+out/
 
