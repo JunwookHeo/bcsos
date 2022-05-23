@@ -11,23 +11,21 @@ then
     echo "rmdir"
 fi
 
-while read -p "Select Target (1. ARM64 Linux, 2. AMD64 Linux, 3.AMD64 Windows): " opt1
+while read -p "Select Target (1. ARM64 Linux, 2.AMD64 Windows): " opt1
 do
     if [ $opt1 -eq 1 ]
     then
         GOARCH=arm64
         GOOS=linux
-        CC=aarch64-linux-gnu-gcc
+        if [[ $OSTYPE == 'darwin'* ]]; then
+            CC=aarch64-unknown-linux-gnu-gcc
+        elif [ $OSTYPE == 'linux'* ]]; then
+            CC=aarch64-linux-gnu-gcc
+        fi
+                
         OUT_FILE=blockchainnode
         break
-    elif [ $opt1 -eq 2 ]
-    then
-        GOARCH=amd64
-        GOOS=linux
-        CC=""
-        OUT_FILE=blockchainnode
-        break
-    elif [ $opt1 -eq 3 ]
+    elif [ $opt1 -eq 2 ]    
     then
         GOARCH=amd64
         GOOS=windows
