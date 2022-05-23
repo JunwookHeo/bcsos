@@ -9,7 +9,7 @@ exit
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect("node1.local", 22, "mldc", "mldc", timeout=5)
+ssh.connect("node0.local", 22, "mldc", "mldc", timeout=5)
 
 channel = ssh.get_transport().open_session()
 channel.get_pty()

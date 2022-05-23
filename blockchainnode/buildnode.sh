@@ -19,7 +19,7 @@ do
         GOOS=linux
         if [[ $OSTYPE == 'darwin'* ]]; then
             CC=aarch64-unknown-linux-gnu-gcc
-        elif [ $OSTYPE == 'linux'* ]]; then
+        elif [[ $OSTYPE == 'linux'* ]]; then
             CC=aarch64-linux-gnu-gcc
         fi
                 
