@@ -39,7 +39,7 @@ def copyBinary(nodes):
         ssh.close()
 
 def runSim(pane, node):
-    tmux_shell(pane, 'sshpass -p mldc ssh mldc@%s' %(node.url))
+    tmux_shell(pane, 'sshpass -p mldc ssh -o StrictHostKeyChecking=no mldc@%s' %(node.url))
     tmux_shell(pane, 'cd client')
     tmux_shell(pane, 'rm -rf db_nodes')
     tmux_shell(pane, './blockchainnode %s %s'%(node.sc, node.port))
