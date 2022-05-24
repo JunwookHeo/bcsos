@@ -1,0 +1,3 @@
+node0.local -sc=0 -port=7001
+node1.local -sc=0 -port=7002
+
