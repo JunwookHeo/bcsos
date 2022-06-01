@@ -126,7 +126,7 @@ func (h *Handler) SimulateAccessPattern(pid *int) bool {
 			if h.getObjectQuery(&req, &bh) {
 				h.db.AddBlockHeader(hash.Hash, &bh)
 				if hash.Hash != hex.EncodeToString(bh.GetHash()) {
-					log.Panicf("%v header Hash not equal %v", hash.Hash, hex.EncodeToString(bh.GetHash()))
+					log.Printf("%v header Hash not equal %v", hash.Hash, hex.EncodeToString(bh.GetHash()))
 				}
 			}
 		} else {
@@ -135,7 +135,7 @@ func (h *Handler) SimulateAccessPattern(pid *int) bool {
 			if h.getObjectQuery(&req, &tr) {
 				h.db.AddTransaction(&tr)
 				if hash.Hash != hex.EncodeToString(tr.Hash) {
-					log.Panicf("%v Tr Hash not equal %v", hash.Hash, hex.EncodeToString(tr.Hash))
+					log.Printf("%v Tr Hash not equal %v", hash.Hash, hex.EncodeToString(tr.Hash))
 				}
 			}
 		}
