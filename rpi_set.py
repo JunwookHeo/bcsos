@@ -2,7 +2,7 @@
 
 import paramiko
 from scp import SCPClient
-import time, os
+import time, os, sys
 from os import system
 import argparse
 
@@ -93,20 +93,44 @@ def connectNodes(nodes):
 
     tmux('attach -t MLDC')
 
+def checkInput(job):
+    while(1):
+        val = input(job)
+        if val == "" or val.upper() == "N":
+            return "NO"
+        elif val.upper() == "Y":
+            return "YES"
+        else:
+            print("Press Y or N")
+
+def getResults():
+    ## Get nodes from rpi.nodes
+    nodes = getNodes()
+    outputname = time.strftime("MLDC_%Y%m%d_%H%M%S")
+    os.mkdir(outputname)
+    getResult(outputname, nodes)
+    print(outputname)
+
+if len(sys.argv) == 1:
+    if checkInput("Do you want to get result data from RPIs? [y/N]") == "YES":
+        getResults()
+    else:
+        if checkInput("Do you want to put binary files to RPIs? [y/N]") == "YES":
+            nodes = getNodes()
+            putBinary(nodes)
+        if checkInput("Do you want to put run client on RPIs? [y/N]") == "YES":
+            nodes = getNodes()
+            connectNodes(nodes)
+    sys.exit()
+    
 parser = argparse.ArgumentParser()
 parser.add_argument('--get_result', type=str, default="yes", help='Get result data')
 args = parser.parse_args()
 print(args.get_result)
 
 if args.get_result.lower() == 'yes':
-    ### Get nodes from rpi.nodes
-    nodes = getNodes()
+    getResults()
 
-    outputname = time.strftime("MLDC_%Y%m%d_%H%M%S")
-    os.mkdir(outputname)
-    getResult(outputname, nodes)
-
-    print(outputname)
 elif args.get_result.lower() == 'no':
     ### Get nodes from rpi.nodes
     nodes = getNodes()
