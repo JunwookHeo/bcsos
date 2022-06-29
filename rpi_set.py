@@ -118,7 +118,7 @@ if len(sys.argv) == 1:
         if checkInput("Do you want to put binary files to RPIs? [y/N]") == "YES":
             nodes = getNodes()
             putBinary(nodes)
-        if checkInput("Do you want to put run client on RPIs? [y/N]") == "YES":
+        if checkInput("Do you want to run client on RPIs? [y/N]") == "YES":
             nodes = getNodes()
             connectNodes(nodes)
     sys.exit()
