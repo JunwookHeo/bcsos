@@ -55,6 +55,5 @@ func main() {
 	log.Printf("h : %v", h.Sum64())
 
 	h3 := wallet.DistanceXor(h1, h2)
-	h3.Int64()
 	log.Printf("h : %v", h3)
 }

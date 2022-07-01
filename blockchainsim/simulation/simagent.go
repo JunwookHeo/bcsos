@@ -76,7 +76,7 @@ func (h *Handler) getObjectQuery(reqData *dtype.ReqData, obj interface{}) bool {
 			// 	maxdist = *dist
 			// 	tnode = node
 			// }
-			dist := wallet.DistanceXor2(reqData.ObjHash, node.Hash)
+			dist := wallet.DistanceXor(reqData.ObjHash, node.Hash)
 			if maxdist < dist {
 				maxdist = dist
 				tnode = node

@@ -2,29 +2,12 @@ package network
 
 import (
 	"log"
-	"math/big"
 	"sync"
 
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/wallet"
 )
-
-// type scnNode struct {
-// 	next *scnNode
-// 	pre  *scnNode
-// 	node dtype.NodeInfo
-// }
-// type scnList struct {
-// 	header *scnNode
-// 	count  int
-// }
-
-// type scnInfo struct {
-// 	local   *dtype.NodeInfo
-// 	scnodes []scnList
-// 	mutex   sync.Mutex
-// }
 
 type scnInfo struct {
 	scnodes [][]dtype.NodeInfo
@@ -68,50 +51,6 @@ func (c *scnInfo) AddNSCNNode(n dtype.NodeInfo) {
 		}
 		d1 := wallet.DistanceXor(local.Hash, n.Hash)
 		d2 := wallet.DistanceXor(local.Hash, peer.Hash)
-		if d1.Cmp(d2) < 0 { // if new node is closer than cur node, insert new node
-			break
-		}
-		pos++
-	}
-
-	switch pos {
-	case 0:
-		for i := config.MAX_SC_PEER - 1; 0 < i; i-- {
-			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
-		}
-		c.scnodes[n.SC][0] = n
-	case config.MAX_SC_PEER - 1:
-		c.scnodes[n.SC][pos] = n
-	case config.MAX_SC_PEER:
-		break
-	default:
-		for i := config.MAX_SC_PEER - 1; pos < i; i-- {
-			c.scnodes[n.SC][i] = c.scnodes[n.SC][i-1]
-		}
-		c.scnodes[n.SC][pos] = n
-
-	}
-}
-
-func (c *scnInfo) AddNSCNNode2(n dtype.NodeInfo) {
-	ni := NodeInfoInst()
-	local := ni.GetLocalddr()
-
-	if n.SC >= config.MAX_SC || n.Hash == local.Hash {
-		return
-	}
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	pos := 0
-	for _, peer := range c.scnodes[n.SC] {
-		if peer.Hash == n.Hash {
-			return
-		}
-		if peer.Hash == "" {
-			break
-		}
-		d1 := wallet.DistanceXor2(local.Hash, n.Hash)
-		d2 := wallet.DistanceXor2(local.Hash, peer.Hash)
 		if d1 < d2 { // if new node is closer than cur node, insert new node
 			break
 		}
@@ -195,40 +134,7 @@ func (c *scnInfo) GetSCNNodeList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeIn
 	return pos > 0
 }
 
-// return the copy of node list due to conccurency issues
 func (c *scnInfo) GetSCNNodeListbyDistance(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
-	if sc >= config.MAX_SC {
-		return false
-	}
-
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	pos := 0
-	var dists [config.MAX_SC_PEER]*big.Int
-	for _, peer := range c.scnodes[sc] {
-		if peer.Hash != "" {
-			dists[pos] = wallet.DistanceXor(oid, peer.Hash)
-			nodes[pos] = peer
-			pos++
-		}
-	}
-	if 1 < pos {
-		// Buble sort by distance
-		for i := 0; i < pos; i++ {
-			for j := 1; j < pos-i; j++ {
-				if dists[j].Cmp(dists[j-1]) < 0 {
-					dists[j], dists[j-1] = dists[j-1], dists[j]
-					nodes[j], nodes[j-1] = nodes[j-1], nodes[j]
-				}
-			}
-		}
-	}
-
-	return pos > 0
-}
-
-func (c *scnInfo) GetSCNNodeListbyDistance2(sc int, oid string, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
 	if sc >= config.MAX_SC {
 		return false
 	}
@@ -240,7 +146,7 @@ func (c *scnInfo) GetSCNNodeListbyDistance2(sc int, oid string, nodes *[config.M
 	var dists [config.MAX_SC_PEER]uint64
 	for _, peer := range c.scnodes[sc] {
 		if peer.Hash != "" {
-			dists[pos] = wallet.DistanceXor2(oid, peer.Hash)
+			dists[pos] = wallet.DistanceXor(oid, peer.Hash)
 			nodes[pos] = peer
 			pos++
 		}

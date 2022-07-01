@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -99,7 +100,10 @@ func initNode() {
 	w := wm.GetWallet()
 	//w := wallet.NewWallet(wallet_path)
 
-	hash := hex.EncodeToString(w.GetAddress()[:])
+	// hash := hex.EncodeToString(w.GetAddress()[:])
+	// Hash of Bitcoin address is used for content-addressing
+	bhash := sha256.Sum256(w.GetAddress()[:])
+	hash := hex.EncodeToString(bhash[:])
 	log.Printf("==>%v", hash)
 
 	// init nodeInfo

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"time"
 
-	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/junwookheo/bcsos/common/wallet"
 )
 
@@ -69,7 +68,8 @@ func (b *Block) MerkleRoot() []byte {
 	var hashes [][]byte
 
 	for _, tr := range b.Transactions {
-		hashes = append(hashes, serial.Serialize(tr))
+		// hashes = append(hashes, serial.Serialize(tr))
+		hashes = append(hashes, tr.Hash)
 	}
 	root := CalMerkleRootHash(hashes)
 
