@@ -623,6 +623,55 @@ func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	}
 }
 
+// Proof of Storage
+func (a *dbagent) ProofStorage(ridx [32]byte, timestamp int64, tsc int) []byte {
+	match := hex.EncodeToString(ridx[:])
+	// log.Printf("match : %v", match)
+
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	query := fmt.Sprintf(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, match[len(match)-2:])
+	rows, err := a.db.Query(query)
+	if err != nil {
+		log.Printf("Show latest db status Error : %v", err)
+		return nil
+	}
+
+	defer rows.Close()
+
+	var data []byte
+	i := 0
+	tr := blockchain.Transaction{}
+	var hash string
+	var ts int64
+	var hashes [][]byte
+
+	// Guard Time : 60 sec
+	th_lower := timestamp - int64(config.TSCX[tsc]*float32(1e9)) + int64(60*float32(1e9))
+	th_upper := timestamp - int64(60*float32(1e9))
+	// log.Printf("threshold : %v, %v, %v", th_lower, th_upper, timestamp)
+
+	for rows.Next() {
+		err := rows.Scan(&hash, &ts, &data)
+		if err != nil {
+			break
+		}
+
+		serial.Deserialize(data, &tr)
+		if th_lower < tr.Timestamp && tr.Timestamp < th_upper {
+			// log.Printf("match %v : %v - %v", i, time.UnixMicro(ts/1000), hex.EncodeToString(tr.Hash))
+			tr.Timestamp = timestamp
+			hashes = append(hashes, tr.GetHash())
+			i++
+		} else {
+			// log.Printf("not match %v : %v - %v", i, time.UnixMicro(ts/1000), hex.EncodeToString(tr.Hash))
+		}
+	}
+	log.Printf("MerkleRoot : %v", hex.EncodeToString(blockchain.CalMerkleRootHash(hashes)))
+	return blockchain.CalMerkleRootHash(hashes)
+}
+
 func (a *dbagent) GetDBStatus() *DBStatus {
 	a.dbstatus.Timestamp = time.Now()
 	return &a.dbstatus

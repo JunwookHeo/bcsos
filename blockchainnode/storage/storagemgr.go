@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -282,6 +283,56 @@ func (h *StorageMgr) RemoveNoAccessObjects() {
 	}
 }
 
+// proofStorageHandler handles the request of Proof of Storage
+// Request : Hash of block and timestamp
+// Response : Merkel root of transactions to be proven
+func (h *StorageMgr) proofStorageHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("proofStorageHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	var pos dtype.ReqPoStorage
+	if err := ws.ReadJSON(&pos); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+	proof := h.ProofStorageProc(&pos, local)
+
+	if err := ws.WriteJSON(proof); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+}
+
+func (h *StorageMgr) ProofStorageProc(pos *dtype.ReqPoStorage, node *dtype.NodeInfo) *dtype.ResPoStorage {
+	proof := dtype.ResPoStorage{}
+
+	proof.Addr = node.Hash
+	proof.SC = node.SC
+
+	baddr, _ := hex.DecodeString(node.Hash)
+	bhash, _ := hex.DecodeString(pos.Hash)
+	ridx := sha256.Sum256(append(bhash, baddr...))
+
+	// log.Printf("RIDX : %v, sc : %v", ridx, node.SC)
+
+	merkle := h.db.ProofStorage(ridx, pos.Timestamp, node.SC)
+	if merkle == nil {
+		proof.Proof = ""
+	} else {
+		proof.Proof = hex.EncodeToString(merkle)
+	}
+
+	return &proof
+}
+
 func (h *StorageMgr) ObjectbyAccessPatternProc() {
 	command := make(chan string)
 	el := listener.EventListenerInst()
@@ -341,6 +392,7 @@ func (h *StorageMgr) GetLatestBlockHash() (string, int) {
 func (sm *StorageMgr) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/getobject", sm.getObjectHandler)
 	m.HandleFunc("/statusinfo", sm.statusInfoHandler)
+	m.HandleFunc("/proofstorage", sm.proofStorageHandler)
 }
 
 func StorageMgrInst(db_path string) *StorageMgr {

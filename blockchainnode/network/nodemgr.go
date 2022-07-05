@@ -130,6 +130,10 @@ func (n *NodeMgr) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/ping", n.pingHandler)
 }
 
+func (n *NodeMgr) GetTargetList(sc int, nodes *[config.MAX_SC_PEER]dtype.NodeInfo) bool {
+	return n.scn.GetSCNNodeList(sc, nodes)
+}
+
 func NodeMgrInst() *NodeMgr {
 	once.Do(func() {
 		nm = &NodeMgr{

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -91,9 +92,13 @@ func TestBlockchainPoStorage(t *testing.T) {
 	addr := "000dc82e66b0465fe0d9021bffe6e4092969526e8ee50f6cc7355feb81ebe699"
 	baddr, _ := hex.DecodeString(addr)
 	ridx := sha256.Sum256(append(bh.Hash, baddr...))
-	log.Printf("%v", hex.EncodeToString(ridx[:]))
+	log.Printf("ridx : %v", hex.EncodeToString(ridx[:]))
+	match := hex.EncodeToString(ridx[:])
+	log.Printf("ridx : %v", match[len(match)-3:])
 
-	rows2, err2 := db.Query(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%a4";`)
+	query := fmt.Sprintf(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, match[len(match)-2:])
+	// query := `SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%4947";`
+	rows2, err2 := db.Query(query)
 	if err2 != nil {
 		log.Printf("Show latest db status Error : %v", err)
 		return
@@ -112,7 +117,6 @@ func TestBlockchainPoStorage(t *testing.T) {
 		if err != nil {
 			break
 		}
-
 		serial.Deserialize(data, &tr)
 		if tth < tr.Timestamp {
 			log.Printf("match %v : %v - %v", i, time.UnixMicro(ts/1000), hex.EncodeToString(tr.Hash))

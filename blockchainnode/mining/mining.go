@@ -114,6 +114,12 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 			// log.Printf("Broadcast Transaction : %v", node)
 		}
 	}
+
+	// When a node receives a new block, it carries out Proof of Storage
+	// it start from 120 * 5 min
+	if b.Header.Height > 120 {
+		mi.requestProofStorage(b, nodes)
+	}
 }
 
 func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
@@ -285,6 +291,94 @@ func (mi *Mining) broadcastTrascationHandler(w http.ResponseWriter, r *http.Requ
 	mi.AddTransactionToPool(hex.EncodeToString(tr.Hash), &tr)
 	// log.Printf("===FWD TR : %v", hex.EncodeToString(tr.Hash))
 	mi.BroadcasTransaction(&tr)
+}
+
+// Request Proof of Storage
+func (mi *Mining) requestProofStorage(b *blockchain.Block, nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo) {
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	h1 := b.Header.Hash
+	h2, _ := hex.DecodeString(local.Hash)
+
+	// Check address and hash
+	if h1[len(h1)-1] != h2[len(h2)-1] {
+		return
+	}
+
+	// Get target node for Proof of Storage
+	node := mi.GetTargetNodePoS(nodes)
+	if node == nil {
+		return
+	}
+
+	url := fmt.Sprintf("ws://%v:%v/proofstorage", node.IP, node.Port)
+	// log.Printf("Send ping with local info : %v", url)
+
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Printf("BroadcasNewBlock error : %v", err)
+		return
+	}
+	defer ws.Close()
+
+	req := dtype.ReqPoStorage{}
+	req.Hash = hex.EncodeToString(b.Header.Hash)
+	req.Timestamp = b.Header.Timestamp
+
+	if err := ws.WriteJSON(req); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+
+	var pproof dtype.ResPoStorage
+	if err := ws.ReadJSON(&pproof); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+
+	// log.Printf("=====Prover PoS : %v", pproof)
+
+	sm := storage.StorageMgrInst("")
+	vproof := sm.ProofStorageProc(&req, node)
+
+	// log.Printf("=====Verifier PoS : %v", vproof)
+
+	if vproof.Proof != pproof.Proof {
+		log.Panicf("Fail PoStorage : %v-%v", vproof.Proof, pproof.Proof)
+	}
+
+	log.Printf("Success PoStorage : %v-%v", node.Port, vproof.Proof)
+}
+
+func (mi *Mining) GetTargetNodePoS(nodes [config.MAX_SC * config.MAX_SC_PEER]dtype.NodeInfo) *dtype.NodeInfo {
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+	t_sc := local.SC - 1
+
+	if config.MAX_SC < local.SC {
+		return nil
+	}
+
+	if t_sc < 0 {
+		t_sc = 0
+	}
+
+	var t_nodes []dtype.NodeInfo
+	cnt := 0
+	for _, node := range nodes {
+		if node.Hash != "" && node.SC == t_sc {
+			t_nodes = append(t_nodes, node)
+			cnt++
+		}
+	}
+
+	if cnt == 0 {
+		return nil
+	}
+
+	t := rand.Intn(cnt)
+	return &t_nodes[t]
 }
 
 // chainInfoHandler sends blockchain connection information to the webapp.

@@ -29,6 +29,9 @@ func CalMerkleUpperHashs(hashes [][]byte) [][]byte {
 // Input d : list of hashes not data
 func CalMerkleRootHash(d [][]byte) []byte {
 	var mtns [][]byte
+	if len(d) == 0 {
+		return nil
+	}
 
 	for _, n := range d {
 		// node := CalHashSha256(n)

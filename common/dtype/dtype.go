@@ -24,3 +24,14 @@ type Command struct {
 	Arg2   string `json:"arg2"`
 	Arg3   string `json:"arg3"`
 }
+
+type ReqPoStorage struct {
+	Hash      string `json:"Hash"`
+	Timestamp int64  `json:"Timestamp"`
+}
+
+type ResPoStorage struct {
+	Addr  string `json:"Address"`
+	SC    int    `json:"storage_class"`
+	Proof string `json:"Proof"`
+}
