@@ -24,4 +24,4 @@ blockchainsim.exe
 .DS_Store
 AccessPatterns.png
 out/
-
+*_Performance.png
