@@ -15,8 +15,9 @@ def getReplications():
     'group': group,
     'Security': [1.2, 0.3, 0.4, 1.9],
     'Decentralisation': [0.7, 0.3, 1.5, 1.9],
-    'Network Efficiency': [0.3, 1.4, 0.7, 1.7],
-    'Storage Efficiency': [1.8, 1.5, 1.7, 1.4],    
+    'NE': [0.3, 1.4, 0.7, 1.7],
+    'CE' : [1.8, 1.7, 1.1, 1.8],
+    'SE': [1.8, 1.5, 1.7, 1.4],    
     })
 
     print(df)
@@ -29,11 +30,10 @@ def getRedactions():
     df = pd.DataFrame({
     'group': group,
     'Security': [1.1, 1.3, 1.2, 0.4],
-    'Decentralisation': [0.3, 0.5, 1.8, 1.8],
-    'Transaction Throughput': [1.2, 1.8, 1.0, 1.7],
-    'Computational Cost ': [2.0, 1.1, 1.2, 1.8],
-    'Consensus Delay': [1.0, 0.3, 1.2, 0.3],
-    'Storage Efficiency': [1.0, 1.1, 0.2, 1.1],
+    'Decentralisation': [0.3, 0.5, 1.8, 1.7],
+    'NE': [1.1, 1.8, 1.7, 1.7],
+    'CE': [0.2, 1.2, 0.5, 1.1],
+    'SE': [1.0, 1.1, 0.2, 1.6],
     })
 
     print(df)
@@ -47,10 +47,9 @@ def getContents():
     'group': group,
     'Security': [1.3, 1.2, 1.9, 2.0],
     'Decentralisation': [0.5, 0.3, 1.8, 1.8],
-    'Transaction Throughput': [1.8, 1.8, 0.4, 0.2],
-    'Computational Cost ': [1.1, 1.8, 1.9, 2.0],
-    'Consensus Delay': [0.3, 1.8, 1.8, 1.8],
-    'Storage Efficiency': [1.1, 0.3, 1.2, 2.0],
+    'NE': [1.8, 1.8, 0.4, 0.2],
+    'CE': [1.2, 0.2, 0.1, 0.1],
+    'SE': [1.1, 0.3, 1.2, 2.0],
     })
 
     print(df)
@@ -60,47 +59,54 @@ def getContents():
  
 # title, group, colors, df = getReplications()
 # title, group, colors, df = getRedactions()
-title, group, colors, df = getContents()
+# title, group, colors, df = getContents()
 
-# number of variable
-categories=list(df)[1:]
-N = len(categories)
- 
-# What will be the angle of each axis in the plot? (we divide the plot / number of variable)
-angles = [n / float(N) * 2 * pi for n in range(N)]
-angles += angles[:1]
- 
-# Initialise the spider plot
-ax = plt.subplot(111, polar=True)
- 
-# If you want the first axis to be on top:
-ax.set_theta_offset(pi / 2)
-ax.set_theta_direction(-1)
- 
-# Draw one axe per variable + add labels
-plt.xticks(angles[:-1], categories)
- 
-# Draw ylabels
-ax.set_rlabel_position(0)
-plt.yticks([0,1,2], ["Low","Medium","High"], color="grey", size=7)
-plt.ylim(0,2)
- 
+foptimisations = [getReplications, getRedactions, getContents]
 
-# ------- PART 2: Add plots
- 
-# Plot each individual = each line of the data
-# I don't make a loop, because plotting more than 3 groups makes the chart unreadable
-alpha = 0.0
+plt.subplots(1, 3, figsize=(18, 5))
 
-for i, g in enumerate (group):
-    values=df.loc[i].drop('group').values.flatten().tolist()
-    values += values[:1]
-    ax.plot(angles, values, linewidth=1, linestyle='solid', label=group[i])
-    ax.fill(angles, values, colors[i], alpha=alpha)
+for i, foptimise in enumerate(foptimisations):
+    title, group, colors, df = foptimise()
+
+    # number of variable
+    categories=list(df)[1:]
+    N = len(categories)
     
-# Add legend
-plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.15))
+    # What will be the angle of each axis in the plot? (we divide the plot / number of variable)
+    angles = [n / float(N) * 2 * pi for n in range(N)]
+    angles += angles[:1]
+    
+    # Initialise the spider plot
+    ax = plt.subplot(1, 3, i+1, polar=True)
+    
+    # If you want the first axis to be on top:
+    ax.set_theta_offset(pi / 2)
+    ax.set_theta_direction(-1)
+    
+    # Draw one axe per variable + add labels
+    plt.xticks(angles[:-1], categories)
+    
+    # Draw ylabels
+    ax.set_rlabel_position(0)
+    plt.yticks([0,1,2], ["Low","Medium","High"], color="grey", size=7)
+    plt.ylim(0,2)
+    
+
+    # ------- PART 2: Add plots
+    
+    # Plot each individual = each line of the data
+    # I don't make a loop, because plotting more than 3 groups makes the chart unreadable
+    alpha = 0.0
+
+    for i, g in enumerate (group):
+        values=df.loc[i].drop('group').values.flatten().tolist()
+        values += values[:1]
+        ax.plot(angles, values, linewidth=1, linestyle='solid', label=group[i])
+        ax.fill(angles, values, colors[i], alpha=alpha)
+        
+    # Add legend
+    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.15))
 
 # Show the graph
-plt.savefig(title + "_Performance.png")
+plt.savefig("Performance.png")
 plt.show()
