@@ -2,7 +2,7 @@
 This is a simulator for [Multi-Level Distributed Caching on the Blockchain for Storage Optimisation](https://eprints.qut.edu.au/228429/) which was presented at the ICBC2022 conference.
 
 # Requirements
-* go version 1.16 or above
+* go version 1.16 
 * Linux 64bit/Raspberry 64bit/Windows 10 or above 64bit
 * tmux 3.0a
 
