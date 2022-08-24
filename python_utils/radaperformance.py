@@ -14,7 +14,7 @@ def getReplications():
     df = pd.DataFrame({
     'group': group,
     'Security': [1.2, 0.3, 0.4, 1.9],
-    'Decentralisation': [0.7, 0.3, 1.5, 1.9],
+    'Decentralisation': [1.1, 0.3, 1.6, 1.8],
     'NE': [0.3, 1.4, 0.7, 1.7],
     'CE' : [1.8, 1.7, 1.1, 1.8],
     'SE': [1.8, 1.4, 1.6, 1.5],    
