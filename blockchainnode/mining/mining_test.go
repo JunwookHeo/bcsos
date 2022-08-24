@@ -84,7 +84,7 @@ func TestBlockchainPoStorage(t *testing.T) {
 
 		serial.Deserialize(data, &bh)
 		tth = bh.Timestamp - int64(config.TSCX[0]*float32(1e9))
-		log.Printf("add block : %v, %v, %v", i, bh.Height, time.UnixMicro(tth/1000))
+		log.Printf("add block : %v, %v, %v", i, bh.Height, time.Unix((tth/1000)/1e6, ((tth/1000)%1e6)*1e3))
 		log.Printf("%v - %v", hex.EncodeToString(bh.Hash), hex.EncodeToString(bh.PrvHash))
 		i++
 	}
@@ -119,7 +119,7 @@ func TestBlockchainPoStorage(t *testing.T) {
 		}
 		serial.Deserialize(data, &tr)
 		if tth < tr.Timestamp {
-			log.Printf("match %v : %v - %v", i, time.UnixMicro(ts/1000), hex.EncodeToString(tr.Hash))
+			log.Printf("match %v : %v - %v", i, time.Unix((tth/1000)/1e6, ((tth/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
 			tr.Timestamp = bh.Timestamp
 			hashes = append(hashes, tr.GetHash())
 			i++
