@@ -63,7 +63,7 @@ def getContents():
 
 foptimisations = [getReplications, getRedactions, getContents]
 
-plt.subplots(1, 3, figsize=(18, 6))
+plt.subplots(1, 3, figsize=(15, 5.5))
 plt.subplots_adjust(wspace=0.5, hspace=1)
 
 for i, foptimise in enumerate(foptimisations):
@@ -106,7 +106,7 @@ for i, foptimise in enumerate(foptimisations):
         ax.fill(angles, values, colors[i], alpha=alpha)
         
     # Add legend
-    plt.legend(loc='right', bbox_to_anchor=(0.8, -0.18), fontsize=13)
+    plt.legend(loc='right', bbox_to_anchor=(0.9, -0.22), fontsize=13)
     plt.title(title+"-based", fontsize=16, pad=20)
     plt.tick_params(labelsize=14) 
 
