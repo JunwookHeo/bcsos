@@ -13,11 +13,11 @@ def getReplications():
     # Set data
     df = pd.DataFrame({
     'group': group,
-    'Security': [1.4, 0.3, 0.4, 1.9],
-    'Decentralisation': [1.7, 0.3, 1.6, 1.8],
+    'Security': [1.0, 0.7, 0.7, 1.7],
+    'Decentralisation': [1.6, 1.0, 1.5, 1.7],
     'NE': [0.3, 1.4, 0.7, 1.7],
-    'CE' : [1.8, 1.7, 1.1, 1.8],
-    'SE': [1.8, 1.4, 1.6, 1.5],    
+    'CE' : [1.8, 1.7, 1.1, 1.6],
+    'SE': [1.8, 1.7, 1.4, 1.5],    
     })
 
     print(df)
@@ -29,11 +29,11 @@ def getRedactions():
     # Set data
     df = pd.DataFrame({
     'group': group,
-    'Security': [1.1, 1.3, 1.2, 0.4],
-    'Decentralisation': [0.3, 0.5, 1.8, 1.7],
+    'Security': [1.0, 1.0, 1.0, 1.0],
+    'Decentralisation': [1.0, 1.0, 1.8, 1.7],
     'NE': [1.1, 1.8, 1.7, 1.7],
     'CE': [0.2, 1.2, 0.5, 1.1],
-    'SE': [1.0, 1.1, 0.2, 1.6],
+    'SE': [1.6, 1.1, 0.2, 1.7],
     })
 
     print(df)
@@ -45,11 +45,11 @@ def getContents():
     # Set data
     df = pd.DataFrame({
     'group': group,
-    'Security': [1.3, 1.2, 1.9, 2.0],
-    'Decentralisation': [0.5, 0.3, 1.8, 1.8],
+    'Security': [1.0, 1.0, 2.0, 2.0],
+    'Decentralisation': [1.0, 1.7, 1.8, 1.8],
     'NE': [1.8, 1.8, 0.4, 0.2],
     'CE': [1.2, 0.2, 0.1, 0.1],
-    'SE': [1.1, 0.3, 1.2, 2.0],
+    'SE': [1.1, 1.0, 1.2, 2.0],
     })
 
     print(df)
@@ -88,7 +88,7 @@ for i, foptimise in enumerate(foptimisations):
     plt.xticks(angles[:-1], categories)
     
     # Draw ylabels
-    ax.set_rlabel_position(0)
+    ax.set_rlabel_position(-50)
     plt.yticks([0,1,2], ["Low","Medium","High"], color="grey", size=7)
     plt.ylim(0,2)
     
@@ -98,11 +98,12 @@ for i, foptimise in enumerate(foptimisations):
     # Plot each individual = each line of the data
     # I don't make a loop, because plotting more than 3 groups makes the chart unreadable
     alpha = 0.0
+    linestyles = ["solid", "dotted", "dashed", "dashdot"]
 
     for i, g in enumerate (group):
         values=df.loc[i].drop('group').values.flatten().tolist()
         values += values[:1]
-        ax.plot(angles, values, linewidth=1, linestyle='solid', label=group[i])
+        ax.plot(angles, values, linewidth=2, linestyle=linestyles[i%len(group)], label=group[i])
         ax.fill(angles, values, colors[i], alpha=alpha)
         
     # Add legend

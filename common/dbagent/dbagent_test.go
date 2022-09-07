@@ -130,3 +130,29 @@ func TestDBAgentReplicatoin(t *testing.T) {
 	// obj2.Hash = hash2
 	// dba.AddTransaction(&obj2)
 }
+
+func TestDBAgentProofStorage(t *testing.T) {
+	path := "../../blockchainnode/db_nodes/7001.db"
+	if !assert.FileExistsf(t, path, "no file exist") {
+		return
+	}
+
+	dba := NewDBAgent(path)
+	tt, _ := hex.DecodeString("0ab51095bf5314967f964422f91fc6b39e7761103875eeafebe1cef430d9f531")
+	var tid [32]byte
+	copy(tid[:], tt)
+	ts := int64(1661228540001266000)
+
+	dba.ProofStorage(tid, ts, 0)
+}
+
+func TestDBAgentTestQuery(t *testing.T) {
+	path := "../../blockchainnode/db_nodes/7001.db"
+	if !assert.FileExistsf(t, path, "no file exist") {
+		return
+	}
+
+	dba := NewDBAgent(path)
+
+	dba.ProofStorage2()
+}

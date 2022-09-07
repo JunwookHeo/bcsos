@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const DB_PATH_TEST = "../db_nodes/7002.db"
+const DB_PATH_TEST = "../db_nodes/7001.db"
 
 func TestBlockchainConsistency(t *testing.T) {
 	db, err := sql.Open("sqlite3", DB_PATH_TEST)
@@ -54,12 +54,12 @@ func TestBlockchainConsistency(t *testing.T) {
 func TestProofStorage(t *testing.T) {
 	sm := StorageMgrInst("../db_nodes/7001.db")
 	req := dtype.ReqPoStorage{}
-	req.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e4"
-	req.Timestamp = 1656640535013592000
+	req.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e7"
+	req.Timestamp = 1661228540001266000
 
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
-	local.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e6"
+	local.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e0"
 
 	proof := sm.ProofStorageProc(&req, local)
 

@@ -205,7 +205,7 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 	return id
 }
 
-//DeleteNoAccedObjects will delete transaction if there is no access more than a hour
+// DeleteNoAccedObjects will delete transaction if there is no access more than a hour
 func (a *dbagent) DeleteNoAccedObjects() {
 	//log.Printf("%v", config.TSC0I)
 	ts := time.Now().UnixNano() - int64(config.TSCX[a.SClass]*float32(1e9)) // no access for if one hour, delete it
@@ -623,15 +623,56 @@ func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	}
 }
 
-// Proof of Storage
-func (a *dbagent) ProofStorage(ridx [32]byte, timestamp int64, tsc int) []byte {
-	match := hex.EncodeToString(ridx[:])
-	// log.Printf("match : %v", match)
+func (a *dbagent) ProofStorage2() {
+	TargetBits := 5
+	tidx, _ := hex.DecodeString("0ab51095bf5314967f964422f91fc6b39e7761103875eeafebe1cef430d9f531")
+
+	matcht := hex.EncodeToString(tidx[:])
+	matchs := matcht[len(matcht)-TargetBits/4:]
+	log.Printf("matchs : %v", matchs)
 
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	query := fmt.Sprintf(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, match[len(match)-2:])
+	query := fmt.Sprintf(`SELECT hash FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, matchs)
+	rows, err := a.db.Query(query)
+	if err != nil {
+		log.Printf("Show latest db status Error : %v", err)
+		return
+	}
+
+	defer rows.Close()
+	i := 0
+	var hash string
+	// posDiffBit := 5
+	mask := (uint64)(0xFFFFFFFFFFFFFFFF >> (64 - TargetBits))
+	matchi, _ := strconv.ParseUint(matcht[len(matcht)-16:], 16, 64)
+	matchi = matchi & mask
+	log.Printf("match : %x", matchi)
+
+	for rows.Next() {
+		err := rows.Scan(&hash)
+		if err != nil {
+			break
+		}
+		value, _ := strconv.ParseUint(hash[len(hash)-16:], 16, 64)
+		if value&mask == matchi {
+			log.Printf("not match %v : %x, %x, %v", i, mask, value&mask, hash)
+			i++
+		}
+
+	}
+}
+
+// Proof of Storage
+func (a *dbagent) ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte {
+	match := hex.EncodeToString(tidx[:])
+	log.Printf("match : %v", match)
+
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	query := fmt.Sprintf(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, match[len(match)-1:])
 	rows, err := a.db.Query(query)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
@@ -660,15 +701,16 @@ func (a *dbagent) ProofStorage(ridx [32]byte, timestamp int64, tsc int) []byte {
 
 		serial.Deserialize(data, &tr)
 		if th_lower < tr.Timestamp && tr.Timestamp < th_upper {
-			// log.Printf("match %v : %v - %v", i, time.UnixMicro(ts/1000), hex.EncodeToString(tr.Hash))
+			log.Printf("match %v : %v - %v", i, time.Unix((ts/1000)/1e6, ((ts/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
 			tr.Timestamp = timestamp
 			hashes = append(hashes, tr.GetHash())
 			i++
 		} else {
-			// log.Printf("not match %v : %v - %v", i, time.UnixMicro(ts/1000), hex.EncodeToString(tr.Hash))
+			log.Printf("not match %v : %v - %v", i, time.Unix((ts/1000)/1e6, ((ts/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
+
 		}
 	}
-	log.Printf("MerkleRoot : %v", hex.EncodeToString(blockchain.CalMerkleRootHash(hashes)))
+	log.Printf("MerkleRoot : %v - %v", i, hex.EncodeToString(blockchain.CalMerkleRootHash(hashes)))
 	return blockchain.CalMerkleRootHash(hashes)
 }
 

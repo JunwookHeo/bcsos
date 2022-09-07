@@ -319,11 +319,11 @@ func (h *StorageMgr) ProofStorageProc(pos *dtype.ReqPoStorage, node *dtype.NodeI
 
 	baddr, _ := hex.DecodeString(node.Hash)
 	bhash, _ := hex.DecodeString(pos.Hash)
-	ridx := sha256.Sum256(append(bhash, baddr...))
+	tidx := sha256.Sum256(append(bhash, baddr...))
 
-	// log.Printf("RIDX : %v, sc : %v", ridx, node.SC)
+	// log.Printf("RIDX : %v, sc : %v", tidx, node.SC)
 
-	merkle := h.db.ProofStorage(ridx, pos.Timestamp, node.SC)
+	merkle := h.db.ProofStorage(tidx, pos.Timestamp, node.SC)
 	if merkle == nil {
 		proof.Proof = ""
 	} else {
