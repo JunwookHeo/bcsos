@@ -1,13 +1,17 @@
 package simulation
 
 import (
+	"bufio"
+	"encoding/json"
 	"log"
+	"os"
 	"testing"
 
 	"github.com/junwookheo/bcsos/common/dbagent"
 )
 
-const PATH_TEST = "../iotdata/IoT_normal_fridge_1.log"
+// const PATH_TEST = "../iotdata/IoT_normal_fridge_1.log"
+const PATH_TEST = "../../transactions.json"
 const DB_PATH_TEST = "../bc_dummy.db"
 
 func TestLoadFromJson(t *testing.T) {
@@ -19,6 +23,22 @@ func TestLoadFromJson(t *testing.T) {
 	// 	log.Printf("%v", tr)
 	// 	time.Sleep(1 * time.Second)
 	// }
+	f, err := os.Open(PATH_TEST)
+	if err != nil {
+		log.Printf("Open error : %v", err)
+		return
+	}
+
+	fscanner := bufio.NewScanner(f)
+	for fscanner.Scan() {
+		var rec map[string]interface{}
+		err := json.Unmarshal([]byte(fscanner.Text()), &rec)
+		if err != nil {
+			panic(err)
+		}
+
+		log.Printf("===> %v", rec["hash"])
+	}
 }
 
 func TestDBAgent(t *testing.T) {

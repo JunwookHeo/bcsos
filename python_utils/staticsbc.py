@@ -78,6 +78,83 @@ def show_plot(df, title):
     plt.savefig(title) 
     # plt.show()
 
+def get_bitcoin_transactions(name):
+    # df = pd.DataFrame()
+
+    preid = 0
+    limit = 1
+    offset = 11
+    for i in range(offset):
+        api_url = f"https://api.blockchair.com/{name}/transactions?q=time(2022-01)&s=id(asc)&limit={limit}&offset={i}"
+        response = requests.get(api_url)
+        res = response.json()
+        print('============Bitcoin===========')
+        # print('transaction hash : {}'.format(res['data'][0]['id']))
+        print('transaction hash : {}'.format(res['data'][-1]['id']))
+        preid = int(res['data'][-1]['id'])
+
+        # print(res)
+        for d in res['data']:
+            api_url = f"https://api.blockchair.com/{name}/raw/transaction/{d['hash']}"
+            response = requests.get(api_url)
+            transaction = response.json()
+            print(transaction['data'][d['hash']]['decoded_raw_transaction'])
+
+def get_bitcoin_blocks(name):
+    # df = pd.DataFrame()
+
+    preid = 0
+    limit = 1
+    offset = 2
+    for i in range(offset):
+        api_url = f"https://api.blockchair.com/{name}/blocks?q=time(2022-01)&s=id(asc)&limit={limit}&offset={i}"
+        response = requests.get(api_url)
+        res = response.json()
+        print('============Bitcoin===========')
+        # print('transaction hash : {}'.format(res['data'][0]['id']))
+        print('transaction hash : {}'.format(res['data'][-1]['id']))
+        preid = int(res['data'][-1]['id'])
+
+        # print(res)
+        for d in res['data']:
+            api_url = f"https://api.blockchair.com/{name}/raw/block/{d['hash']}"
+            response = requests.get(api_url)
+            block = response.json()
+            # print(block)
+
+def get_transaction_from_url():
+    import wget
+    url = "https://gz.blockchair.com/bitcoin/transactions/"
+    file = "blockchair_bitcoin_transactions_20221009.tsv.gz"
+    response = wget.download(f"{url}{file}", file)
+
+def get_bitcoin_transactions():
+    import csv
+    import json
+    path = "./blockchainsim/iotdata/blockchair_bitcoin_transactions_20221009.tsv"
+    outfile = 'transactions.json'
+    with open(outfile, "w") as fo:
+        with open(path, newline='') as fi:
+            header = next(fi)
+            print(header)
+            lines = csv.reader(fi, delimiter='\t')
+            for i, rec in enumerate(lines):            
+                api_url = f'https://blockchain.info/rawtx/{rec[1]}'
+                response = requests.get(api_url)
+                res = response.json()
+                json.dump(res, fo)
+                fo.writelines('\n')
+                print(res)
+                if i > 0:
+                    break
+    with open(outfile, 'r') as openfile:
+        # Reading from json file
+        lines = openfile.readlines()
+        print("==================================")
+        for rec in lines:
+            json_object = json.loads(rec)
+            print(json_object)
+
 # df = blockchain_stats('bitcoin')
 # show_plot(df, 'BitcoinState')
 
@@ -87,5 +164,18 @@ def show_plot(df, title):
 # df = blockchain_stats('litecoin')
 # show_plot(df, 'LitecoinState')
 
-df = blockchain_stats('zcash')
-show_plot(df, 'ZcashState')
+# df = blockchain_stats('zcash')
+# show_plot(df, 'ZcashState')
+
+
+# get_bitcoin_transactions('bitcoin')
+# get_bitcoin_blocks('bitcoin')
+# get_transaction_from_url()
+
+
+# api_url = f"https://api.blockchair.com/bitcoin/raw/transaction/00d42e0fa72b7a3742e27dcc961c9ff265d297d0a8ca6aff62896733d14f6672"
+# response = requests.get(api_url)
+# res = response.json()
+# print(res)
+
+get_bitcoin_transactions()
