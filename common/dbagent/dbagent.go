@@ -24,8 +24,8 @@ type DBAgent interface {
 	DeleteNoAccedObjects()
 	UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int)
 	UpdateDBNetworkDelay(addtime int, hop int)
-	ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte
-	ProofStorage2()
+	// ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte
+	// ProofStorage2()
 }
 
 type StorageObj struct {

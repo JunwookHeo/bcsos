@@ -114,12 +114,6 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 			// log.Printf("Broadcast Transaction : %v", node)
 		}
 	}
-
-	// When a node receives a new block, it carries out Proof of Storage
-	// it start from 120 * 5 min
-	if b.Header.Height > 120 {
-		mi.requestProofStorage(b, nodes)
-	}
 }
 
 func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
@@ -218,6 +212,8 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 
 	// log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
 	go mi.BroadcastNewBlock(&block)
+	// Proof of Storage
+	go mi.requestProofStorage(&block)
 
 	sm := storage.StorageMgrInst("")
 	sm.AddNewBlock(&block)
@@ -294,7 +290,17 @@ func (mi *Mining) broadcastTrascationHandler(w http.ResponseWriter, r *http.Requ
 }
 
 // Request Proof of Storage
-func (mi *Mining) requestProofStorage(b *blockchain.Block, nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo) {
+func (mi *Mining) requestProofStorage(b *blockchain.Block) {
+	// When a node receives a new block, it carries out Proof of Storage
+	// it start from 120 * 5 min
+	if b.Header.Height < 120 {
+		return
+	}
+
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
+	nm := network.NodeMgrInst()
+	nm.GetSCNNodeListAll(&nodes)
+
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
@@ -312,6 +318,11 @@ func (mi *Mining) requestProofStorage(b *blockchain.Block, nodes [(config.MAX_SC
 		return
 	}
 
+	// =============================================================
+	// TODO : POS_IMPL
+	// Request k consecutive hashes
+	// Choose c encrypted blocks
+	// Verify them
 	url := fmt.Sprintf("ws://%v:%v/proofstorage", node.IP, node.Port)
 	// log.Printf("Send ping with local info : %v", url)
 
@@ -322,33 +333,41 @@ func (mi *Mining) requestProofStorage(b *blockchain.Block, nodes [(config.MAX_SC
 	}
 	defer ws.Close()
 
-	req := dtype.ReqPoStorage{}
-	req.Hash = hex.EncodeToString(b.Header.Hash)
-	req.Timestamp = b.Header.Timestamp
+	req := dtype.ReqConsecutiveHashes{}
+	req.Hash = "" // Randomly choose hex.EncodeToString(b.Header.Hash)
+	req.Count = config.NUM_CONSECUTIVE_HASHES
 
 	if err := ws.WriteJSON(req); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
 
-	var pproof dtype.ResPoStorage
-	if err := ws.ReadJSON(&pproof); err != nil {
+	var hashes dtype.ResConsecutiveHashes
+	if err := ws.ReadJSON(&hashes); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
 
+	// Request c of encrypted blocks
+	reqblock := dtype.ReqEncryptedBlock{}
+	reqblock.Hash = "" // Randomly choose
+
+	if err := ws.WriteJSON(reqblock); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+
+	var resblock dtype.ResEncryptedBlock
+	if err := ws.ReadJSON(&resblock); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
 	// log.Printf("=====Prover PoS : %v", pproof)
 
 	sm := storage.StorageMgrInst("")
-	vproof := sm.ProofStorageProc(&req, node)
+	vproof := sm.ProofStorageProc(hashes.Hashes, []byte(resblock.Block))
 
-	// log.Printf("=====Verifier PoS : %v", vproof)
-
-	if vproof.Proof != pproof.Proof {
-		log.Panicf("Fail PoStorage : %v-%v", vproof.Proof, pproof.Proof)
-	}
-
-	log.Printf("Success PoStorage : %v-%v", node.Port, vproof.Proof)
+	log.Printf("Success PoStorage : %v", vproof)
 }
 
 func (mi *Mining) GetTargetNodePoS(nodes [config.MAX_SC * config.MAX_SC_PEER]dtype.NodeInfo) *dtype.NodeInfo {

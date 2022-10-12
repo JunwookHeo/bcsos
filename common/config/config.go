@@ -85,3 +85,6 @@ const TIME_UPDATE_NEITHBOUR int = 10 //60 // Second
 const END_TEST string = "END_TEST"
 
 const FINALITY int = 6
+
+// Proof of Storage
+const NUM_CONSECUTIVE_HASHES int = 10

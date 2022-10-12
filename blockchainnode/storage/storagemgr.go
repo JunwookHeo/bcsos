@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -295,42 +294,37 @@ func (h *StorageMgr) proofStorageHandler(w http.ResponseWriter, r *http.Request)
 	}
 	defer ws.Close()
 
-	var pos dtype.ReqPoStorage
-	if err := ws.ReadJSON(&pos); err != nil {
+	var reqHash dtype.ReqConsecutiveHashes
+	if err := ws.ReadJSON(&reqHash); err != nil {
 		log.Printf("Read json error : %v", err)
 		return
 	}
 
-	ni := network.NodeInfoInst()
-	local := ni.GetLocalddr()
-	proof := h.ProofStorageProc(&pos, local)
+	// TODO : Get k of consecutive hashes and return them
+	hashes := ""
+	if err := ws.WriteJSON(hashes); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
 
-	if err := ws.WriteJSON(proof); err != nil {
+	var reqBlock dtype.ReqEncryptedBlock
+	if err := ws.ReadJSON(&reqBlock); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+
+	// TODO : Get the enctypted block and return it
+	resBlock := dtype.ResEncryptedBlock{}
+	resBlock.Block = ""
+	if err := ws.WriteJSON(resBlock); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
 }
 
-func (h *StorageMgr) ProofStorageProc(pos *dtype.ReqPoStorage, node *dtype.NodeInfo) *dtype.ResPoStorage {
-	proof := dtype.ResPoStorage{}
-
-	proof.Addr = node.Hash
-	proof.SC = node.SC
-
-	baddr, _ := hex.DecodeString(node.Hash)
-	bhash, _ := hex.DecodeString(pos.Hash)
-	tidx := sha256.Sum256(append(bhash, baddr...))
-
-	// log.Printf("RIDX : %v, sc : %v", tidx, node.SC)
-
-	merkle := h.db.ProofStorage(tidx, pos.Timestamp, node.SC)
-	if merkle == nil {
-		proof.Proof = ""
-	} else {
-		proof.Proof = hex.EncodeToString(merkle)
-	}
-
-	return &proof
+func (h *StorageMgr) ProofStorageProc(hashes string, block []byte) bool {
+	// TODO : Verify encrypted block
+	return false
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {

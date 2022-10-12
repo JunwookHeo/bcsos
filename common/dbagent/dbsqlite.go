@@ -623,96 +623,96 @@ func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	}
 }
 
-func (a *dbagent) ProofStorage2() {
-	TargetBits := 5
-	tidx, _ := hex.DecodeString("0ab51095bf5314967f964422f91fc6b39e7761103875eeafebe1cef430d9f531")
+// func (a *dbagent) ProofStorage2() {
+// 	TargetBits := 5
+// 	tidx, _ := hex.DecodeString("0ab51095bf5314967f964422f91fc6b39e7761103875eeafebe1cef430d9f531")
 
-	matcht := hex.EncodeToString(tidx[:])
-	matchs := matcht[len(matcht)-TargetBits/4:]
-	log.Printf("matchs : %v", matchs)
+// 	matcht := hex.EncodeToString(tidx[:])
+// 	matchs := matcht[len(matcht)-TargetBits/4:]
+// 	log.Printf("matchs : %v", matchs)
 
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
+// 	a.mutex.Lock()
+// 	defer a.mutex.Unlock()
 
-	query := fmt.Sprintf(`SELECT hash FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, matchs)
-	rows, err := a.db.Query(query)
-	if err != nil {
-		log.Printf("Show latest db status Error : %v", err)
-		return
-	}
+// 	query := fmt.Sprintf(`SELECT hash FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, matchs)
+// 	rows, err := a.db.Query(query)
+// 	if err != nil {
+// 		log.Printf("Show latest db status Error : %v", err)
+// 		return
+// 	}
 
-	defer rows.Close()
-	i := 0
-	var hash string
-	// posDiffBit := 5
-	mask := (uint64)(0xFFFFFFFFFFFFFFFF >> (64 - TargetBits))
-	matchi, _ := strconv.ParseUint(matcht[len(matcht)-16:], 16, 64)
-	matchi = matchi & mask
-	log.Printf("match : %x", matchi)
+// 	defer rows.Close()
+// 	i := 0
+// 	var hash string
+// 	// posDiffBit := 5
+// 	mask := (uint64)(0xFFFFFFFFFFFFFFFF >> (64 - TargetBits))
+// 	matchi, _ := strconv.ParseUint(matcht[len(matcht)-16:], 16, 64)
+// 	matchi = matchi & mask
+// 	log.Printf("match : %x", matchi)
 
-	for rows.Next() {
-		err := rows.Scan(&hash)
-		if err != nil {
-			break
-		}
-		value, _ := strconv.ParseUint(hash[len(hash)-16:], 16, 64)
-		if value&mask == matchi {
-			log.Printf("not match %v : %x, %x, %v", i, mask, value&mask, hash)
-			i++
-		}
+// 	for rows.Next() {
+// 		err := rows.Scan(&hash)
+// 		if err != nil {
+// 			break
+// 		}
+// 		value, _ := strconv.ParseUint(hash[len(hash)-16:], 16, 64)
+// 		if value&mask == matchi {
+// 			log.Printf("not match %v : %x, %x, %v", i, mask, value&mask, hash)
+// 			i++
+// 		}
 
-	}
-}
+// 	}
+// }
 
-// Proof of Storage
-func (a *dbagent) ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte {
-	match := hex.EncodeToString(tidx[:])
-	log.Printf("match : %v", match)
+// // Proof of Storage
+// func (a *dbagent) ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte {
+// 	match := hex.EncodeToString(tidx[:])
+// 	log.Printf("match : %v", match)
 
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
+// 	a.mutex.Lock()
+// 	defer a.mutex.Unlock()
 
-	query := fmt.Sprintf(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, match[len(match)-1:])
-	rows, err := a.db.Query(query)
-	if err != nil {
-		log.Printf("Show latest db status Error : %v", err)
-		return nil
-	}
+// 	query := fmt.Sprintf(`SELECT hash, timestamp, data FROM bcobjects WHERE type = "transaction" and hash LIKE "%%%s";`, match[len(match)-1:])
+// 	rows, err := a.db.Query(query)
+// 	if err != nil {
+// 		log.Printf("Show latest db status Error : %v", err)
+// 		return nil
+// 	}
 
-	defer rows.Close()
+// 	defer rows.Close()
 
-	var data []byte
-	i := 0
-	tr := blockchain.Transaction{}
-	var hash string
-	var ts int64
-	var hashes [][]byte
+// 	var data []byte
+// 	i := 0
+// 	tr := blockchain.Transaction{}
+// 	var hash string
+// 	var ts int64
+// 	var hashes [][]byte
 
-	// Guard Time : 60 sec
-	th_lower := timestamp - int64(config.TSCX[tsc]*float32(1e9)) + int64(60*float32(1e9))
-	th_upper := timestamp - int64(60*float32(1e9))
-	// log.Printf("threshold : %v, %v, %v", th_lower, th_upper, timestamp)
+// 	// Guard Time : 60 sec
+// 	th_lower := timestamp - int64(config.TSCX[tsc]*float32(1e9)) + int64(60*float32(1e9))
+// 	th_upper := timestamp - int64(60*float32(1e9))
+// 	// log.Printf("threshold : %v, %v, %v", th_lower, th_upper, timestamp)
 
-	for rows.Next() {
-		err := rows.Scan(&hash, &ts, &data)
-		if err != nil {
-			break
-		}
+// 	for rows.Next() {
+// 		err := rows.Scan(&hash, &ts, &data)
+// 		if err != nil {
+// 			break
+// 		}
 
-		serial.Deserialize(data, &tr)
-		if th_lower < tr.Timestamp && tr.Timestamp < th_upper {
-			log.Printf("match %v : %v - %v", i, time.Unix((ts/1000)/1e6, ((ts/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
-			tr.Timestamp = timestamp
-			hashes = append(hashes, tr.GetHash())
-			i++
-		} else {
-			log.Printf("not match %v : %v - %v", i, time.Unix((ts/1000)/1e6, ((ts/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
+// 		serial.Deserialize(data, &tr)
+// 		if th_lower < tr.Timestamp && tr.Timestamp < th_upper {
+// 			log.Printf("match %v : %v - %v", i, time.Unix((ts/1000)/1e6, ((ts/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
+// 			tr.Timestamp = timestamp
+// 			hashes = append(hashes, tr.GetHash())
+// 			i++
+// 		} else {
+// 			log.Printf("not match %v : %v - %v", i, time.Unix((ts/1000)/1e6, ((ts/1000)%1e6)*1e3), hex.EncodeToString(tr.Hash))
 
-		}
-	}
-	log.Printf("MerkleRoot : %v - %v", i, hex.EncodeToString(blockchain.CalMerkleRootHash(hashes)))
-	return blockchain.CalMerkleRootHash(hashes)
-}
+// 		}
+// 	}
+// 	log.Printf("MerkleRoot : %v - %v", i, hex.EncodeToString(blockchain.CalMerkleRootHash(hashes)))
+// 	return blockchain.CalMerkleRootHash(hashes)
+// }
 
 func (a *dbagent) GetDBStatus() *DBStatus {
 	a.dbstatus.Timestamp = time.Now()

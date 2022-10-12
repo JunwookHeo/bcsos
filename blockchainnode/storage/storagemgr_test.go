@@ -6,9 +6,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/blockchain"
-	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/stretchr/testify/assert"
 )
@@ -52,16 +50,16 @@ func TestBlockchainConsistency(t *testing.T) {
 }
 
 func TestProofStorage(t *testing.T) {
-	sm := StorageMgrInst("../db_nodes/7001.db")
-	req := dtype.ReqPoStorage{}
-	req.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e7"
-	req.Timestamp = 1661228540001266000
+	// sm := StorageMgrInst("../db_nodes/7001.db")
+	// req := dtype.ReqPoStorage{}
+	// req.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e7"
+	// req.Timestamp = 1661228540001266000
 
-	ni := network.NodeInfoInst()
-	local := ni.GetLocalddr()
-	local.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e0"
+	// ni := network.NodeInfoInst()
+	// local := ni.GetLocalddr()
+	// local.Hash = "3feb6dc6e7fa909ac617fe1b98ff52860b25f0799e5bcb31118182082cc9d6e0"
 
-	proof := sm.ProofStorageProc(&req, local)
+	// proof := sm.ProofStorageProc(&req, local)
 
-	log.Printf("Proof : %v", proof)
+	// log.Printf("Proof : %v", proof)
 }

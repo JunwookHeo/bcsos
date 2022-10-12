@@ -25,13 +25,19 @@ type Command struct {
 	Arg3   string `json:"arg3"`
 }
 
-type ReqPoStorage struct {
-	Hash      string `json:"Hash"`
-	Timestamp int64  `json:"Timestamp"`
+type ReqConsecutiveHashes struct {
+	Hash  string `json:"Hash"`
+	Count int    `json:"Count"`
 }
 
-type ResPoStorage struct {
-	Addr  string `json:"Address"`
-	SC    int    `json:"storage_class"`
-	Proof string `json:"Proof"`
+type ResConsecutiveHashes struct {
+	Hashes string `json:"Hashes"`
+}
+
+type ReqEncryptedBlock struct {
+	Hash string `json:"Hash"`
+}
+
+type ResEncryptedBlock struct {
+	Block string `json:"Block"`
 }
