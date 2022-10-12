@@ -14,7 +14,7 @@ type DBAgent interface {
 	GetBlockHeader(hash string, h *blockchain.BlockHeader) int64
 	AddTransaction(t *blockchain.Transaction) int64
 	GetTransaction(hash string, t *blockchain.Transaction) int64
-	AddBlock(b *blockchain.Block) int64
+	AddNewBlock(b *blockchain.Block) int64
 	GetBlock(hash string, b *blockchain.Block) int64
 	ShowAllObjets() bool
 	GetDBDataSize() uint64

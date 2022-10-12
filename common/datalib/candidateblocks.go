@@ -24,7 +24,7 @@ type CandidateBlocks struct {
 }
 
 type SaveBlock interface {
-	AddBlock(b *blockchain.Block) int64
+	AddNewBlock(b *blockchain.Block) int64
 }
 
 func (q *CandidateBlocks) PushAndSave(block *blockchain.Block, sb SaveBlock) bool {
@@ -65,7 +65,7 @@ func (q *CandidateBlocks) PushAndSave(block *blockchain.Block, sb SaveBlock) boo
 				prehash = hex.EncodeToString(b.Header.PrvHash)
 				if q.savedheight < b.Header.Height && b.Header.Height <= q.maxheight-config.FINALITY {
 					// log.Printf("Save block(%v) : %v", b.Header.Height, hex.EncodeToString(b.Header.Hash))
-					sb.AddBlock(b)
+					sb.AddNewBlock(b)
 					if savedheight < b.Header.Height {
 						savedheight = b.Header.Height
 					}

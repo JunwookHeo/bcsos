@@ -41,7 +41,7 @@ func TestDBSqliteAdd(t *testing.T) {
 
 	dba.GetLatestBlockHash()
 	b1 := crbl("aaaaa-", 0)
-	dba.AddBlock(b1)
+	dba.AddNewBlock(b1)
 	status := dba.GetDBStatus()
 	log.Println(status)
 	phash, height := dba.GetLatestBlockHash()
@@ -57,7 +57,7 @@ func TestDBSqliteAdd(t *testing.T) {
 	}
 
 	b1 = crbl("bbbbb-", 1)
-	dba.AddBlock(b1)
+	dba.AddNewBlock(b1)
 	status = dba.GetDBStatus()
 	log.Println(status)
 	phash, height = dba.GetLatestBlockHash()

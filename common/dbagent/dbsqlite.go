@@ -368,7 +368,9 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 	return id
 }
 
-func (a *dbagent) AddBlock(b *blockchain.Block) int64 {
+func (a *dbagent) AddNewBlock(b *blockchain.Block) int64 {
+	// TODO : Impliment enctypting a new block and stor it for Proof of Storage
+
 	hash := hex.EncodeToString(b.Header.Hash)
 	obj := StorageObj{"block", hash, b.Header.Timestamp, b.Header.Height} // store height in data field.
 	if id := a.GetObject(&obj); id != 0 {
