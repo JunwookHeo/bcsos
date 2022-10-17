@@ -128,7 +128,7 @@ def get_transaction_from_url():
     file = "blockchair_bitcoin_transactions_20221009.tsv.gz"
     response = wget.download(f"{url}{file}", file)
 
-def get_bitcoin_transactions():
+def get_bitcoin_transactions2():
     import csv
     import json
     path = "./blockchainsim/iotdata/blockchair_bitcoin_transactions_20221009.tsv"
@@ -147,6 +147,28 @@ def get_bitcoin_transactions():
                 print(res)
                 if i > 0:
                     break
+    with open(outfile, 'r') as openfile:
+        # Reading from json file
+        lines = openfile.readlines()
+        print("==================================")
+        for rec in lines:
+            json_object = json.loads(rec)
+            print(json_object)
+
+def get_blocks_from_height():
+    import csv
+    import json
+    outfile = 'blocks.json'
+    height = 756450
+    with open(outfile, "w") as fo:
+        for h in range(height, height + 2):
+            api_url = f'https://api.blockchair.com/bitcoin/raw/block/{h}'
+            response = requests.get(api_url)
+            res = response.json()
+            json.dump(res, fo)
+            fo.writelines('\n')
+            print(res)
+
     with open(outfile, 'r') as openfile:
         # Reading from json file
         lines = openfile.readlines()
@@ -178,4 +200,4 @@ def get_bitcoin_transactions():
 # res = response.json()
 # print(res)
 
-get_bitcoin_transactions()
+get_blocks_from_height()
