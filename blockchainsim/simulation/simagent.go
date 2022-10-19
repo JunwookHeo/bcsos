@@ -25,6 +25,7 @@ type Handler struct {
 
 const WALLET_PATH = "./bc_sim.wallet"
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
+const PATH_BTC_BLOCK = "../../blocks.json"
 
 // getObjectQuery queries a transaction ot other nodes with highr Storage Class
 // Request : hash of transaction
@@ -84,11 +85,7 @@ func (h *Handler) getObjectQuery(reqData *dtype.ReqData, obj interface{}) bool {
 		}
 	}
 
-	if queryObject(tnode.IP, tnode.Port, reqData, obj) {
-		return true
-	}
-
-	return false
+	return queryObject(tnode.IP, tnode.Port, reqData, obj)
 }
 
 func (h *Handler) newReqData(objtype string, hash string) dtype.ReqData {
@@ -192,12 +189,16 @@ func (h *Handler) SimulateTransaction(id int) *blockchain.Transaction {
 	tr := blockchain.CreateTransaction(h.w, jstr)
 	// log.Printf("Creating a new tr (%v) : %v", id, hex.EncodeToString(tr.Hash))
 	for {
-		if h.broadcastNewTransaction(tr) == true {
+		if h.broadcastNewTransaction(tr) {
 			break
 		}
 	}
 
 	return tr
+}
+
+func (h *Handler) SimulateBtcBlock(isend bool, msg chan string) {
+	// go LoadBtcData(PATH_BTC_BLOCK, isend, msg)
 }
 
 func NewSimAgent(db dbagent.DBAgent, nodes *map[string]dtype.NodeInfo) *Handler {

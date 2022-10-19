@@ -359,6 +359,56 @@ func (h *Handler) SimulateTransactionProc() {
 	}(command)
 }
 
+func (h *Handler) SimulateBtcBlockProc() {
+	command := make(chan string)
+	h.el.AddListener(command)
+	id := 0
+
+	msg := make(chan string)
+	isend := false
+	h.bcsim.SimulateBtcBlock(isend, msg)
+
+	go func(command <-chan string) {
+		var status = "Pause"
+
+		for {
+			select {
+			case cmd := <-command:
+				switch cmd {
+				case "Stop":
+					status = "Stop"
+					log.Printf("Stop running")
+					// Wait untile client nodes terminate
+					time.Sleep(time.Duration(20) * time.Second)
+					h.db.Close()
+					h.KillProcess()
+				case "Start":
+					status = "Running"
+				}
+			default:
+				if status == "Running" {
+					if id < config.TOTAL_TRANSACTIONS {
+
+						id++
+						time.Sleep(time.Second)
+					} else {
+						//Stop generating access pattern proc
+						h.el.Notify("Stop")
+						// Sleep for a while for client nodes
+						time.Sleep(time.Duration(10) * time.Second)
+						// Send test stop to client nodes
+						cmd := dtype.Command{Cmd: "SET", Subcmd: "Test", Arg1: "Stop", Arg2: "", Arg3: ""}
+						h.broadcastCommand(cmd)
+						log.Printf("sendiing stop")
+					}
+				} else {
+					time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
+				}
+			}
+		}
+	}(command)
+}
+
 func NewHandler(mode string, path string) *Handler {
 	m := mux.NewRouter()
 	h := &Handler{
@@ -389,8 +439,9 @@ func NewHandler(mode string, path string) *Handler {
 	h.bcsim = simulation.NewSimAgent(h.db, &h.Nodes)
 	h.TC = NewTestConfig(h.db, &h.Nodes)
 
-	h.SimulateTransactionProc()
-	h.SimulateAccessPatternProc()
+	// BITCOIN NOT USE
+	// h.SimulateTransactionProc()
+	// h.SimulateAccessPatternProc()
 
 	return h
 }

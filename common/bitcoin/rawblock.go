@@ -118,3 +118,11 @@ func (rb *RawBlock) ReverseBuf(buf []byte) []byte {
 	}
 	return buf
 }
+
+func (rb *RawBlock) GetRawBytes(start uint32, len uint32) []byte {
+	return rb.rawBuf[start : start+len]
+}
+
+func (rb *RawBlock) GetPosition() uint32 {
+	return rb.pos
+}
