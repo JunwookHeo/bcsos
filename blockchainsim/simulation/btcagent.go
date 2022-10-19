@@ -25,7 +25,7 @@ func LoadBtcData(path string, msg chan string) {
 	scanner.Buffer(buf, maxCapacity)
 
 	i := 0
-	// cnt := 0
+
 	for scanner.Scan() {
 		select {
 		case <-msg:
@@ -50,11 +50,11 @@ func LoadBtcData(path string, msg chan string) {
 				raw := b[key].(map[string]interface{})["raw_block"].(string)
 				msg <- raw
 			}
-			log.Printf("Channel rutine : %v", i)
+			log.Printf("Num blocks : %v", i)
 			i++
 		}
 	}
 
-	log.Println("Channel closed go rutine End")
 	msg <- config.END_TEST
+	log.Println("LoadBtcData End")
 }

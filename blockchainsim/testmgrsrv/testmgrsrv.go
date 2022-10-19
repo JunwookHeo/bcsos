@@ -362,11 +362,9 @@ func (h *Handler) SimulateTransactionProc() {
 func (h *Handler) SimulateBtcBlockProc() {
 	command := make(chan string)
 	h.el.AddListener(command)
-	id := 0
 
 	msg := make(chan string)
-	isend := false
-	h.bcsim.SimulateBtcBlock(isend, msg)
+	h.bcsim.SimulateBtcBlock(msg)
 
 	go func(command <-chan string) {
 		var status = "Pause"
@@ -378,6 +376,8 @@ func (h *Handler) SimulateBtcBlockProc() {
 				case "Stop":
 					status = "Stop"
 					log.Printf("Stop running")
+					close(msg)
+
 					// Wait untile client nodes terminate
 					time.Sleep(time.Duration(20) * time.Second)
 					h.db.Close()
@@ -387,11 +387,16 @@ func (h *Handler) SimulateBtcBlockProc() {
 				}
 			default:
 				if status == "Running" {
-					if id < config.TOTAL_TRANSACTIONS {
+					b, ok := <-msg
+					if !ok {
+						log.Println("Channle closed")
+						break
+					}
 
-						id++
-						time.Sleep(time.Second)
-					} else {
+					log.Printf("Block : %v", b[:8])
+					h.bcsim.BroadcastBtcBlock(b)
+
+					if b == config.END_TEST {
 						//Stop generating access pattern proc
 						h.el.Notify("Stop")
 						// Sleep for a while for client nodes
@@ -400,13 +405,17 @@ func (h *Handler) SimulateBtcBlockProc() {
 						cmd := dtype.Command{Cmd: "SET", Subcmd: "Test", Arg1: "Stop", Arg2: "", Arg3: ""}
 						h.broadcastCommand(cmd)
 						log.Printf("sendiing stop")
+						break
 					}
+
+					time.Sleep(time.Second * 60)
 				} else {
 					time.Sleep(time.Duration(config.BLOCK_CREATE_PERIOD) * time.Second)
 				}
 			}
 		}
 	}(command)
+
 }
 
 func NewHandler(mode string, path string) *Handler {
@@ -442,6 +451,7 @@ func NewHandler(mode string, path string) *Handler {
 	// BITCOIN NOT USE
 	// h.SimulateTransactionProc()
 	// h.SimulateAccessPatternProc()
+	h.SimulateBtcBlockProc()
 
 	return h
 }

@@ -25,7 +25,7 @@ type Handler struct {
 
 const WALLET_PATH = "./bc_sim.wallet"
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
-const PATH_BTC_BLOCK = "../../blocks.json"
+const PATH_BTC_BLOCK = "../blocks.json"
 
 // getObjectQuery queries a transaction ot other nodes with highr Storage Class
 // Request : hash of transaction
@@ -197,8 +197,53 @@ func (h *Handler) SimulateTransaction(id int) *blockchain.Transaction {
 	return tr
 }
 
-func (h *Handler) SimulateBtcBlock(isend bool, msg chan string) {
-	// go LoadBtcData(PATH_BTC_BLOCK, isend, msg)
+func (h *Handler) SimulateBtcBlock(msg chan string) {
+	go LoadBtcData(PATH_BTC_BLOCK, msg)
+}
+
+func (h *Handler) sendNewBtcBlock(b string, ip string, port int) bool {
+	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", ip, port)
+	// log.Printf("Send new BTC block to %v", url)
+
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Printf("dial: %v", err)
+		return false
+	}
+	defer ws.Close()
+	// log.Printf("DefaultDialer Send new block to %v", url)
+
+	if err := ws.WriteJSON(b); err != nil {
+		log.Printf("Write json error : %v", err)
+		return false
+	}
+
+	return true
+}
+
+func (h *Handler) broadcastNewBtcBlock(b string) bool {
+	num := len(*h.Nodes)
+	if num == 0 {
+		return true
+	}
+
+	idx := rand.Intn(num)
+	i := 0
+	for _, node := range *h.Nodes {
+		if i == idx {
+			return h.sendNewBtcBlock(b, node.IP, node.Port)
+		}
+		i++
+	}
+	return false
+}
+
+func (h *Handler) BroadcastBtcBlock(b string) {
+	for {
+		if h.broadcastNewBtcBlock(b) {
+			break
+		}
+	}
 }
 
 func NewSimAgent(db dbagent.DBAgent, nodes *map[string]dtype.NodeInfo) *Handler {

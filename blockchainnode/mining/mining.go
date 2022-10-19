@@ -289,6 +289,47 @@ func (mi *Mining) broadcastTrascationHandler(w http.ResponseWriter, r *http.Requ
 	mi.BroadcasTransaction(&tr)
 }
 
+// newBlockHandler is called when a new block is received from miners
+// When a node receive this, it stores the block on its local db
+// Request : a new block
+// Response : none
+func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("newBtcBlockHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	var block string
+	if err := ws.ReadJSON(&block); err != nil {
+		log.Printf("Read json error : %v", err)
+	}
+
+	log.Printf("Received New BTC Block : %v", block[:20])
+
+	// mi.mutex.Lock()
+	// if mi.sb.Find(hex.EncodeToString(block.Header.Hash)) {
+	// 	// log.Printf("===END bc Block: %v", hex.EncodeToString(block.Header.Hash))
+	// 	mi.mutex.Unlock()
+	// 	return
+	// }
+
+	// mi.sb.Push(hex.EncodeToString(block.Header.Hash))
+	// mi.mutex.Unlock()
+
+	// mi.UpdateTransactionPool(&block)
+
+	// // log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
+	// go mi.BroadcastNewBlock(&block)
+	// // Proof of Storage
+	// go mi.requestProofStorage(&block)
+
+	// sm := storage.StorageMgrInst("")
+	// sm.AddNewBlock(&block)
+}
+
 // Request Proof of Storage
 func (mi *Mining) requestProofStorage(b *blockchain.Block) {
 	// When a node receives a new block, it carries out Proof of Storage
@@ -469,6 +510,8 @@ func (mi *Mining) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/broadcastnewblock", mi.newBlockHandler)
 	m.HandleFunc("/broadcastransaction", mi.broadcastTrascationHandler)
 	// m.HandleFunc("/chaininfo", mi.chainInfoHandler)
+
+	m.HandleFunc("/broadcastnewbtcblock", mi.newBtcBlockHandler)
 }
 
 func MiningInst() *Mining {
