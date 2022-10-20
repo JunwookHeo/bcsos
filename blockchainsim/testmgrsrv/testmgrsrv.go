@@ -393,9 +393,6 @@ func (h *Handler) SimulateBtcBlockProc() {
 						break
 					}
 
-					log.Printf("Block : %v", b[:8])
-					h.bcsim.BroadcastBtcBlock(b)
-
 					if b == config.END_TEST {
 						//Stop generating access pattern proc
 						h.el.Notify("Stop")
@@ -406,6 +403,9 @@ func (h *Handler) SimulateBtcBlockProc() {
 						h.broadcastCommand(cmd)
 						log.Printf("sendiing stop")
 						break
+					} else {
+						log.Printf("Block : %v", b[:8])
+						h.bcsim.BroadcastBtcBlock(b)
 					}
 
 					time.Sleep(time.Second * 60)

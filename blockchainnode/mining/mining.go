@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/blockchainnode/storage"
+	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/datalib"
@@ -111,6 +112,35 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 	for _, node := range nodes {
 		if node.IP != "" {
 			mi.sendBlock(b, &node)
+			// log.Printf("Broadcast Transaction : %v", node)
+		}
+	}
+}
+
+func (mi *Mining) sendBtcBlock(b string, node *dtype.NodeInfo) {
+	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", node.IP, node.Port)
+	// log.Printf("Send new btc block with local info : %v", url)
+
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		log.Printf("BroadcasNewBlock error : %v", err)
+		return
+	}
+	defer ws.Close()
+
+	if err := ws.WriteJSON(b); err != nil {
+		log.Printf("Write json error : %v", err)
+		return
+	}
+}
+
+func (mi *Mining) BroadcastNewBtcBlock(b string) {
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
+	nm := network.NodeMgrInst()
+	nm.GetSCNNodeListAll(&nodes)
+	for _, node := range nodes {
+		if node.IP != "" {
+			mi.sendBtcBlock(b, &node)
 			// log.Printf("Broadcast Transaction : %v", node)
 		}
 	}
@@ -302,32 +332,33 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	var block string
-	if err := ws.ReadJSON(&block); err != nil {
+	var buf string
+	if err := ws.ReadJSON(&buf); err != nil {
 		log.Printf("Read json error : %v", err)
 	}
 
-	log.Printf("Received New BTC Block : %v", block[:20])
+	block := bitcoin.NewBlock()
+	rb := bitcoin.NewRawBlock(buf)
+	block.SetHash(rb.GetRawBytes(0, 80))
+	hash := block.GetHashString()
 
-	// mi.mutex.Lock()
-	// if mi.sb.Find(hex.EncodeToString(block.Header.Hash)) {
-	// 	// log.Printf("===END bc Block: %v", hex.EncodeToString(block.Header.Hash))
-	// 	mi.mutex.Unlock()
-	// 	return
-	// }
+	mi.mutex.Lock()
+	if mi.sb.Find(hash) {
+		// log.Printf("===END bc Block: %v", hex.EncodeToString(block.Header.Hash))
+		mi.mutex.Unlock()
+		return
+	}
 
-	// mi.sb.Push(hex.EncodeToString(block.Header.Hash))
-	// mi.mutex.Unlock()
+	mi.sb.Push(hash)
+	mi.mutex.Unlock()
 
-	// mi.UpdateTransactionPool(&block)
-
-	// // log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
-	// go mi.BroadcastNewBlock(&block)
+	log.Printf("Received New BTC Block : %v", hash)
+	go mi.BroadcastNewBtcBlock(buf)
 	// // Proof of Storage
 	// go mi.requestProofStorage(&block)
 
-	// sm := storage.StorageMgrInst("")
-	// sm.AddNewBlock(&block)
+	sm := storage.StorageMgrInst("")
+	sm.AddNewBtcBlock(buf, hash)
 }
 
 // Request Proof of Storage
