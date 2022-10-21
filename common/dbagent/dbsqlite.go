@@ -21,7 +21,7 @@ import (
 
 type dbagent struct {
 	db       *sql.DB
-	SClass   int
+	sclass   int
 	dbstatus DBStatus
 	mutex    sync.Mutex
 }
@@ -95,7 +95,7 @@ func (a *dbagent) updateACTimeObject(hash string) bool {
 	defer st.Close()
 
 	act := time.Now().UnixNano()
-	rst, err := st.Exec(act, a.SClass, hash)
+	rst, err := st.Exec(act, a.sclass, hash)
 	if err != nil {
 		log.Panicf("Update exec error id(%v): %v", hash, err)
 		return false
@@ -184,7 +184,7 @@ func (a *dbagent) GetBlockTransactionMatching(bh string, hashes *[]string) int {
 }
 
 func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) int64 {
-	obj := StorageBLTR{bh, index, th, time.Now().UnixNano(), a.SClass}
+	obj := StorageBLTR{bh, index, th, time.Now().UnixNano(), a.sclass}
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	st, err := a.db.Prepare("INSERT INTO blocktrtbl (blockhash, idx, transactionhash, actime, aflevel) VALUES (?, ?, ?, ?, ?)")
@@ -208,7 +208,7 @@ func (a *dbagent) AddBlockTransactionMatching(bh string, index int, th string) i
 // DeleteNoAccedObjects will delete transaction if there is no access more than a hour
 func (a *dbagent) DeleteNoAccedObjects() {
 	//log.Printf("%v", config.TSC0I)
-	ts := time.Now().UnixNano() - int64(config.TSCX[a.SClass]*float32(1e9)) // no access for if one hour, delete it
+	ts := time.Now().UnixNano() - int64(config.TSCX[a.sclass]*float32(1e9)) // no access for if one hour, delete it
 	//rows, err := a.db.Query(`SELECT transactionhash FROM blocktrtbl WHERE actime >= ? AND actime < ?;`, a.latestts, ts)
 	rows, err := a.db.Query(`SELECT hash FROM bcobjects WHERE type != 'block' AND hash 
 								IN (SELECT transactionhash FROM blocktrtbl WHERE actime < ?) ;`, ts)
@@ -368,8 +368,13 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 	return id
 }
 
-func (a *dbagent) AddNewBlock(b *blockchain.Block) int64 {
+func (a *dbagent) AddNewBlock(block interface{}) int64 {
 	// TODO : Impliment encrypting a new block and stor it for Proof of Storage
+	b, ok := block.(*blockchain.Block)
+	if !ok {
+		log.Panicf("Type mismatch : %v", ok)
+		return -1
+	}
 
 	hash := hex.EncodeToString(b.Header.Hash)
 	obj := StorageObj{"block", hash, b.Header.Timestamp, b.Header.Height} // store height in data field.
@@ -795,7 +800,7 @@ func newDBSqlite(path string) DBAgent {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	dba := dbagent{db: db, SClass: local.SC, dbstatus: DBStatus{Timestamp: time.Now()}, mutex: sync.Mutex{}}
+	dba := dbagent{db: db, sclass: local.SC, dbstatus: DBStatus{Timestamp: time.Now()}, mutex: sync.Mutex{}}
 	dba.getLatestDBStatus(&dba.dbstatus)
 	go dba.updateDBStatus()
 	return &dba

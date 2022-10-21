@@ -376,7 +376,7 @@ func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 }
 
 func (h *StorageMgr) AddNewBtcBlock(b string, hash string) {
-	// TODO: Save block
+	h.db.AddNewBlock(b)
 }
 
 func (h *StorageMgr) GetHighestBlockHash() (int, string) {

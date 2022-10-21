@@ -24,7 +24,7 @@ type CandidateBlocks struct {
 }
 
 type SaveBlock interface {
-	AddNewBlock(b *blockchain.Block) int64
+	AddNewBlock(b interface{}) int64
 }
 
 func (q *CandidateBlocks) PushAndSave(block *blockchain.Block, sb SaveBlock) bool {

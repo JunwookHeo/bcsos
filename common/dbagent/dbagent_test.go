@@ -156,3 +156,27 @@ func TestDBAgentReplicatoin(t *testing.T) {
 
 // 	dba.ProofStorage2()
 // }
+
+func TestBtcDBAgent(t *testing.T) {
+	path := "../../blockchainnode/db_nodes/7001.db" + ".blocks"
+
+	err := os.RemoveAll(path)
+	if err != nil {
+		log.Printf(" : %v", err)
+		return
+	}
+
+	err = os.MkdirAll(path, 0777)
+	if err != nil {
+		log.Printf("MkdirAll %q: %s", path, err)
+	}
+}
+
+func TestBtcDBAgentEncrypt(t *testing.T) {
+	key, _ := hex.DecodeString("2c0111001f010100061a024b53535009181")
+	s, _ := hex.DecodeString("686974207468652062756c6c277320657965s")
+
+	d := encryptXorWithFixedLength(key, s)
+
+	log.Printf("%v", hex.EncodeToString(d))
+}

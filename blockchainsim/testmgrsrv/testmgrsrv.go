@@ -404,7 +404,7 @@ func (h *Handler) SimulateBtcBlockProc() {
 						log.Printf("sendiing stop")
 						break
 					} else {
-						log.Printf("Block : %v", b[:8])
+						log.Printf("Block(%v) : %v", len(b), b[:80])
 						h.bcsim.BroadcastBtcBlock(b)
 					}
 

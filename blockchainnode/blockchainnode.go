@@ -332,7 +332,8 @@ func main() {
 
 	sm.ObjectbyAccessPatternProc()
 	PeerListProc()
-	TransactionProc()
+	// No need for BTC PoS
+	// TransactionProc()
 	EndTestProc()
 
 	local := ni.GetLocalddr()
