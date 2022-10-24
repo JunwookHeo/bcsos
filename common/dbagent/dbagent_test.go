@@ -171,12 +171,3 @@ func TestBtcDBAgent(t *testing.T) {
 		log.Printf("MkdirAll %q: %s", path, err)
 	}
 }
-
-func TestBtcDBAgentEncrypt(t *testing.T) {
-	key, _ := hex.DecodeString("2c0111001f010100061a024b53535009181")
-	s, _ := hex.DecodeString("686974207468652062756c6c277320657965s")
-
-	d := encryptXorWithFixedLength(key, s)
-
-	log.Printf("%v", hex.EncodeToString(d))
-}

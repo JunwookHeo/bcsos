@@ -151,7 +151,7 @@ func (a *btcdbagent) getHashforXorKey(key []byte, ls int) string {
 	return a.getHashString(d)
 }
 
-func (a *btcdbagent) AddNewBlock(ib interface{}) int {
+func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 	sb, ok := ib.(string)
 	if !ok {
 		log.Panicf("Type mismatch : %v", ok)
@@ -180,7 +180,7 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int {
 		return -1
 	}
 
-	return a.lastblock.height
+	return int64(a.lastblock.height)
 }
 
 func (a *btcdbagent) initLastBlock() {
