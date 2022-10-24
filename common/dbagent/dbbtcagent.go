@@ -1,6 +1,7 @@
 package dbagent
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"io/ioutil"
@@ -13,14 +14,24 @@ import (
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/wallet"
 )
 
+type lastBlock struct {
+	height  int
+	hash    string // hash of plain data
+	hashenc string // hash of encrypted data
+	hashkey string // hash of key data used when enctypting the next block
+	key     []byte // Key to encrypt the next block
+}
+
 type btcdbagent struct {
-	db       *sql.DB
-	sclass   int
-	dbstatus DBStatus
-	dirpath  string
-	mutex    sync.Mutex
+	db        *sql.DB
+	sclass    int
+	dbstatus  DBStatus
+	dirpath   string
+	lastblock lastBlock
+	mutex     sync.Mutex
 }
 
 func (a *btcdbagent) getLatestDBStatus(status *DBStatus) bool {
@@ -66,31 +77,81 @@ func (a *btcdbagent) GetTransaction(hash string, t *blockchain.Transaction) int6
 	return -1
 }
 
-func encryptXorWithFixedLength(key, s []byte) []byte {
-	if len(key) < len(s) {
-		d := make([]byte, len(s))
-		m := len(key)
-		for i := 0; i < len(s); i++ {
-			d[i] = key[i%m] ^ s[i]
-		}
-		return d
-	} else if len(key) > len(s) {
-		d := make([]byte, len(key))
-		m := len(s)
-		for i := 0; i < len(key); i++ {
-			d[i] = key[i] ^ s[i%m]
-		}
-		return d
-	} else {
-		d := make([]byte, len(s))
-		for i := 0; i < len(s); i++ {
-			d[i] = key[i] ^ s[i]
-		}
-		return d
-	}
+func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
+	w := wallet.NewWallet("")
+	return w.GetAddress()
 }
 
-func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
+func (a *btcdbagent) getHashString(buf []byte) string {
+	hash := sha256.Sum256(buf)
+	hash = sha256.Sum256(hash[:])
+	return hex.EncodeToString(hash[:])
+}
+
+func (a *btcdbagent) encryptXorWithVariableLength(key, s []byte) (string, []byte) {
+	lk := len(key)
+	ls := len(s)
+	d := make([]byte, ls)
+
+	if lk < ls {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i%lk] ^ s[i]
+		}
+	} else if lk > ls {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i] ^ s[i]
+		}
+	} else {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i] ^ s[i]
+		}
+	}
+	return a.getHashString(d), d
+}
+
+func (a *btcdbagent) decryptXorWithVariableLength(key, s []byte) []byte {
+	lk := len(key)
+	ls := len(s)
+	d := make([]byte, ls)
+
+	if lk < ls {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i%lk] ^ s[i]
+		}
+	} else if lk > ls {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i] ^ s[i]
+		}
+	} else {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i] ^ s[i]
+		}
+	}
+	return d
+}
+
+func (a *btcdbagent) getHashforXorKey(key []byte, ls int) string {
+	lk := len(key)
+	d := make([]byte, ls)
+
+	if lk < ls {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i%lk]
+		}
+	} else if lk > ls {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i]
+		}
+	} else {
+		for i := 0; i < ls; i++ {
+			d[i] = key[i]
+		}
+	}
+
+	return a.getHashString(d)
+}
+
+func (a *btcdbagent) AddNewBlock(ib interface{}) int {
 	sb, ok := ib.(string)
 	if !ok {
 		log.Panicf("Type mismatch : %v", ok)
@@ -101,27 +162,32 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 	rb := bitcoin.NewRawBlock(sb)
 	block.SetHash(rb.GetRawBytes(0, 80))
 	hash := block.GetHashString()
+	s := rb.GetBlockBytes()
+	a.lastblock.hashkey = a.getHashforXorKey(a.lastblock.key, len(s))
+	// Todo update lastblock to DB
 
-	// TODO : Encryptions
+	// Enctypting a new block
+	hashenc, encblock := a.encryptXorWithVariableLength(a.lastblock.key, s)
+	a.lastblock.hash = hash
+	a.lastblock.height += 1
+	a.lastblock.hashenc = hashenc
+	a.lastblock.hashkey = "" // You don't know hashkey at this point
+	a.lastblock.key = encblock
 
-	buf, err := hex.DecodeString(sb)
-	if err != nil {
-		log.Panicf("Decoding string block err : %v", err)
-	}
-
-	err = ioutil.WriteFile(filepath.Join(a.dirpath, hash), buf, 0777)
+	err := ioutil.WriteFile(filepath.Join(a.dirpath, hash), encblock, 0777)
 	if err != nil {
 		log.Panicf("Wrinting block err : %v", err)
+		return -1
 	}
 
-	buf2, err := ioutil.ReadFile(filepath.Join(a.dirpath, hash))
-	if err != nil {
-		log.Panicf("Wrinting block err : %v", err)
-	}
-	sb2 := hex.EncodeToString(buf2)
-	log.Printf("encode(%v) : %v", len(sb2), sb2[:80])
+	return a.lastblock.height
+}
 
-	return -1
+func (a *btcdbagent) initLastBlock() {
+	a.lastblock.key = a.getEncryptKeyforGenesis()
+	a.lastblock.hash = a.getHashString(a.lastblock.key)
+	a.lastblock.hashenc = a.lastblock.hash // First block does not need to be encrypted
+	a.lastblock.hashkey = ""               // At this point, you don't know hashkey.
 }
 
 func (a *btcdbagent) GetBlock(hash string, b *blockchain.Block) int64 {
@@ -176,7 +242,8 @@ func newDBBtcSqlite(path string) DBAgent {
 		id      	INTEGER  PRIMARY KEY AUTOINCREMENT,
 		height		INTEGER,
 		hash    	TEXT,
-		enchash		TEXT
+		enchash		TEXT,
+		enchashc	TEXT
 	);`
 
 	st, err := db.Prepare(create_objtlb)
@@ -220,9 +287,11 @@ func newDBBtcSqlite(path string) DBAgent {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: DBStatus{Timestamp: time.Now()}, dirpath: "", mutex: sync.Mutex{}}
+	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: DBStatus{Timestamp: time.Now()}, dirpath: "", lastblock: lastBlock{}, mutex: sync.Mutex{}}
 	dba.getLatestDBStatus(&dba.dbstatus)
 	go dba.updateDBStatus()
+
+	dba.initLastBlock()
 
 	dba.dirpath = path + ".blocks"
 	err = os.RemoveAll(dba.dirpath)

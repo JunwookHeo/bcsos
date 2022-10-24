@@ -21,6 +21,10 @@ func NewRawBlock(raw string) *RawBlock {
 	return &RawBlock{rawBuf: rawb, pos: 0}
 }
 
+func (rb *RawBlock) GetBlockBytes() []byte {
+	return rb.rawBuf
+}
+
 func (rb *RawBlock) ReadBytes(len uint32) []byte {
 	buf := make([]byte, len)
 	err := binary.Read(bytes.NewBuffer(rb.rawBuf[rb.pos:]), binary.LittleEndian, &buf)
