@@ -2,10 +2,13 @@ package dbagent
 
 import (
 	"encoding/hex"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/stretchr/testify/assert"
@@ -159,15 +162,34 @@ func TestDBAgentReplicatoin(t *testing.T) {
 
 func TestBtcDBAgent(t *testing.T) {
 	path := "../../blockchainnode/db_nodes/7001.db" + ".blocks"
-
-	err := os.RemoveAll(path)
+	fenc2 := "0000000000000000000027895a1788f2339b84a4f365c0accb95be3d406726fb"
+	enc2, err := ioutil.ReadFile(filepath.Join(path, fenc2))
 	if err != nil {
-		log.Printf(" : %v", err)
+		log.Panicf("Read 2 block err : %v", err)
+		return
+	}
+	fenc1 := "00000000000000000005a72e37590b534da3667ae2da19979e28a1229ebf94f0"
+	enc1, err := ioutil.ReadFile(filepath.Join(path, fenc1))
+	if err != nil {
+		log.Panicf("Read 2 block err : %v", err)
 		return
 	}
 
-	err = os.MkdirAll(path, 0777)
-	if err != nil {
-		log.Printf("MkdirAll %q: %s", path, err)
-	}
+	sb := hex.EncodeToString(DecryptXorWithVariableLength(enc1, enc2))
+	block := bitcoin.NewBlock()
+	rb := bitcoin.NewRawBlock(sb)
+
+	block.Header.Version = rb.ReadUint32()
+	block.Header.PreHash = rb.ReverseBuf(rb.ReadBytes(32))
+	block.Header.MerkelRoot = rb.ReverseBuf(rb.ReadBytes(32))
+	block.Header.Timestamp = rb.ReadUint32()
+	block.Header.Difficulty = rb.ReadUint32()
+	block.Header.Nonce = rb.ReadUint32()
+	log.Printf("Header : %x", block.Header)
+	block.SetHash(rb.GetRawBytes(0, 80))
+	log.Printf("Hash : %v", block.GetHashString())
+
+	txcount := rb.ReadVariant()
+	log.Printf("Tx Count : %d", txcount)
+
 }

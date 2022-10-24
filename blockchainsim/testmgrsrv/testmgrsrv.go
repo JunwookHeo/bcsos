@@ -21,6 +21,7 @@ import (
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/listener"
+	"github.com/junwookheo/bcsos/common/wallet"
 )
 
 var upgrader = websocket.Upgrader{
@@ -419,6 +420,7 @@ func (h *Handler) SimulateBtcBlockProc() {
 }
 
 func NewHandler(mode string, path string) *Handler {
+	w := wallet.NewWallet(config.WALLET_PATH)
 	m := mux.NewRouter()
 	h := &Handler{
 		Handler: m,
@@ -445,7 +447,7 @@ func NewHandler(mode string, path string) *Handler {
 
 	h.el = listener.EventListenerInst()
 
-	h.bcsim = simulation.NewSimAgent(h.db, &h.Nodes)
+	h.bcsim = simulation.NewSimAgent(w, h.db, &h.Nodes)
 	h.TC = NewTestConfig(h.db, &h.Nodes)
 
 	// BITCOIN NOT USE

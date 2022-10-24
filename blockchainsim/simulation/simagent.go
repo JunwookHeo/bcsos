@@ -23,9 +23,11 @@ type Handler struct {
 	Nodes *map[string]dtype.NodeInfo
 }
 
-const WALLET_PATH = "./bc_sim.wallet"
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
 const PATH_BTC_BLOCK = "../blocks.json"
+
+func init() {
+}
 
 // getObjectQuery queries a transaction ot other nodes with highr Storage Class
 // Request : hash of transaction
@@ -246,8 +248,8 @@ func (h *Handler) BroadcastBtcBlock(b string) {
 	}
 }
 
-func NewSimAgent(db dbagent.DBAgent, nodes *map[string]dtype.NodeInfo) *Handler {
-	h := Handler{wallet.NewWallet(WALLET_PATH), db, false, nodes}
+func NewSimAgent(w *wallet.Wallet, db dbagent.DBAgent, nodes *map[string]dtype.NodeInfo) *Handler {
+	h := Handler{w, db, false, nodes}
 	log.Printf("start : %v", nodes)
 	return &h
 }

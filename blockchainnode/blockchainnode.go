@@ -50,6 +50,9 @@ var (
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+
+	config.DB_PATH = db_path
+	config.WALLET_PATH = wallet_path
 }
 
 // GetFreePort asks the kernel for a free open port that is ready to use.
@@ -92,13 +95,13 @@ func initNode() {
 		}
 	}
 
-	db_path = fmt.Sprintf("./db_nodes/%v.db", port)
-	wallet_path = fmt.Sprintf("./db_nodes/%v.wallet", port)
+	config.DB_PATH = fmt.Sprintf("./db_nodes/%v.db", port)
+	config.WALLET_PATH = fmt.Sprintf("./db_nodes/%v.wallet", port)
 
 	// init wallet Manager
-	wm = mining.WalletMgrInst(wallet_path)
+	wm = mining.WalletMgrInst(config.WALLET_PATH)
 	w := wm.GetWallet()
-	//w := wallet.NewWallet(wallet_path)
+	//w := wallet.NewWallet(config.WALLET_PATH)
 
 	// hash := hex.EncodeToString(w.GetAddress()[:])
 	// Hash of Bitcoin address is used for content-addressing
@@ -319,7 +322,7 @@ func main() {
 
 	m := mux.NewRouter()
 	initNode()
-	sm = storage.StorageMgrInst(db_path)
+	sm = storage.StorageMgrInst(config.DB_PATH)
 	mi = mining.MiningInst()
 
 	m.Handle("/", http.FileServer(http.Dir("static")))

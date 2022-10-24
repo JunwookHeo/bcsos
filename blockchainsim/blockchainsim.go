@@ -10,13 +10,18 @@ import (
 
 	"github.com/grandcat/zeroconf"
 	"github.com/junwookheo/bcsos/blockchainsim/testmgrsrv"
+	"github.com/junwookheo/bcsos/common/config"
 )
 
 const DB_PATH = "./bc_sim.db"
+const WALLET_PATH = "./bc_sim.wallet"
+
 const PORT = 8080
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+	config.DB_PATH = DB_PATH
+	config.WALLET_PATH = WALLET_PATH
 }
 
 func flagParse() (string, string) {
@@ -69,7 +74,7 @@ func main() {
 	defer signal.Reset()
 
 	mode, ip := flagParse()
-	s := testmgrsrv.NewHandler(mode, DB_PATH)
+	s := testmgrsrv.NewHandler(mode, config.DB_PATH)
 	go s.StartService(PORT)
 	//go bcdummy.Start()
 

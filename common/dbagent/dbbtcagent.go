@@ -14,15 +14,16 @@ import (
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/wallet"
 )
 
 type lastBlock struct {
-	height  int
-	hash    string // hash of plain data
-	hashenc string // hash of encrypted data
-	hashkey string // hash of key data used when enctypting the next block
-	key     []byte // Key to encrypt the next block
+	height   int
+	hash     string // hash of plain data
+	hashenc  string // hash of encrypted data
+	hashkey  string // hash of key data of the previous encrypted block used when enctypting
+	encblock []byte // encrypted block to encrypt the next block
 }
 
 type btcdbagent struct {
@@ -78,7 +79,7 @@ func (a *btcdbagent) GetTransaction(hash string, t *blockchain.Transaction) int6
 }
 
 func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
-	w := wallet.NewWallet("")
+	w := wallet.NewWallet(config.WALLET_PATH)
 	return w.GetAddress()
 }
 
@@ -109,7 +110,8 @@ func (a *btcdbagent) encryptXorWithVariableLength(key, s []byte) (string, []byte
 	return a.getHashString(d), d
 }
 
-func (a *btcdbagent) decryptXorWithVariableLength(key, s []byte) []byte {
+// func (a *btcdbagent) decryptXorWithVariableLength(key, s []byte) []byte {
+func DecryptXorWithVariableLength(key, s []byte) []byte {
 	lk := len(key)
 	ls := len(s)
 	d := make([]byte, ls)
@@ -163,16 +165,17 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 	block.SetHash(rb.GetRawBytes(0, 80))
 	hash := block.GetHashString()
 	s := rb.GetBlockBytes()
-	a.lastblock.hashkey = a.getHashforXorKey(a.lastblock.key, len(s))
-	// Todo update lastblock to DB
 
 	// Enctypting a new block
-	hashenc, encblock := a.encryptXorWithVariableLength(a.lastblock.key, s)
+	key := a.lastblock.encblock
+	hashenc, encblock := a.encryptXorWithVariableLength(key, s)
 	a.lastblock.hash = hash
 	a.lastblock.height += 1
 	a.lastblock.hashenc = hashenc
-	a.lastblock.hashkey = "" // You don't know hashkey at this point
-	a.lastblock.key = encblock
+	a.lastblock.encblock = encblock
+	a.lastblock.hashkey = a.getHashforXorKey(key, len(s))
+
+	// Todo update lastblock to DB
 
 	err := ioutil.WriteFile(filepath.Join(a.dirpath, hash), encblock, 0777)
 	if err != nil {
@@ -184,10 +187,12 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 }
 
 func (a *btcdbagent) initLastBlock() {
-	a.lastblock.key = a.getEncryptKeyforGenesis()
-	a.lastblock.hash = a.getHashString(a.lastblock.key)
-	a.lastblock.hashenc = a.lastblock.hash // First block does not need to be encrypted
-	a.lastblock.hashkey = ""               // At this point, you don't know hashkey.
+	a.lastblock.encblock = a.getEncryptKeyforGenesis()
+	a.lastblock.hash = a.getHashString(a.lastblock.encblock)
+	a.lastblock.hashenc = a.lastblock.hash // Thsi block does not need to be encrypted
+	a.lastblock.hashkey = ""               // There is no key
+
+	// TODO : Add to it to db
 }
 
 func (a *btcdbagent) GetBlock(hash string, b *blockchain.Block) int64 {
