@@ -106,7 +106,7 @@ func (a *dbagent) updateACTimeObject(hash string) bool {
 	return cnt > 0
 }
 
-func (a *dbagent) GetObject(obj *StorageObj) int64 {
+func (a *dbagent) getObject(obj *StorageObj) int64 {
 	var data []byte
 	var id int64 = 0
 	switch err := a.db.QueryRow("SELECT id, type, hash, timestamp, data FROM bcobjects WHERE hash=?",
@@ -126,7 +126,7 @@ func (a *dbagent) GetObject(obj *StorageObj) int64 {
 }
 
 func (a *dbagent) AddObject(obj *StorageObj) int64 {
-	if id := a.GetObject(obj); id != 0 {
+	if id := a.getObject(obj); id != 0 {
 		// log.Printf("Replicatoin exists : %v - %v", id, obj)
 		return id
 	}
@@ -314,7 +314,7 @@ func (a *dbagent) GetTransactionwithExponential(num int, hashes *[]RemoverbleObj
 
 func (a *dbagent) GetBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
 	obj := StorageObj{"blockheader", hash, h.Timestamp, h}
-	return a.GetObject(&obj)
+	return a.getObject(&obj)
 }
 
 func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
@@ -327,7 +327,7 @@ func (a *dbagent) AddBlockHeader(hash string, h *blockchain.BlockHeader) int64 {
 
 func (a *dbagent) GetTransaction(hash string, t *blockchain.Transaction) int64 {
 	obj := StorageObj{"transaction", hash, t.Timestamp, t}
-	return a.GetObject(&obj)
+	return a.getObject(&obj)
 }
 
 func (a *dbagent) AddTransaction(t *blockchain.Transaction) int64 {
@@ -345,7 +345,7 @@ func (a *dbagent) GetBlock(hash string, b *blockchain.Block) int64 {
 
 	obj := StorageObj{}
 	obj.Type, obj.Hash = "block", hash
-	id := a.GetObject(&obj)
+	id := a.getObject(&obj)
 	if id == 0 {
 		log.Printf("Not found block : %v", hash)
 		return 0
@@ -378,7 +378,7 @@ func (a *dbagent) AddNewBlock(block interface{}) int64 {
 
 	hash := hex.EncodeToString(b.Header.Hash)
 	obj := StorageObj{"block", hash, b.Header.Timestamp, b.Header.Height} // store height in data field.
-	if id := a.GetObject(&obj); id != 0 {
+	if id := a.getObject(&obj); id != 0 {
 		log.Printf("Replicatoin exists : %v - %v", id, hex.EncodeToString(b.Header.Hash))
 		return id
 	}
@@ -774,7 +774,7 @@ func newDBSqlite(path string) DBAgent {
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
 		timestamp			DATETIME,
 		totalblocks			INTEGER,
-		totaltransactions 	INTERGER,
+		totaltransactions 	INTEGER,
 		headers				INTEGER,
 		blocks 				INTEGER,
 		transactions    	INTEGER,

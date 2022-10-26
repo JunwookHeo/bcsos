@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
+	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/datalib"
@@ -364,7 +365,7 @@ func (h *Handler) SimulateBtcBlockProc() {
 	command := make(chan string)
 	h.el.AddListener(command)
 
-	msg := make(chan string)
+	msg := make(chan bitcoin.BlockPkt)
 	h.bcsim.SimulateBtcBlock(msg)
 
 	go func(command <-chan string) {
@@ -393,8 +394,9 @@ func (h *Handler) SimulateBtcBlockProc() {
 						log.Println("Channle closed")
 						break
 					}
+					b.Timestamp = time.Now().UnixNano()
 
-					if b == config.END_TEST {
+					if b.Block == config.END_TEST {
 						//Stop generating access pattern proc
 						h.el.Notify("Stop")
 						// Sleep for a while for client nodes
@@ -405,8 +407,8 @@ func (h *Handler) SimulateBtcBlockProc() {
 						log.Printf("sendiing stop")
 						break
 					} else {
-						log.Printf("Block(%v) : %v", len(b), b[:80])
-						h.bcsim.BroadcastBtcBlock(b)
+						log.Printf("Block(%v) : %v", len(b.Block), b.Block[:80])
+						h.bcsim.BroadcastBtcBlock(&b)
 					}
 
 					time.Sleep(time.Second * 60)

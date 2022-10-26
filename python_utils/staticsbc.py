@@ -161,7 +161,7 @@ def get_blocks_from_height():
     outfile = 'blocks.json'
     height = 756450
     with open(outfile, "w") as fo:
-        for h in range(height, height + 2):
+        for h in range(height, height + 10):
             api_url = f'https://api.blockchair.com/bitcoin/raw/block/{h}'
             response = requests.get(api_url)
             res = response.json()

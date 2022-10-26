@@ -3,9 +3,11 @@ package simulation
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/config"
@@ -150,7 +152,7 @@ func TestLoadBlockFromJson(t *testing.T) {
 }
 
 func TestLoadBtcData(t *testing.T) {
-	msg := make(chan string)
+	msg := make(chan bitcoin.BlockPkt)
 
 	go LoadBtcData(PATH_TEST, msg)
 
@@ -162,17 +164,17 @@ func TestLoadBtcData(t *testing.T) {
 			break
 		}
 
-		log.Printf("Block : %v", d[:8])
-
 		if i > 0 {
 			close(msg)
 			return
 		}
 		i += 1
 
-		if d == config.END_TEST {
+		if d.Block == config.END_TEST {
 			break
 		}
+
+		log.Printf("Block : %v", d.Block[:8])
 	}
 	close(msg)
 }
@@ -183,4 +185,14 @@ func TestDBAgent(t *testing.T) {
 	dba.GetLatestBlockHash()
 	status := dba.GetDBStatus()
 	log.Printf("DB Status : %v", status)
+}
+
+func TestDBAgentTime(t *testing.T) {
+	ts := time.Now()
+	ts1 := time.Now().UnixNano()
+	ts2 := time.Unix(ts1/1000000000, ts1%1000000000)
+
+	fmt.Println(ts.String())
+	fmt.Println(ts2.String())
+	fmt.Println("yyyy-mm-dd HH:mm:ss: ", ts2.Format("2006-01-02 15:04:05.000000"))
 }

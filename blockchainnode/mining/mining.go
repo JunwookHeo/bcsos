@@ -117,7 +117,7 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 	}
 }
 
-func (mi *Mining) sendBtcBlock(b string, node *dtype.NodeInfo) {
+func (mi *Mining) sendBtcBlock(b *bitcoin.BlockPkt, node *dtype.NodeInfo) {
 	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", node.IP, node.Port)
 	// log.Printf("Send new btc block with local info : %v", url)
 
@@ -134,7 +134,7 @@ func (mi *Mining) sendBtcBlock(b string, node *dtype.NodeInfo) {
 	}
 }
 
-func (mi *Mining) BroadcastNewBtcBlock(b string) {
+func (mi *Mining) BroadcastNewBtcBlock(b *bitcoin.BlockPkt) {
 	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
 	nm := network.NodeMgrInst()
 	nm.GetSCNNodeListAll(&nodes)
@@ -332,13 +332,13 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	var buf string
+	var buf bitcoin.BlockPkt
 	if err := ws.ReadJSON(&buf); err != nil {
 		log.Printf("Read json error : %v", err)
 	}
 
 	block := bitcoin.NewBlock()
-	rb := bitcoin.NewRawBlock(buf)
+	rb := bitcoin.NewRawBlock(buf.Block)
 	block.SetHash(rb.GetRawBytes(0, 80))
 	hash := block.GetHashString()
 
@@ -353,12 +353,12 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 	mi.mutex.Unlock()
 
 	log.Printf("Received New BTC Block : %v", hash)
-	go mi.BroadcastNewBtcBlock(buf)
+	go mi.BroadcastNewBtcBlock(&buf)
 	// // Proof of Storage
 	// go mi.requestProofStorage(&block)
 
 	sm := storage.StorageMgrInst("")
-	sm.AddNewBtcBlock(buf, hash)
+	sm.AddNewBtcBlock(&buf, hash)
 }
 
 // Request Proof of Storage

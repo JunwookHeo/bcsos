@@ -6,14 +6,15 @@ import (
 	"log"
 	"os"
 
+	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/config"
 )
 
-func LoadBtcData(path string, msg chan string) {
+func LoadBtcData(path string, msg chan bitcoin.BlockPkt) {
 	file, err := os.Open(path)
 	if err != nil {
 		log.Printf("Load Raw data from file error : %v", err)
-		msg <- config.END_TEST
+		msg <- bitcoin.BlockPkt{Timestamp: 0, Block: config.END_TEST}
 		return
 	}
 
@@ -36,25 +37,25 @@ func LoadBtcData(path string, msg chan string) {
 			err := json.Unmarshal([]byte(scanner.Text()), &rec)
 			if err != nil {
 				log.Panicln(err)
-				msg <- config.END_TEST
+				msg <- bitcoin.BlockPkt{Timestamp: 0, Block: config.END_TEST}
 			}
 
 			// var b map[string]interface{}
 			b, ok := rec["data"].(map[string]interface{})
 			if !ok {
 				log.Panicln("Read block type error")
-				msg <- config.END_TEST
+				msg <- bitcoin.BlockPkt{Timestamp: 0, Block: config.END_TEST}
 			}
 
 			for key := range b {
 				raw := b[key].(map[string]interface{})["raw_block"].(string)
-				msg <- raw
+				msg <- bitcoin.BlockPkt{Timestamp: 0, Block: raw}
 			}
 			log.Printf("Num blocks : %v", i)
 			i++
 		}
 	}
 
-	msg <- config.END_TEST
+	msg <- bitcoin.BlockPkt{Timestamp: 0, Block: config.END_TEST}
 	log.Println("LoadBtcData End")
 }

@@ -5,6 +5,11 @@ import (
 	"encoding/hex"
 )
 
+type BlockPkt struct {
+	Timestamp int64
+	Block     string
+}
+
 type BlockHeader struct {
 	Version    uint32
 	PreHash    []byte

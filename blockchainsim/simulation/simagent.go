@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
@@ -199,11 +200,11 @@ func (h *Handler) SimulateTransaction(id int) *blockchain.Transaction {
 	return tr
 }
 
-func (h *Handler) SimulateBtcBlock(msg chan string) {
+func (h *Handler) SimulateBtcBlock(msg chan bitcoin.BlockPkt) {
 	go LoadBtcData(PATH_BTC_BLOCK, msg)
 }
 
-func (h *Handler) sendNewBtcBlock(b string, ip string, port int) bool {
+func (h *Handler) sendNewBtcBlock(b *bitcoin.BlockPkt, ip string, port int) bool {
 	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", ip, port)
 	// log.Printf("Send new BTC block to %v", url)
 
@@ -223,7 +224,7 @@ func (h *Handler) sendNewBtcBlock(b string, ip string, port int) bool {
 	return true
 }
 
-func (h *Handler) broadcastNewBtcBlock(b string) bool {
+func (h *Handler) broadcastNewBtcBlock(b *bitcoin.BlockPkt) bool {
 	num := len(*h.Nodes)
 	if num == 0 {
 		return true
@@ -240,7 +241,7 @@ func (h *Handler) broadcastNewBtcBlock(b string) bool {
 	return false
 }
 
-func (h *Handler) BroadcastBtcBlock(b string) {
+func (h *Handler) BroadcastBtcBlock(b *bitcoin.BlockPkt) {
 	for {
 		if h.broadcastNewBtcBlock(b) {
 			break
