@@ -10,6 +10,7 @@ import (
 
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/cipher"
 	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/stretchr/testify/assert"
 )
@@ -162,20 +163,22 @@ func TestDBAgentReplicatoin(t *testing.T) {
 
 func TestBtcDBAgent(t *testing.T) {
 	path := "../../blockchainnode/db_nodes/7001.db" + ".blocks"
-	fenc2 := "0000000000000000000027895a1788f2339b84a4f365c0accb95be3d406726fb"
-	enc2, err := ioutil.ReadFile(filepath.Join(path, fenc2))
+	// b2 := "0000000000000000000027895a1788f2339b84a4f365c0accb95be3d406726fb"
+	b2 := "00000000000000000000f9e395753e490f29a1213fdfbe89314691a0d268c1d4"
+	encb2, err := ioutil.ReadFile(filepath.Join(path, b2))
 	if err != nil {
 		log.Panicf("Read 2 block err : %v", err)
 		return
 	}
-	fenc1 := "00000000000000000005a72e37590b534da3667ae2da19979e28a1229ebf94f0"
-	enc1, err := ioutil.ReadFile(filepath.Join(path, fenc1))
+	// b1 := "00000000000000000005a72e37590b534da3667ae2da19979e28a1229ebf94f0"
+	b1 := "00000000000000000006d8469efdd8b316d0a52c6bc7c2248baddfa6780900ff"
+	encb1, err := ioutil.ReadFile(filepath.Join(path, b1))
 	if err != nil {
 		log.Panicf("Read 2 block err : %v", err)
 		return
 	}
 
-	sb := hex.EncodeToString(DecryptXorWithVariableLength(enc1, enc2))
+	sb := hex.EncodeToString(cipher.DecryptXorWithVariableLength(encb1, encb2))
 	block := bitcoin.NewBlock()
 	rb := bitcoin.NewRawBlock(sb)
 

@@ -40,10 +40,18 @@ def thresholdProbability(t):
     print('P : %f, T : %f' %(P_A, t))
     return P_A
 
-fa = [1, 2, 3, 4]
-for i in fa:
-    thresholdProbability(6.931471806 * i)
+# fa = [1, 2, 3, 4]
+# for i in fa:
+#     thresholdProbability(6.931471806 * i)
 
 # ns = [1, 2, 4, 8, 16]
 # for i in ns:
 #     print(i, pa(0.5, i)*100)
+
+
+def gcm(num):
+    for i in range(1, int(num/2)+1):
+        if num % i == 0:
+            print(i)
+
+gcm(196606)

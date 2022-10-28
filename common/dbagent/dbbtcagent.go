@@ -14,6 +14,7 @@ import (
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/cipher"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/junwookheo/bcsos/common/wallet"
@@ -120,31 +121,34 @@ func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
 	return w.GetAddress()
 }
 
-func (a *btcdbagent) getHashString(buf []byte) string {
-	hash := sha256.Sum256(buf)
-	hash = sha256.Sum256(hash[:])
-	return hex.EncodeToString(hash[:])
-}
+// func (a *btcdbagent) getHashString(buf []byte) string {
+// 	hash := sha256.Sum256(buf)
+// 	hash = sha256.Sum256(hash[:])
+// 	return hex.EncodeToString(hash[:])
+// }
 
 func (a *btcdbagent) encryptXorWithVariableLength(key, s []byte) (string, []byte) {
 	start := time.Now().UnixNano()
-	lk := len(key)
-	ls := len(s)
-	d := make([]byte, ls)
 
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i%lk] ^ s[i]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	}
+	// lk := len(key)
+	// ls := len(s)
+	// d := make([]byte, ls)
+
+	hash, d := cipher.EncryptXorWithVariableLength(key, s)
+
+	// if lk < ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i%lk] ^ s[i]
+	// 	}
+	// } else if lk > ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i] ^ s[i]
+	// 	}
+	// } else {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i] ^ s[i]
+	// 	}
+	// }
 	gap := int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -153,29 +157,29 @@ func (a *btcdbagent) encryptXorWithVariableLength(key, s []byte) (string, []byte
 		status.TimeEncryptAcc += gap
 	}
 
-	return a.getHashString(d), d
+	return hash, d
 }
 
 func (a *btcdbagent) decryptXorWithVariableLength(key, s []byte) []byte {
-	// func DecryptXorWithVariableLength(key, s []byte) []byte {
 	start := time.Now().UnixNano()
-	lk := len(key)
-	ls := len(s)
-	d := make([]byte, ls)
+	d := cipher.DecryptXorWithVariableLength(key, s)
+	// lk := len(key)
+	// ls := len(s)
+	// d := make([]byte, ls)
 
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i%lk] ^ s[i]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	}
+	// if lk < ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i%lk] ^ s[i]
+	// 	}
+	// } else if lk > ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i] ^ s[i]
+	// 	}
+	// } else {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i] ^ s[i]
+	// 	}
+	// }
 
 	gap := int(time.Now().UnixNano() - start)
 	{
@@ -189,24 +193,25 @@ func (a *btcdbagent) decryptXorWithVariableLength(key, s []byte) []byte {
 }
 
 func (a *btcdbagent) getHashforXorKey(key []byte, ls int) string {
-	lk := len(key)
-	d := make([]byte, ls)
+	return cipher.GetHashforXorKey(key, ls)
+	// lk := len(key)
+	// d := make([]byte, ls)
 
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i%lk]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i]
-		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i]
-		}
-	}
+	// if lk < ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i%lk]
+	// 	}
+	// } else if lk > ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i]
+	// 	}
+	// } else {
+	// 	for i := 0; i < ls; i++ {
+	// 		d[i] = key[i]
+	// 	}
+	// }
 
-	return a.getHashString(d)
+	// return cipher.GetHashString(d)
 }
 
 func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
@@ -264,7 +269,7 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 func (a *btcdbagent) initLastBlock() {
 	a.lastblock.timestamp = time.Now().UnixNano()
 	a.lastblock.encblock = a.getEncryptKeyforGenesis() // encblock is data to encrypt the next block
-	a.lastblock.hash = a.getHashString(a.lastblock.encblock)
+	a.lastblock.hash = cipher.GetHashString(a.lastblock.encblock)
 	a.lastblock.hashenc = a.lastblock.hash // This block does not need to be encrypted
 	a.lastblock.hashkey = ""               // There is no key
 	a.lastblock.height = -1                // This is key for the first block(B0)
