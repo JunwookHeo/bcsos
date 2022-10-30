@@ -101,9 +101,165 @@ func test_gf2() {
 	log.Printf("<==> %v", cal)
 }
 
+// func test_gf_mult() {
+// 	gfpoly, err := galois.GF(16)
+// 	if err != nil {
+// 		log.Println("GF(1) should rise error")
+// 	}
+
+// 	start := time.Now().UnixNano()
+// 	var cal1 uint32
+// 	var cal2 uint64
+// 	max_len := 65536
+// 	for i := 0; i < max_len; i++ {
+// 		for j := 0; j < max_len; j++ {
+// 			cal1, _ = gfpoly.Mul(uint32(i), uint32(j))
+// 			cal2 = gfpoly.MulN(uint64(i), uint64(j))
+// 			if cal1 != uint32(cal2) {
+// 				log.Printf("Fail (%v, %v) : %v - %v", i, j, cal1, cal2)
+// 				return
+// 			}
+// 		}
+// 	}
+// 	end := time.Now().UnixNano()
+// 	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+// }
+
+// func test_gf_div() {
+// 	gfpoly, err := galois.GF(16)
+// 	if err != nil {
+// 		log.Println("GF(1) should rise error")
+// 	}
+
+// 	start := time.Now().UnixNano()
+// 	var cal1 uint32
+// 	var cal2 uint64
+// 	max_len := 65536
+// 	for i := 65536 / 2; i < max_len; i++ {
+// 		for j := 0; j < max_len; j++ {
+// 			cal1, _ = gfpoly.Div(uint32(i), uint32(j))
+// 			cal2 = gfpoly.DivN(uint64(i), uint64(j))
+// 			if cal1 != uint32(cal2) {
+// 				log.Printf("Fail (%v, %v) : %v - %v", i, j, cal1, cal2)
+// 				return
+// 			}
+// 		}
+// 	}
+// 	end := time.Now().UnixNano()
+// 	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+// }
+
+// func test_gf_exp() {
+// 	gfpoly, err := galois.GF(16)
+// 	if err != nil {
+// 		log.Println("GF(1) should rise error")
+// 	}
+
+// 	start := time.Now().UnixNano()
+// 	var cal1 uint32
+// 	var cal2 uint64
+// 	max_len := 65536
+// 	for i := 0; i < max_len; i++ {
+// 		for j := 0; j < max_len; j++ {
+// 			cal1, _ = gfpoly.Expon(uint32(i), uint32(j))
+// 			cal2 = gfpoly.Exp(uint64(i), uint64(j))
+// 			if cal1 != uint32(cal2) {
+// 				log.Printf("Fail (%v, %v) : %v - %v", i, j, cal1, cal2)
+// 				return
+// 			}
+// 		}
+// 	}
+// 	end := time.Now().UnixNano()
+// 	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+// }
+
+// 2^32 :
+//	 - 2P -1 :  7 * 1227133513
+// 	 - 3P -3 :  2 * 6442450943
+func test_gf_exp2() {
+	gfpoly := galois.GFN(32)
+	if gfpoly == nil {
+		log.Println("GF(1) should rise error")
+		return
+	}
+
+	start := time.Now().UnixNano()
+	var cal1 uint64
+	var cal2 uint64
+	max_len := 4294967296
+	for i := 0; i < max_len; i++ {
+		cal1 = gfpoly.Exp(uint64(i), 2)
+		cal2 = gfpoly.Exp(uint64(cal1), 6442450943)
+		if uint64(i) != cal2 {
+			log.Printf("ERROR   %v : %v <==> %v", i, cal1, cal2)
+			break
+		}
+	}
+	end := time.Now().UnixNano()
+	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+}
+
+// 2^32 :
+//	 - 2P -1 :  7 * 1227133513
+// 	 - 3P -3 :  2 * 6442450943
+func test_gf_exp3() {
+	gfpoly := galois.GFN(32)
+	if gfpoly == nil {
+		log.Println("GF(1) should rise error")
+		return
+	}
+
+	start := time.Now().UnixNano()
+	var cal uint64
+	max_len := 100000000
+	for i := 0; i < max_len; i++ {
+		cal = gfpoly.Exp(uint64(i), 2)
+	}
+	end := time.Now().UnixNano()
+	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+	log.Printf("<==> %v", cal)
+
+	start = time.Now().UnixNano()
+	for i := 0; i < max_len; i++ {
+		cal = gfpoly.Exp(uint64(i), 6442450943)
+	}
+	end = time.Now().UnixNano()
+	log.Printf("Time for EXP2 : %v", (end-start)/1000)
+	log.Printf("<==> %v", cal)
+}
+
+func test_gf_div2() {
+	gfpoly := galois.GFN(32)
+	if gfpoly == nil {
+		log.Println("GF(1) should rise error")
+		return
+	}
+
+	start := time.Now().UnixNano()
+	var cal1 uint64
+	var cal2 uint64
+	max_len := 4294967296
+	for i := 1; i < max_len; i += 3333 {
+		for j := 1; j < max_len; j += 3333 {
+			cal1 = gfpoly.MulN(uint64(i), uint64(j))
+			cal2 = gfpoly.DivN(uint64(cal1), uint64(j))
+			if uint64(i) != cal2 {
+				log.Printf("ERROR   %v : %v <==> %v", i, cal1, cal2)
+				log.Printf("ERROR %v <==> %v", i, j)
+				return
+			}
+		}
+		log.Printf("PROCESS %v", i)
+	}
+	end := time.Now().UnixNano()
+	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+}
+
 func main() {
 	// test_gf_8()
 	// test_gf_16()
 	// test_gf()
-	test_gf2()
+	// test_gf_div()
+	// test_gf_exp3()
+	test_gf_div2()
 }

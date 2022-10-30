@@ -54,4 +54,4 @@ def gcm(num):
         if num % i == 0:
             print(i)
 
-gcm(196606)
+gcm(2*2**32 - 1)
