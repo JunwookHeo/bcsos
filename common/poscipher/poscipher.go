@@ -1,4 +1,4 @@
-package cipher
+package poscipher
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 
 const ALIGN = 4
 
-var GP = galois.GFN(32)
+var GF = galois.GFN(32)
 
 func GetHashString(buf []byte) string {
 	hash := sha256.Sum256(buf)
@@ -20,7 +20,7 @@ func GetHashString(buf []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func EncryptXorWithVariableLength(key, s []byte) (string, []byte) {
+func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 	lk := len(key)
 	ls := len(s)
 	d := make([]byte, ls)
@@ -42,7 +42,7 @@ func EncryptXorWithVariableLength(key, s []byte) (string, []byte) {
 	return GetHashString(d), d
 }
 
-func EncryptXorWithVariableLength2(key, s []byte) (string, []byte) {
+func EncryptPoSWithVariableLength2(key, s []byte) (string, []byte) {
 	lk := len(key) // assume key is aligned
 	if lk%ALIGN != 0 {
 		log.Panicf("Error Key length ALIGN: %v", lk)
@@ -58,38 +58,48 @@ func EncryptXorWithVariableLength2(key, s []byte) (string, []byte) {
 	key_reader := bytes.NewReader(key)
 	s_reader := bytes.NewReader(s)
 
-	ui_key := make([]uint32, lk)
-	err := binary.Read(key_reader, binary.LittleEndian, &ui_key)
+	k := make([]uint32, lk)
+	err := binary.Read(key_reader, binary.LittleEndian, &k)
 	if err != nil {
 		log.Panicf("converting key to uint32 error : %v", err)
 		return "", nil
 	}
 
-	ui_s := make([]uint32, ls)
-	err = binary.Read(s_reader, binary.LittleEndian, &ui_s)
+	x := make([]uint32, ls)
+	err = binary.Read(s_reader, binary.LittleEndian, &x)
 	if err != nil {
 		log.Panicf("converting source to uint32 error : %v", err)
 		return "", nil
 	}
 
-	ui_d := make([]uint32, ls)
+	y := make([]uint32, ls)
 
+	pre := uint32(0)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			ui_d[i] = ui_key[i%lk] ^ ui_s[i]
+			// y[i] = k[i%lk] ^ x[i]
+			d := (x[i] ^ k[i%lk]) ^ pre
+			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			pre = y[i]
 		}
 	} else if lk > ls {
 		for i := 0; i < ls; i++ {
-			ui_d[i] = ui_key[i] ^ ui_s[i]
+			// y[i] = k[i] ^ x[i]
+			d := (x[i] ^ k[i]) ^ pre
+			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			pre = y[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			ui_d[i] = ui_key[i] ^ ui_s[i]
+			// y[i] = k[i] ^ x[i]
+			d := (x[i] ^ k[i]) ^ pre
+			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			pre = y[i]
 		}
 	}
 
 	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, ui_d)
+	err = binary.Write(buf, binary.LittleEndian, y)
 	if err != nil {
 		log.Panicf("convert uint32 to byte error : %v", err)
 		return "", nil
@@ -98,7 +108,7 @@ func EncryptXorWithVariableLength2(key, s []byte) (string, []byte) {
 	return GetHashString(buf.Bytes()), buf.Bytes()
 }
 
-func DecryptXorWithVariableLength(key, s []byte) []byte {
+func DecryptPoSWithVariableLength(key, s []byte) []byte {
 	lk := len(key)
 	ls := len(s)
 	d := make([]byte, ls)
@@ -120,7 +130,7 @@ func DecryptXorWithVariableLength(key, s []byte) []byte {
 	return d
 }
 
-func DecryptXorWithVariableLength2(key, s []byte) []byte {
+func DecryptPoSWithVariableLength2(key, s []byte) []byte {
 	lk := len(key) // assume key is aligned
 	if lk%ALIGN != 0 {
 		log.Panicf("Error Key length ALIGN: %v", lk)
@@ -135,38 +145,47 @@ func DecryptXorWithVariableLength2(key, s []byte) []byte {
 	key_reader := bytes.NewReader(key)
 	s_reader := bytes.NewReader(s)
 
-	ui_key := make([]uint32, lk)
-	err := binary.Read(key_reader, binary.LittleEndian, &ui_key)
+	k := make([]uint32, lk)
+	err := binary.Read(key_reader, binary.LittleEndian, &k)
 	if err != nil {
 		log.Panicf("converting key to uint32 error : %v", err)
 		return nil
 	}
 
-	ui_s := make([]uint32, ls)
-	err = binary.Read(s_reader, binary.LittleEndian, &ui_s)
+	x := make([]uint32, ls)
+	err = binary.Read(s_reader, binary.LittleEndian, &x)
 	if err != nil {
 		log.Panicf("converting source to uint32 error : %v", err)
 		return nil
 	}
 
-	ui_d := make([]uint32, ls)
-
+	y := make([]uint32, ls)
+	pre := uint32(0)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			ui_d[i] = ui_key[i%lk] ^ ui_s[i]
+			// ui_d[i] = ui_key[i%lk] ^ ui_s[i]
+			d := uint32(GF.Exp(uint64(x[i]), 2))
+			y[i] = (d ^ pre) ^ k[i%lk]
+			pre = x[i]
 		}
 	} else if lk > ls {
 		for i := 0; i < ls; i++ {
-			ui_d[i] = ui_key[i] ^ ui_s[i]
+			// y[i] = k[i] ^ x[i]
+			d := uint32(GF.Exp(uint64(x[i]), 2))
+			y[i] = (d ^ pre) ^ k[i]
+			pre = x[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			ui_d[i] = ui_key[i] ^ ui_s[i]
+			// y[i] = k[i] ^ x[i]
+			d := uint32(GF.Exp(uint64(x[i]), 2))
+			y[i] = (d ^ pre) ^ k[i]
+			pre = x[i]
 		}
 	}
 
 	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, ui_d)
+	err = binary.Write(buf, binary.LittleEndian, y)
 	if err != nil {
 		log.Panicf("convert uint32 to byte error : %v", err)
 		return nil
@@ -175,7 +194,7 @@ func DecryptXorWithVariableLength2(key, s []byte) []byte {
 	return buf.Bytes()
 }
 
-func GetHashforXorKey(key []byte, ls int) string {
+func GetHashforPoSKey(key []byte, ls int) string {
 	lk := len(key)
 	d := make([]byte, ls)
 

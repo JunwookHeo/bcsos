@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"log"
 
-	"github.com/junwookheo/bcsos/common/cipher"
+	"github.com/junwookheo/bcsos/common/poscipher"
 )
 
-const ALIGN = cipher.ALIGN
+const ALIGN = poscipher.ALIGN
 
 type RawBlock struct {
 	rawBuf []byte

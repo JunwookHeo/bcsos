@@ -1,13 +1,15 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
 	"log"
 	"time"
 
+	"github.com/junwookheo/bcsos/blockchainsim/simulation"
+	"github.com/junwookheo/bcsos/common/bitcoin"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/galois"
+	"github.com/junwookheo/bcsos/common/poscipher"
+	"github.com/junwookheo/bcsos/common/wallet"
 )
 
 func init() {
@@ -258,6 +260,105 @@ func test_gf_div2() {
 	log.Printf("Time for EXP1 : %v", (end-start)/1000)
 }
 
+func test_encypt_1() {
+	x := []uint32{21, 32, 43, 54, 65, 76, 87, 98, 19, 20, 31}
+	k := []uint32{19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 19}
+	y := make([]uint32, len(x))
+
+	gfpoly := galois.GFN(32)
+	if gfpoly == nil {
+		log.Println("GF(1) should rise error")
+		return
+	}
+
+	pre := uint32(0)
+	for i := 0; i < len(x); i++ {
+		d := (x[i] ^ k[i]) ^ pre
+		y[i] = uint32(gfpoly.Exp(uint64(d), 6442450943))
+		pre = y[i]
+		log.Printf("X:%v, d:%v, y:%v", x[i], d, y[i])
+	}
+
+	pre = 0
+	for i := 0; i < len(y); i++ {
+		d := uint32(gfpoly.Exp(uint64(y[i]), 2))
+		x[i] = (d ^ pre) ^ k[i]
+		pre = y[i]
+		log.Printf("X:%v, d:%v, y:%v", x[i], d, y[i])
+	}
+}
+
+func test_encypt_2() {
+	x := []uint32{21, 32, 43, 54, 65, 76, 87, 98, 19, 20, 31}
+	k := []uint32{19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 19}
+	y := make([]uint32, len(x))
+
+	gfpoly := galois.GFN(32)
+	if gfpoly == nil {
+		log.Println("GF(1) should rise error")
+		return
+	}
+
+	pre := uint32(0)
+	for i := 0; i < len(x); i++ {
+		d := (x[i] ^ k[i]) ^ pre
+		y[i] = uint32(gfpoly.Exp(uint64(d), 6442450943))
+		pre = y[i]
+		log.Printf("X:%v, d:%v, y:%v", x[i], d, y[i])
+	}
+
+	pre = 0
+	for i := 0; i < len(y); i++ {
+		d := uint32(gfpoly.Exp(uint64(y[i]), 2))
+		x[i] = (d ^ pre) ^ k[i]
+		pre = y[i]
+		log.Printf("X:%v, d:%v, y:%v", x[i], d, y[i])
+	}
+}
+
+func test_encypt_decrypt() {
+	const PATH_TEST = "blocks.json"
+	w := wallet.NewWallet("blocks.json.wallet")
+	key := w.PublicKey
+
+	msg := make(chan bitcoin.BlockPkt)
+	go simulation.LoadBtcData(PATH_TEST, msg)
+
+	tenc := int64(0)
+	tdec := int64(0)
+	for {
+		d, ok := <-msg
+		if !ok {
+			log.Println("Channle closed")
+			break
+		}
+
+		if d.Block == config.END_TEST {
+			break
+		}
+
+		rb := bitcoin.NewRawBlock(d.Block)
+		x := rb.GetBlockBytes()
+		// log.Printf("Block : %v", x[:80])
+
+		// Start Encryption
+		start := time.Now().UnixNano()
+		_, y := poscipher.EncryptPoSWithVariableLength2(key, x)
+		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Encryption Time : %v", tenc)
+
+		// Start Decryption
+		start = time.Now().UnixNano()
+		x_t := poscipher.DecryptPoSWithVariableLength2(key, y)
+		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Decryption Time : %v", tdec)
+
+		log.Printf("Org x:%v", x[0:80])
+		log.Printf("New x:%v", x_t[0:80])
+		key = y
+	}
+	close(msg)
+}
 func main() {
 	// test_gf_8()
 	// test_gf_16()
@@ -265,20 +366,6 @@ func main() {
 	// test_gf_div()
 	// test_gf_exp3()
 	// test_gf_div2()
-
-	buf := new(bytes.Buffer)
-	source := []uint32{1, 2, 3}
-	err := binary.Write(buf, binary.LittleEndian, source)
-	if err != nil {
-		fmt.Println("binary.Write failed:", err)
-	}
-	fmt.Printf("Encoded: % x\n", buf.Bytes())
-
-	check := make([]uint32, 3)
-	rbuf := bytes.NewReader(buf.Bytes())
-	err = binary.Read(rbuf, binary.LittleEndian, &check)
-	if err != nil {
-		fmt.Println("binary.Read failed:", err)
-	}
-	fmt.Printf("Decoded: %v\n", check)
+	// test_encypt_2()
+	test_encypt_decrypt()
 }

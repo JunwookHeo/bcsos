@@ -10,7 +10,7 @@ import (
 
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
-	"github.com/junwookheo/bcsos/common/cipher"
+	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/stretchr/testify/assert"
 )
@@ -178,7 +178,7 @@ func TestBtcDBAgent(t *testing.T) {
 		return
 	}
 
-	sb := hex.EncodeToString(cipher.DecryptXorWithVariableLength(encb1, encb2))
+	sb := hex.EncodeToString(poscipher.DecryptPoSWithVariableLength(encb1, encb2))
 	block := bitcoin.NewBlock()
 	rb := bitcoin.NewRawBlock(sb)
 
