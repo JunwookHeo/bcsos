@@ -5,7 +5,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"log"
+
+	"github.com/junwookheo/bcsos/common/cipher"
 )
+
+const ALIGN = cipher.ALIGN
 
 type RawBlock struct {
 	rawBuf []byte
@@ -18,7 +22,12 @@ func NewRawBlock(raw string) *RawBlock {
 		log.Panicf("NewRawBlock Error : %v", err)
 		return nil
 	}
-	return &RawBlock{rawBuf: rawb, pos: 0}
+	// log.Printf("===> leng block : %v", len(rawb))
+
+	lp := (ALIGN - len(rawb)%ALIGN) % ALIGN // length of padding
+	pad := make([]byte, lp)
+
+	return &RawBlock{rawBuf: append(rawb, pad...), pos: 0}
 }
 
 func (rb *RawBlock) GetBlockBytes() []byte {

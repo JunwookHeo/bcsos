@@ -118,7 +118,7 @@ func (a *btcdbagent) addBtcBlocktoList(b *btcBlock) int64 {
 
 func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
 	w := wallet.NewWallet(config.WALLET_PATH)
-	return w.GetAddress()
+	return w.PublicKey //GetAddress()
 }
 
 // func (a *btcdbagent) getHashString(buf []byte) string {
@@ -136,6 +136,10 @@ func (a *btcdbagent) encryptXorWithVariableLength(key, s []byte) (string, []byte
 
 	hash, d := cipher.EncryptXorWithVariableLength(key, s)
 
+	hash2, d2 := cipher.EncryptXorWithVariableLength2(key, s)
+
+	log.Printf("hash1 %v, %v", hash, d[0:80])
+	log.Printf("hash2 %v, %v", hash2, d2[0:80])
 	// if lk < ls {
 	// 	for i := 0; i < ls; i++ {
 	// 		d[i] = key[i%lk] ^ s[i]

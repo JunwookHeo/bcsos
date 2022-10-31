@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
 	"log"
 	"time"
 
@@ -174,8 +177,8 @@ func test_gf2() {
 // }
 
 // 2^32 :
-//	 - 2P -1 :  7 * 1227133513
-// 	 - 3P -3 :  2 * 6442450943
+//   - 2P -1 :  7 * 1227133513
+//   - 3P -2 :  2 * 6442450943
 func test_gf_exp2() {
 	gfpoly := galois.GFN(32)
 	if gfpoly == nil {
@@ -200,8 +203,8 @@ func test_gf_exp2() {
 }
 
 // 2^32 :
-//	 - 2P -1 :  7 * 1227133513
-// 	 - 3P -3 :  2 * 6442450943
+//   - 2P -1 :  7 * 1227133513
+//   - 3P -2 :  2 * 6442450943
 func test_gf_exp3() {
 	gfpoly := galois.GFN(32)
 	if gfpoly == nil {
@@ -211,20 +214,20 @@ func test_gf_exp3() {
 
 	start := time.Now().UnixNano()
 	var cal uint64
-	max_len := 100000000
-	for i := 0; i < max_len; i++ {
+	max_len := 4294967296
+	for i := 1; i < max_len; i += 4096 {
 		cal = gfpoly.Exp(uint64(i), 2)
 	}
 	end := time.Now().UnixNano()
-	log.Printf("Time for EXP1 : %v", (end-start)/1000)
+	log.Printf("Time for EXP1 : %v", (end-start)/1000000)
 	log.Printf("<==> %v", cal)
 
 	start = time.Now().UnixNano()
-	for i := 0; i < max_len; i++ {
+	for i := 1; i < max_len; i += 4096 {
 		cal = gfpoly.Exp(uint64(i), 6442450943)
 	}
 	end = time.Now().UnixNano()
-	log.Printf("Time for EXP2 : %v", (end-start)/1000)
+	log.Printf("Time for EXP2 : %v", (end-start)/1000000)
 	log.Printf("<==> %v", cal)
 }
 
@@ -261,5 +264,21 @@ func main() {
 	// test_gf()
 	// test_gf_div()
 	// test_gf_exp3()
-	test_gf_div2()
+	// test_gf_div2()
+
+	buf := new(bytes.Buffer)
+	source := []uint32{1, 2, 3}
+	err := binary.Write(buf, binary.LittleEndian, source)
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+	}
+	fmt.Printf("Encoded: % x\n", buf.Bytes())
+
+	check := make([]uint32, 3)
+	rbuf := bytes.NewReader(buf.Bytes())
+	err = binary.Read(rbuf, binary.LittleEndian, &check)
+	if err != nil {
+		fmt.Println("binary.Read failed:", err)
+	}
+	fmt.Printf("Decoded: %v\n", check)
 }
