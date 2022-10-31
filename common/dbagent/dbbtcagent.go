@@ -135,11 +135,6 @@ func (a *btcdbagent) encryptXorWithVariableLength(key, s []byte) (string, []byte
 	// d := make([]byte, ls)
 
 	hash, d := cipher.EncryptXorWithVariableLength(key, s)
-
-	hash2, d2 := cipher.EncryptXorWithVariableLength2(key, s)
-
-	log.Printf("hash1 %v, %v", hash, d[0:80])
-	log.Printf("hash2 %v, %v", hash2, d2[0:80])
 	// if lk < ls {
 	// 	for i := 0; i < ls; i++ {
 	// 		d[i] = key[i%lk] ^ s[i]
