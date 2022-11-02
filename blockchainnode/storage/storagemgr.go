@@ -323,9 +323,31 @@ func (h *StorageMgr) proofStorageHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (h *StorageMgr) ProofStorageProc(hashes string, block []byte) bool {
-	// TODO : Verify encrypted block
-	return false
+// nonInteractiveProofHandler handles the request of Non-interactive Proof of Storage
+// Request : Non-interactive Proof
+// Response : No Response
+func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("nonInteractiveProofHandler", err)
+		return
+	}
+	defer ws.Close()
+
+	var proof dtype.NonInteractiveProof
+	if err := ws.ReadJSON(&proof); err != nil {
+		log.Printf("Read json error : %v", err)
+		return
+	}
+
+	// Todo : Verification of proof
+	h.db.VerifyNonInteractiveProof(&proof)
+
+}
+
+func (h *StorageMgr) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
+	return h.db.GetNonInteractiveProof(hash)
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {
@@ -392,6 +414,7 @@ func (sm *StorageMgr) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/getobject", sm.getObjectHandler)
 	m.HandleFunc("/statusinfo", sm.statusInfoHandler)
 	m.HandleFunc("/proofstorage", sm.proofStorageHandler)
+	m.HandleFunc("/noninteractiveproof", sm.nonInteractiveProofHandler)
 }
 
 func StorageMgrInst(db_path string) *StorageMgr {

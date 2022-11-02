@@ -21,28 +21,6 @@ func GetHashString(buf []byte) string {
 }
 
 func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
-	lk := len(key)
-	ls := len(s)
-	d := make([]byte, ls)
-
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i%lk] ^ s[i]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	}
-
-	return GetHashString(d), d
-}
-
-func EncryptPoSWithVariableLength2(key, s []byte) (string, []byte) {
 	lk := len(key) // assume key is aligned
 	if lk%ALIGN != 0 {
 		log.Panicf("Error Key length ALIGN: %v", lk)
@@ -109,28 +87,6 @@ func EncryptPoSWithVariableLength2(key, s []byte) (string, []byte) {
 }
 
 func DecryptPoSWithVariableLength(key, s []byte) []byte {
-	lk := len(key)
-	ls := len(s)
-	d := make([]byte, ls)
-
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i%lk] ^ s[i]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i] ^ s[i]
-		}
-	}
-
-	return d
-}
-
-func DecryptPoSWithVariableLength2(key, s []byte) []byte {
 	lk := len(key) // assume key is aligned
 	if lk%ALIGN != 0 {
 		log.Panicf("Error Key length ALIGN: %v", lk)

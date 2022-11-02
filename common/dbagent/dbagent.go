@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/dtype"
 )
 
 type DBAgent interface {
@@ -24,6 +25,8 @@ type DBAgent interface {
 	DeleteNoAccedObjects()
 	UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int)
 	UpdateDBNetworkDelay(addtime int, hop int)
+	GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof
+	VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool
 	// ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte
 	// ProofStorage2()
 }

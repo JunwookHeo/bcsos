@@ -15,96 +15,6 @@ import (
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
-func test_gf_8() {
-	gfpoly, err := galois.GF(8)
-	if err == nil {
-		log.Println("GF(1) should rise error")
-	}
-
-	start := time.Now().UnixNano()
-	var cal uint32
-	for i := 0; i < 256; i++ {
-		cal, _ = gfpoly.Expon(uint32(i), 7)
-	}
-	end := time.Now().UnixNano()
-	log.Printf("Time for FWD : %v", end-start)
-	log.Printf("Time for FWD : %v", cal)
-
-	start = time.Now().UnixNano()
-	for i := 0; i < 256; i++ {
-		cal, _ = gfpoly.Expon(uint32(i), 73)
-	}
-	end = time.Now().UnixNano()
-	log.Printf("Time for REV : %v", end-start)
-	log.Printf("Time for FWD : %v", cal)
-}
-
-func test_gf_16() {
-	gfpoly, err := galois.GF(16)
-	if err == nil {
-		log.Println("GF(1) should rise error")
-	}
-	// 11 <-> 23831
-	// 2 <-> 98303
-	start := time.Now().UnixNano()
-	var cal uint32
-	for i := 0; i < 65536; i++ {
-		cal, _ = gfpoly.Expon(uint32(i), 11)
-	}
-	end := time.Now().UnixNano()
-	log.Printf("Time for FWD : %v", end-start)
-	log.Printf("Time for FWD : %v", cal)
-
-	start = time.Now().UnixNano()
-	for i := 0; i < 65536; i++ {
-		cal, _ = gfpoly.Expon(uint32(i), 23831)
-	}
-	end = time.Now().UnixNano()
-	log.Printf("Time for REV : %v", end-start)
-	log.Printf("Time for REV : %v", cal)
-}
-
-func test_gf() {
-	gfpoly, err := galois.GF(16)
-	if err == nil {
-		log.Println("GF(1) should rise error")
-	}
-
-	start := time.Now().UnixNano()
-	var cal uint32
-	for i := 0; i < 65536; i++ {
-		cal, _ = gfpoly.Expon(uint32(i), 2)
-		cal, _ = gfpoly.Expon(cal, 98303)
-		log.Printf("%v <==> %v", i, cal)
-	}
-	end := time.Now().UnixNano()
-	log.Printf("Time for REV : %v", end-start)
-}
-
-func test_gf2() {
-	gfpoly, err := galois.GF(16)
-	if err != nil {
-		log.Println("GF(1) should rise error")
-	}
-
-	start := time.Now().UnixNano()
-	var cal uint32
-	max_len := 65536
-	for i := 0; i < max_len; i++ {
-		cal, _ = gfpoly.Expon(uint32(i), 2)
-	}
-	end := time.Now().UnixNano()
-	log.Printf("Time for EXP1 : %v", (end-start)/1000)
-	log.Printf("<==> %v", cal)
-
-	start = time.Now().UnixNano()
-	for i := 0; i < max_len; i++ {
-		cal, _ = gfpoly.Expon2(uint32(i), 98303)
-	}
-	end = time.Now().UnixNano()
-	log.Printf("Time for EXP2 : %v", (end-start)/1000)
-	log.Printf("<==> %v", cal)
-}
 
 // func test_gf_mult() {
 // 	gfpoly, err := galois.GF(16)
@@ -246,8 +156,8 @@ func test_gf_div2() {
 	max_len := 4294967296
 	for i := 1; i < max_len; i += 3333 {
 		for j := 1; j < max_len; j += 3333 {
-			cal1 = gfpoly.MulN(uint64(i), uint64(j))
-			cal2 = gfpoly.DivN(uint64(cal1), uint64(j))
+			cal1 = gfpoly.Mul(uint64(i), uint64(j))
+			cal2 = gfpoly.Div(uint64(cal1), uint64(j))
 			if uint64(i) != cal2 {
 				log.Printf("ERROR   %v : %v <==> %v", i, cal1, cal2)
 				log.Printf("ERROR %v <==> %v", i, j)
@@ -343,13 +253,13 @@ func test_encypt_decrypt() {
 
 		// Start Encryption
 		start := time.Now().UnixNano()
-		_, y := poscipher.EncryptPoSWithVariableLength2(key, x)
+		_, y := poscipher.EncryptPoSWithVariableLength(key, x)
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
 
 		// Start Decryption
 		start = time.Now().UnixNano()
-		x_t := poscipher.DecryptPoSWithVariableLength2(key, y)
+		x_t := poscipher.DecryptPoSWithVariableLength(key, y)
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 

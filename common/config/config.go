@@ -87,4 +87,5 @@ const END_TEST string = "END_TEST"
 const FINALITY int = 6
 
 // Proof of Storage
-const NUM_CONSECUTIVE_HASHES int = 10
+const NUM_CONSECUTIVE_HASHES int = 4
+const MAX_PROOF_TIME_MSEC int = 2000

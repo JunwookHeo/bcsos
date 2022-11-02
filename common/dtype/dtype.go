@@ -41,3 +41,13 @@ type ReqEncryptedBlock struct {
 type ResEncryptedBlock struct {
 	Block string `json:"Block"`
 }
+
+type NonInteractiveProof struct {
+	Timestamp int64
+	Root      []byte
+	HashEncs  [][]byte
+	HashKeys  [][]byte
+	Selected  int
+	Hash      string
+	EncBlock  []byte
+}

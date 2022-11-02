@@ -15,6 +15,7 @@ import (
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
+	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/serial"
 	"github.com/junwookheo/bcsos/common/wallet"
@@ -118,13 +119,15 @@ func (a *btcdbagent) addBtcBlocktoList(b *btcBlock) int64 {
 
 func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
 	w := wallet.NewWallet(config.WALLET_PATH)
-	return w.PublicKey //GetAddress()
+	key := sha256.Sum256(w.GetAddress()[:])
+	return key[:]
+	// return w.PublicKey //GetAddress()
 }
 
 func (a *btcdbagent) encryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 	start := time.Now().UnixNano()
 
-	hash, d := poscipher.EncryptPoSWithVariableLength2(key, s)
+	hash, d := poscipher.EncryptPoSWithVariableLength(key, s)
 	gap := int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -205,6 +208,154 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 	}
 
 	return int64(a.lastblock.height)
+}
+
+func (a *btcdbagent) getEncryptInfoWithHeight(height int) *btcBlock {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE height=?);`, height)
+	if err != nil {
+		log.Printf("Show latest db status Error : %v", err)
+		return nil
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		id := 0
+		bi := btcBlock{}
+		rows.Scan(&id, &bi.timestamp, &bi.height, &bi.hashprev, &bi.hash, &bi.hashenc, &bi.hashkey)
+
+		return &bi
+	}
+
+	return nil
+}
+
+func (a *btcdbagent) getEncryptInfoWithHash(hash string) *btcBlock {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE hash=?);`, hash)
+	if err != nil {
+		log.Printf("Show latest db status Error : %v", err)
+		return nil
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		id := 0
+		bi := btcBlock{}
+		rows.Scan(&id, &bi.timestamp, &bi.height, &bi.hashprev, &bi.hash, &bi.hashenc, &bi.hashkey)
+
+		return &bi
+	}
+
+	return nil
+}
+
+func hashToUint32(b []byte) uint32 {
+	x := uint32(0)
+	for i := 0; i < len(b); i += 4 {
+		x += uint32(b[i+3]) | uint32(b[i+2])<<8 | uint32(b[i+1])<<16 | uint32(b[i])<<24
+	}
+	return x
+}
+
+// hash : new block's hash for randomization
+func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
+	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
+	if a.lastblock.height < config.NUM_CONSECUTIVE_HASHES*3 {
+		return nil
+	}
+	// Select block
+	tmp, _ := hex.DecodeString(hash)
+	hb := sha256.Sum256(tmp)
+	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-10) // margin 10 blocks
+	log.Printf("Block selector : %v", ri)
+
+	// List up the encrypted block hash and key hash of encrypted blocks
+	// And calculate Merkle Root
+	var hashroots [][]byte
+	proof := dtype.NonInteractiveProof{}
+	bis := make([]*btcBlock, config.NUM_CONSECUTIVE_HASHES)
+	for i := 0; i < config.NUM_CONSECUTIVE_HASHES; i++ {
+		bi := a.getEncryptInfoWithHeight(int(ri) + i)
+		bis[i] = bi
+		he, _ := hex.DecodeString(bi.hashenc)
+		proof.HashEncs = append(proof.HashEncs, he)
+		hk, _ := hex.DecodeString(bi.hashkey)
+		proof.HashKeys = append(proof.HashKeys, hk)
+		mh := blockchain.CalMerkleNodeHash(he, hk)
+		hashroots = append(hashroots, mh)
+	}
+
+	// select a block using the merkle root
+	proof.Root = blockchain.CalMerkleRootHash(hashroots)
+	proof.Selected = int(hashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES)) // randomize block selection
+	proof.Hash = bis[proof.Selected].hash
+
+	// create proof, merkle root, {hash, key hash}, encrypted block, timestamp
+	eb, err := ioutil.ReadFile(filepath.Join(a.dirpath, proof.Hash))
+	if err != nil {
+		log.Panicf("Reading encryped block err : %v", err)
+		return nil
+	}
+	proof.EncBlock = eb
+	proof.Timestamp = time.Now().UnixNano()
+	log.Printf("%v", proof)
+
+	return &proof
+}
+
+func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
+	eb, err := ioutil.ReadFile(filepath.Join(a.dirpath, bi.hash))
+	if err != nil {
+		log.Panicf("Reading encryped block err : %v", err)
+		return nil
+	}
+
+	key, err := ioutil.ReadFile(filepath.Join(a.dirpath, bi.hashprev))
+	if err != nil {
+		log.Panicf("Reading encryped block key err : %v", err)
+		return nil
+	}
+
+	return a.decryptPoSWithVariableLength(key, eb)
+}
+
+func (a *btcdbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
+	if proof.Timestamp > time.Now().UnixNano() {
+		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
+		return false
+	}
+
+	if (proof.Timestamp-a.lastblock.timestamp)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-a.lastblock.timestamp)/1000000)
+		return false
+	}
+
+	bi := a.getEncryptInfoWithHash(proof.Hash)
+	if bi == nil {
+		log.Printf("Get Encrypt block info error : %v", bi.hash)
+		return false
+	}
+
+	// Get original block by decrypting bk and bk-1
+	b := a.getDecryptBlock(bi)
+	if b == nil {
+		log.Printf("Get Decrypt block error : %v", bi.hash)
+		return false
+	}
+
+	// Get Key block(Previous encrypt block) from bk and ebk
+	peb := a.decryptPoSWithVariableLength(proof.EncBlock, b)
+	hashkey := poscipher.GetHashString(peb)
+	if hashkey == hex.EncodeToString(proof.HashKeys[proof.Selected]) {
+		return true
+	}
+
+	return false
 }
 
 func (a *btcdbagent) initLastBlock() {

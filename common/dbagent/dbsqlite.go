@@ -15,6 +15,7 @@ import (
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
+	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/serial"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -628,6 +629,14 @@ func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	case 3:
 		status.Hop3 += 1
 	}
+}
+
+func (a *dbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
+	return nil
+}
+
+func (a *dbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
+	return false
 }
 
 // func (a *dbagent) ProofStorage2() {

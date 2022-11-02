@@ -1,6 +1,7 @@
 package mining
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -355,16 +356,82 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received New BTC Block : %v", hash)
 	go mi.BroadcastNewBtcBlock(&buf)
 	// // Proof of Storage
-	// go mi.requestProofStorage(&block)
+	go mi.nonInteractiveProofStorage(hash)
 
 	sm := storage.StorageMgrInst("")
 	sm.AddNewBtcBlock(&buf, hash)
 }
 
+// Non-interactive Proof of Storage
+func (mi *Mining) nonInteractiveProofStorage(hash string) {
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
+	nm := network.NodeMgrInst()
+	nm.GetSCNNodeListAll(&nodes)
+
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	tmp, _ := hex.DecodeString(hash)
+	h1 := sha256.Sum256(tmp)
+	h2, _ := hex.DecodeString(local.Hash)
+
+	// Check address and hash
+	mask := byte(0x0F) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
+	if h1[len(h1)-1]&mask != h2[len(h2)-1]&mask {
+		return
+	}
+
+	// Get target node for Proof of Storage
+	node := mi.GetTargetNodePoS(nodes)
+	if node == nil {
+		return
+	}
+
+	// Create a Proof
+	sm := storage.StorageMgrInst("")
+	proof := sm.GetNonInteractiveProof(hash)
+
+	// Broadcast the Proof
+	log.Printf("Non-interactive ProofStorage : %v", proof)
+	if proof != nil {
+		mi.broadcastNonInteractiveProof(proof)
+	}
+}
+
+func (mi *Mining) broadcastNonInteractiveProof(p *dtype.NonInteractiveProof) {
+	sendTransaction := func(node *dtype.NodeInfo) {
+		url := fmt.Sprintf("ws://%v:%v/noninteractiveproof", node.IP, node.Port)
+		//log.Printf("BroadcasTransaction to : %v", url)
+
+		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			log.Printf("noninteractiveproof error : %v", err)
+			return
+		}
+		defer ws.Close()
+
+		if err := ws.WriteJSON(p); err != nil {
+			log.Printf("Write json error : %v", err)
+			return
+		}
+	}
+
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
+	nm := network.NodeMgrInst()
+	nm.GetSCNNodeListAll(&nodes)
+	for _, node := range nodes {
+		if node.IP != "" {
+			sendTransaction(&node)
+			// log.Printf("Broadcast Transaction : %v", node)
+		}
+
+	}
+}
+
 // Request Proof of Storage
 func (mi *Mining) requestProofStorage(b *blockchain.Block) {
 	// When a node receives a new block, it carries out Proof of Storage
-	// it start from 120 * 5 min
+	// it start from 10 * 5 min
 	if b.Header.Height < 120 {
 		return
 	}
@@ -436,10 +503,10 @@ func (mi *Mining) requestProofStorage(b *blockchain.Block) {
 	}
 	// log.Printf("=====Prover PoS : %v", pproof)
 
-	sm := storage.StorageMgrInst("")
-	vproof := sm.ProofStorageProc(hashes.Hashes, []byte(resblock.Block))
+	// sm := storage.StorageMgrInst("")
+	// vproof := sm.ProofStorageProc(hashes.Hashes, []byte(resblock.Block))
 
-	log.Printf("Success PoStorage : %v", vproof)
+	// log.Printf("Success PoStorage : %v", vproof)
 }
 
 func (mi *Mining) GetTargetNodePoS(nodes [config.MAX_SC * config.MAX_SC_PEER]dtype.NodeInfo) *dtype.NodeInfo {
