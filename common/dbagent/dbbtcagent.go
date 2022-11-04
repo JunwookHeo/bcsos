@@ -148,7 +148,7 @@ func (a *btcdbagent) decryptPoSWithVariableLength(key, s []byte) []byte {
 		a.mutex.Lock()
 		defer a.mutex.Unlock()
 		status := &a.dbstatus
-		status.TimeEncryptAcc += gap
+		status.TimeDecryptAcc += gap
 	}
 
 	return d
@@ -213,7 +213,29 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 func (a *btcdbagent) getEncryptInfoWithHeight(height int) *btcBlock {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE height=?);`, height)
+	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE height=?;`, height)
+	if err != nil {
+		log.Printf("Show latest db status Error : %v", err)
+		return nil
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		id := 0
+		bi := btcBlock{}
+		rows.Scan(&id, &bi.timestamp, &bi.height, &bi.hashprev, &bi.hash, &bi.hashenc, &bi.hashkey)
+
+		return &bi
+	}
+
+	return nil
+}
+
+func (a *btcdbagent) getEncryptInfoWithPreviousHash(hash string) *btcBlock {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE hashprev=?;`, hash)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
 		return nil
@@ -235,7 +257,7 @@ func (a *btcdbagent) getEncryptInfoWithHeight(height int) *btcBlock {
 func (a *btcdbagent) getEncryptInfoWithHash(hash string) *btcBlock {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE hash=?);`, hash)
+	rows, err := a.db.Query(`SELECT *  FROM btcblocklist WHERE hash=?;`, hash)
 	if err != nil {
 		log.Printf("Show latest db status Error : %v", err)
 		return nil
@@ -265,13 +287,14 @@ func hashToUint32(b []byte) uint32 {
 // hash : new block's hash for randomization
 func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
 	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
-	if a.lastblock.height < config.NUM_CONSECUTIVE_HASHES*3 {
+	if a.lastblock.height < config.NUM_CONSECUTIVE_HASHES*2 {
 		return nil
 	}
 	// Select block
 	tmp, _ := hex.DecodeString(hash)
 	hb := sha256.Sum256(tmp)
-	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-10) // margin 10 blocks
+	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-(config.NUM_CONSECUTIVE_HASHES+1)) // margin 10 blocks
+	ri += 1                                                                                  // Exclude genesys block
 	log.Printf("Block selector : %v", ri)
 
 	// List up the encrypted block hash and key hash of encrypted blocks
@@ -292,8 +315,10 @@ func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractivePr
 
 	// select a block using the merkle root
 	proof.Root = blockchain.CalMerkleRootHash(hashroots)
-	proof.Selected = int(hashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES)) // randomize block selection
+	// randomize block selection. exclude the last block for forward verification
+	proof.Selected = int(hashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES-1))
 	proof.Hash = bis[proof.Selected].hash
+	log.Printf("Proof selected : %v - %v", proof.Selected, proof.Hash)
 
 	// create proof, merkle root, {hash, key hash}, encrypted block, timestamp
 	eb, err := ioutil.ReadFile(filepath.Join(a.dirpath, proof.Hash))
@@ -303,7 +328,7 @@ func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractivePr
 	}
 	proof.EncBlock = eb
 	proof.Timestamp = time.Now().UnixNano()
-	log.Printf("%v", proof)
+	log.Printf("Proof : %v - %v", proof.Timestamp, proof.Hash)
 
 	return &proof
 }
@@ -324,7 +349,63 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	return a.decryptPoSWithVariableLength(key, eb)
 }
 
-func (a *btcdbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
+func (a *btcdbagent) verifyNonInteractiveProof_Fwd(proof *dtype.NonInteractiveProof) bool {
+	if proof.Timestamp > time.Now().UnixNano() {
+		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
+		return false
+	}
+
+	if (proof.Timestamp-a.lastblock.timestamp)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-a.lastblock.timestamp)/1000000)
+		return false
+	}
+
+	bi := a.getEncryptInfoWithPreviousHash(proof.Hash)
+	if bi == nil {
+		log.Printf("Get Encrypt block info error : %v", proof.Hash)
+		return false
+	}
+	// log.Printf("Get Block info for verification : %v", bi)
+
+	// Forward verification : Get original block by decrypting bk and bk+1
+	b := a.getDecryptBlock(bi)
+	if b == nil {
+		log.Printf("Get Decrypt block error : %v", bi.hash)
+		return false
+	}
+
+	// block := bitcoin.NewBlock()
+	// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
+	// _ = rb.ReadUint32()
+	// hbuf := rb.ReverseBuf(rb.ReadBytes(32))
+	// hashprev := hex.EncodeToString(hbuf)
+
+	// block.SetHash(rb.GetRawBytes(0, 80))
+	// hash := block.GetHashString()
+	// s := rb.GetBlockBytes()
+	// size := len(s)
+	// log.Printf("%v, %v, %v", hashprev, hash, size)
+
+	// Get Key block(Previous encrypt block) from bk and ebk
+	hashkey, _ := a.encryptPoSWithVariableLength(proof.EncBlock, b)
+	// hashkey := poscipher.GetHashString(peb)
+	if hashkey == hex.EncodeToString(proof.HashEncs[proof.Selected+1]) {
+		log.Printf("Verifying PoS Success : %v", hashkey)
+		return true
+	}
+
+	if hashkey == hex.EncodeToString(proof.HashKeys[proof.Selected]) {
+		log.Printf("Verifying PoS Success : %v", hashkey)
+		return true
+	}
+
+	log.Printf("Verifying PoS Fail : %v", hashkey)
+	log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected]))
+	log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+1]))
+	return false
+}
+
+func (a *btcdbagent) verifyNonInteractiveProof_Rev(proof *dtype.NonInteractiveProof) bool {
 	if proof.Timestamp > time.Now().UnixNano() {
 		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
 		return false
@@ -337,25 +418,48 @@ func (a *btcdbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof)
 
 	bi := a.getEncryptInfoWithHash(proof.Hash)
 	if bi == nil {
-		log.Printf("Get Encrypt block info error : %v", bi.hash)
+		log.Printf("Get Encrypt block info error : %v", proof.Hash)
 		return false
 	}
+	// log.Printf("Get Block info for verification : %v", bi)
 
-	// Get original block by decrypting bk and bk-1
+	// Forward verification : Get original block by decrypting bk and bk-1
 	b := a.getDecryptBlock(bi)
 	if b == nil {
 		log.Printf("Get Decrypt block error : %v", bi.hash)
 		return false
 	}
 
-	// Get Key block(Previous encrypt block) from bk and ebk
-	peb := a.decryptPoSWithVariableLength(proof.EncBlock, b)
+	// block := bitcoin.NewBlock()
+	// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
+	// _ = rb.ReadUint32()
+	// hbuf := rb.ReverseBuf(rb.ReadBytes(32))
+	// hashprev := hex.EncodeToString(hbuf)
+
+	// block.SetHash(rb.GetRawBytes(0, 80))
+	// hash := block.GetHashString()
+	// s := rb.GetBlockBytes()
+	// size := len(s)
+	// log.Printf("%v, %v, %v", hashprev, hash, size)
+
+	// Get Key block(Previous block) from bk and ebk
+	peb := a.decryptPoSWithVariableLength(b, proof.EncBlock)
 	hashkey := poscipher.GetHashString(peb)
+	// log.Printf("PEB : %x", peb[0:80])
+
 	if hashkey == hex.EncodeToString(proof.HashKeys[proof.Selected]) {
+		log.Printf("Verifying PoS Success : %v", hashkey)
 		return true
 	}
 
+	log.Printf("Verifying PoS Fail : %v", hashkey)
+	log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected]))
 	return false
+}
+
+func (a *btcdbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
+	return a.verifyNonInteractiveProof_Rev(proof)
+	// return a.verifyNonInteractiveProof_Fwd(proof)
 }
 
 func (a *btcdbagent) initLastBlock() {

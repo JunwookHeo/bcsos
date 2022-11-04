@@ -1,15 +1,20 @@
 package dbagent
 
 import (
+	"database/sql"
 	"encoding/hex"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/stretchr/testify/assert"
@@ -162,7 +167,7 @@ func TestDBAgentReplicatoin(t *testing.T) {
 // }
 
 func TestBtcDBAgent(t *testing.T) {
-	path := "../../blockchainnode/db_nodes/7001.db" + ".blocks"
+	path := "../../blockchainnode/db_nodes/7011.db" + ".blocks"
 	// b2 := "0000000000000000000027895a1788f2339b84a4f365c0accb95be3d406726fb"
 	b2 := "00000000000000000000f9e395753e490f29a1213fdfbe89314691a0d268c1d4"
 	encb2, err := ioutil.ReadFile(filepath.Join(path, b2))
@@ -195,4 +200,40 @@ func TestBtcDBAgent(t *testing.T) {
 	txcount := rb.ReadVariant()
 	log.Printf("Tx Count : %d", txcount)
 
+}
+
+func newTestDBBtcSqlite(path string) DBAgent {
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		log.Panicf("Open sqlite db error : %v", err)
+	}
+
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: btcDBStatus{Timestamp: time.Now()}, dirpath: "", lastblock: btcBlock{}, mutex: sync.Mutex{}}
+	dba.getLatestDBStatus(&dba.dbstatus)
+	go dba.updateDBStatus()
+
+	dba.lastblock.timestamp = time.Now().UnixNano()
+	dba.lastblock.encblock = dba.getEncryptKeyforGenesis() // encblock is data to encrypt the next block
+	dba.lastblock.hash = poscipher.GetHashString(dba.lastblock.encblock)
+	dba.lastblock.hashenc = dba.lastblock.hash // This block does not need to be encrypted
+	dba.lastblock.hashkey = ""                 // There is no key
+	dba.lastblock.height = 10                  // This is key for the first block(B0)
+	dba.lastblock.hashprev = ""                // No previous block
+
+	dba.dirpath = path + ".blocks"
+
+	return &dba
+}
+
+func TestBtcDBAgentPoS(t *testing.T) {
+	path := "../../blockchainnode/db_nodes/7001.db"
+	config.WALLET_PATH = "../../blockchainnode/db_nodes/7011.wallet"
+	ag := newTestDBBtcSqlite(path)
+	hash := "05500000000000000000f9e395753e490f29a3213fdfbe8931a691a0d268c1df"
+	proof := ag.GetNonInteractiveProof(hash)
+	// log.Printf("Proof : %v", proof.Hash)
+	ag.VerifyNonInteractiveProof(proof)
 }

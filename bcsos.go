@@ -256,7 +256,7 @@ func test_encypt_decrypt() {
 		_, y := poscipher.EncryptPoSWithVariableLength(key, x)
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
-
+		log.Printf("Enc x:%x", y[0:80])
 		// Start Decryption
 		start = time.Now().UnixNano()
 		x_t := poscipher.DecryptPoSWithVariableLength(key, y)
