@@ -170,3 +170,21 @@ func GetHashforPoSKey(key []byte, ls int) string {
 
 	return GetHashString(d)
 }
+
+func CalculateXorWithAddress(addr, s []byte) []byte {
+	lk := len(addr) // assume key is aligned
+	ls := len(s)
+	if lk > ls {
+		log.Panicf("Error Source length is smaller then addr : %v", ls)
+		return nil
+	}
+
+	d := make([]byte, ls)
+
+	for i := 0; i < ls; i++ {
+		// y[i] = k[i%lk] ^ x[i]
+		d[i] = s[i] ^ addr[i%lk]
+	}
+
+	return d
+}

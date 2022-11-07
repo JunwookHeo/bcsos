@@ -230,6 +230,7 @@ func test_encypt_decrypt() {
 	const PATH_TEST = "blocks.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	key := w.PublicKey
+	addr := w.PublicKey
 
 	msg := make(chan bitcoin.BlockPkt)
 	go simulation.LoadBtcData(PATH_TEST, msg)
@@ -253,13 +254,14 @@ func test_encypt_decrypt() {
 
 		// Start Encryption
 		start := time.Now().UnixNano()
-		_, y := poscipher.EncryptPoSWithVariableLength(key, x)
+		_, y := poscipher.EncryptPoSWithVariableLength(key, poscipher.CalculateXorWithAddress(addr, x))
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
 		log.Printf("Enc x:%x", y[0:80])
 		// Start Decryption
 		start = time.Now().UnixNano()
 		x_t := poscipher.DecryptPoSWithVariableLength(key, y)
+		x_t = poscipher.CalculateXorWithAddress(addr, x_t)
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 

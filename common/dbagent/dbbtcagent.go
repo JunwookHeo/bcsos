@@ -178,10 +178,11 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 	hash := block.GetHashString()
 	s := rb.GetBlockBytes()
 	size := len(s)
+	addr := a.getEncryptKeyforGenesis()
 
 	// Enctypting a new block
 	key := a.lastblock.encblock
-	hashenc, encblock := a.encryptPoSWithVariableLength(key, s)
+	hashenc, encblock := a.encryptPoSWithVariableLength(key, poscipher.CalculateXorWithAddress(addr, s))
 	a.lastblock.timestamp = sb.Timestamp
 	a.lastblock.hash = hash
 	a.lastblock.height += 1
@@ -328,6 +329,7 @@ func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractivePr
 	}
 	proof.EncBlock = eb
 	proof.Timestamp = time.Now().UnixNano()
+	proof.Address = a.getEncryptKeyforGenesis()
 	log.Printf("Proof : %v - %v", proof.Timestamp, proof.Hash)
 
 	return &proof
@@ -346,7 +348,8 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 		return nil
 	}
 
-	return a.decryptPoSWithVariableLength(key, eb)
+	addr := a.getEncryptKeyforGenesis()
+	return poscipher.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
 }
 
 func (a *btcdbagent) verifyNonInteractiveProof_Fwd(proof *dtype.NonInteractiveProof) bool {
@@ -384,10 +387,11 @@ func (a *btcdbagent) verifyNonInteractiveProof_Fwd(proof *dtype.NonInteractivePr
 	// hash := block.GetHashString()
 	// s := rb.GetBlockBytes()
 	// size := len(s)
-	// log.Printf("%v, %v, %v", hashprev, hash, size)
+	// log.Printf("FWD : %v, %v, %v", hashprev, hash, size)
 
 	// Get Key block(Previous encrypt block) from bk and ebk
-	hashkey, _ := a.encryptPoSWithVariableLength(proof.EncBlock, b)
+	addr := proof.Address
+	hashkey, _ := a.encryptPoSWithVariableLength(proof.EncBlock, poscipher.CalculateXorWithAddress(addr, b))
 	// hashkey := poscipher.GetHashString(peb)
 	if hashkey == hex.EncodeToString(proof.HashEncs[proof.Selected+1]) {
 		log.Printf("Verifying PoS Success : %v", hashkey)
@@ -440,10 +444,11 @@ func (a *btcdbagent) verifyNonInteractiveProof_Rev(proof *dtype.NonInteractivePr
 	// hash := block.GetHashString()
 	// s := rb.GetBlockBytes()
 	// size := len(s)
-	// log.Printf("%v, %v, %v", hashprev, hash, size)
+	// log.Printf("REV : %v, %v, %v", hashprev, hash, size)
 
 	// Get Key block(Previous block) from bk and ebk
-	peb := a.decryptPoSWithVariableLength(b, proof.EncBlock)
+	addr := proof.Address
+	peb := a.decryptPoSWithVariableLength(poscipher.CalculateXorWithAddress(addr, b), proof.EncBlock)
 	hashkey := poscipher.GetHashString(peb)
 	// log.Printf("PEB : %x", peb[0:80])
 
@@ -458,8 +463,8 @@ func (a *btcdbagent) verifyNonInteractiveProof_Rev(proof *dtype.NonInteractivePr
 }
 
 func (a *btcdbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
-	return a.verifyNonInteractiveProof_Rev(proof)
-	// return a.verifyNonInteractiveProof_Fwd(proof)
+	// return a.verifyNonInteractiveProof_Rev(proof)
+	return a.verifyNonInteractiveProof_Fwd(proof)
 }
 
 func (a *btcdbagent) initLastBlock() {

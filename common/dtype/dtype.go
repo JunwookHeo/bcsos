@@ -44,6 +44,7 @@ type ResEncryptedBlock struct {
 
 type NonInteractiveProof struct {
 	Timestamp int64
+	Address   []byte
 	Root      []byte
 	HashEncs  [][]byte
 	HashKeys  [][]byte
