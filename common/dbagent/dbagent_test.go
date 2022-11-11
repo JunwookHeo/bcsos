@@ -235,5 +235,5 @@ func TestBtcDBAgentPoS(t *testing.T) {
 	hash := "05500000000000000000f9e395753e490f29a3213fdfbe8931a691a0d268c1d1"
 	proof := ag.GetNonInteractiveProof(hash)
 	// log.Printf("Proof : %v", proof.Hash)
-	ag.VerifyNonInteractiveProof(proof)
+	ag.VerifyProofStorage(proof)
 }

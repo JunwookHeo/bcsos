@@ -42,7 +42,7 @@ type ResEncryptedBlock struct {
 	Block string `json:"Block"`
 }
 
-type NonInteractiveProof struct {
+type PoSProof struct {
 	Timestamp int64
 	Address   []byte
 	Root      []byte

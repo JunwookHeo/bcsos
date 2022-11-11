@@ -285,26 +285,15 @@ func hashToUint32(b []byte) uint32 {
 	return x
 }
 
-// hash : new block's hash for randomization
-func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
-	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
-	if a.lastblock.height < config.NUM_CONSECUTIVE_HASHES*2 {
-		return nil
-	}
-	// Select block
-	tmp, _ := hex.DecodeString(hash)
-	hb := sha256.Sum256(tmp)
-	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-(config.NUM_CONSECUTIVE_HASHES+1)) // margin 10 blocks
-	ri += 1                                                                                  // Exclude genesys block
-	log.Printf("Block selector : %v", ri)
-
+// height : the start height of n-consecutive encrypted blocks
+func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	// List up the encrypted block hash and key hash of encrypted blocks
 	// And calculate Merkle Root
 	var hashroots [][]byte
-	proof := dtype.NonInteractiveProof{}
+	proof := dtype.PoSProof{}
 	bis := make([]*btcBlock, config.NUM_CONSECUTIVE_HASHES)
 	for i := 0; i < config.NUM_CONSECUTIVE_HASHES; i++ {
-		bi := a.getEncryptInfoWithHeight(int(ri) + i)
+		bi := a.getEncryptInfoWithHeight(height + i)
 		bis[i] = bi
 		he, _ := hex.DecodeString(bi.hashenc)
 		proof.HashEncs = append(proof.HashEncs, he)
@@ -335,6 +324,34 @@ func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractivePr
 	return &proof
 }
 
+// hash : new block's hash for randomization
+func (a *btcdbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
+	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
+	if a.lastblock.height < config.NUM_CONSECUTIVE_HASHES*2 {
+		return -1
+	}
+	// Select block
+	tmp, _ := hex.DecodeString(hash)
+	hb := sha256.Sum256(tmp)
+	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-(config.NUM_CONSECUTIVE_HASHES+1)) // margin 10 blocks
+	ri += 1                                                                                  // Exclude genesys block
+	log.Printf("Block selector : %v", ri)
+
+	return int(ri)
+}
+
+// hash : new block's hash for randomization
+func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.PoSProof {
+	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
+	ri := a.GetRandomHeightForNConsecutiveBlocks(hash)
+
+	return a.generateProof(int(ri))
+}
+
+func (a *btcdbagent) GetInteractiveProof(height int) *dtype.PoSProof {
+	return a.generateProof(int(height))
+}
+
 func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	eb, err := ioutil.ReadFile(filepath.Join(a.dirpath, bi.hash))
 	if err != nil {
@@ -352,7 +369,7 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	return poscipher.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
 }
 
-func (a *btcdbagent) verifyNonInteractiveProof_Fwd(proof *dtype.NonInteractiveProof) bool {
+func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 	if proof.Timestamp > time.Now().UnixNano() {
 		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
 		return false
@@ -409,7 +426,7 @@ func (a *btcdbagent) verifyNonInteractiveProof_Fwd(proof *dtype.NonInteractivePr
 	return false
 }
 
-func (a *btcdbagent) verifyNonInteractiveProof_Rev(proof *dtype.NonInteractiveProof) bool {
+func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
 	if proof.Timestamp > time.Now().UnixNano() {
 		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
 		return false
@@ -462,9 +479,9 @@ func (a *btcdbagent) verifyNonInteractiveProof_Rev(proof *dtype.NonInteractivePr
 	return false
 }
 
-func (a *btcdbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
-	// return a.verifyNonInteractiveProof_Rev(proof)
-	return a.verifyNonInteractiveProof_Fwd(proof)
+func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
+	// return a.verifyProofStorage_Rev(proof)
+	return a.verifyProofStorage_Fwd(proof)
 }
 
 func (a *btcdbagent) initLastBlock() {

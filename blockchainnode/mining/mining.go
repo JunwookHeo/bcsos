@@ -243,8 +243,6 @@ func (mi *Mining) newBlockHandler(w http.ResponseWriter, r *http.Request) {
 
 	// log.Printf("===FWD bc block : %v", hex.EncodeToString(block.Header.Hash))
 	go mi.BroadcastNewBlock(&block)
-	// Proof of Storage
-	go mi.requestProofStorage(&block)
 
 	sm := storage.StorageMgrInst("")
 	sm.AddNewBlock(&block)
@@ -355,8 +353,12 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Received New BTC Block : %v", hash)
 	go mi.BroadcastNewBtcBlock(&buf)
-	// // Proof of Storage
-	go mi.nonInteractiveProofStorage(hash)
+
+	if config.PROOFSTORAGE_METHOD == "INTERACTIVE" {
+		go mi.requestInteractiveProof(hash)
+	} else {
+		go mi.nonInteractiveProofStorage(hash)
+	}
 
 	sm := storage.StorageMgrInst("")
 	sm.AddNewBtcBlock(&buf, hash)
@@ -381,12 +383,6 @@ func (mi *Mining) nonInteractiveProofStorage(hash string) {
 		return
 	}
 
-	// Get target node for Proof of Storage
-	node := mi.GetTargetNodePoS(nodes)
-	if node == nil {
-		return
-	}
-
 	// Create a Proof
 	sm := storage.StorageMgrInst("")
 	proof := sm.GetNonInteractiveProof(hash)
@@ -398,7 +394,7 @@ func (mi *Mining) nonInteractiveProofStorage(hash string) {
 	}
 }
 
-func (mi *Mining) broadcastNonInteractiveProof(p *dtype.NonInteractiveProof) {
+func (mi *Mining) broadcastNonInteractiveProof(p *dtype.PoSProof) {
 	sendTransaction := func(node *dtype.NodeInfo) {
 		url := fmt.Sprintf("ws://%v:%v/noninteractiveproof", node.IP, node.Port)
 		//log.Printf("BroadcasTransaction to : %v", url)
@@ -429,12 +425,7 @@ func (mi *Mining) broadcastNonInteractiveProof(p *dtype.NonInteractiveProof) {
 }
 
 // Request Proof of Storage
-func (mi *Mining) requestProofStorage(b *blockchain.Block) {
-	// When a node receives a new block, it carries out Proof of Storage
-	// it start from 10 * 5 min
-	if b.Header.Height < 120 {
-		return
-	}
+func (mi *Mining) requestInteractiveProof(hash string) {
 
 	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
 	nm := network.NodeMgrInst()
@@ -443,7 +434,7 @@ func (mi *Mining) requestProofStorage(b *blockchain.Block) {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	h1 := b.Header.Hash
+	h1 := hash
 	h2, _ := hex.DecodeString(local.Hash)
 
 	// Check address and hash
@@ -462,7 +453,7 @@ func (mi *Mining) requestProofStorage(b *blockchain.Block) {
 	// Request k consecutive hashes
 	// Choose c encrypted blocks
 	// Verify them
-	url := fmt.Sprintf("ws://%v:%v/proofstorage", node.IP, node.Port)
+	url := fmt.Sprintf("ws://%v:%v/interactiveproof", node.IP, node.Port)
 	// log.Printf("Send ping with local info : %v", url)
 
 	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -472,41 +463,22 @@ func (mi *Mining) requestProofStorage(b *blockchain.Block) {
 	}
 	defer ws.Close()
 
-	req := dtype.ReqConsecutiveHashes{}
-	req.Hash = "" // Randomly choose hex.EncodeToString(b.Header.Hash)
-	req.Count = config.NUM_CONSECUTIVE_HASHES
+	sm := storage.StorageMgrInst("")
 
-	if err := ws.WriteJSON(req); err != nil {
+	height := sm.GetRandomHeightForNConsecutiveBlocks
+
+	if err := ws.WriteJSON(height); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
 
-	var hashes dtype.ResConsecutiveHashes
-	if err := ws.ReadJSON(&hashes); err != nil {
-		log.Printf("Write json error : %v", err)
+	var proof dtype.PoSProof
+	if err := ws.ReadJSON(&proof); err != nil {
+		log.Printf("Read json error : %v", err)
 		return
 	}
 
-	// Request c of encrypted blocks
-	reqblock := dtype.ReqEncryptedBlock{}
-	reqblock.Hash = "" // Randomly choose
-
-	if err := ws.WriteJSON(reqblock); err != nil {
-		log.Printf("Write json error : %v", err)
-		return
-	}
-
-	var resblock dtype.ResEncryptedBlock
-	if err := ws.ReadJSON(&resblock); err != nil {
-		log.Printf("Write json error : %v", err)
-		return
-	}
-	// log.Printf("=====Prover PoS : %v", pproof)
-
-	// sm := storage.StorageMgrInst("")
-	// vproof := sm.ProofStorageProc(hashes.Hashes, []byte(resblock.Block))
-
-	// log.Printf("Success PoStorage : %v", vproof)
+	sm.VerifyProofStorage(&proof)
 }
 
 func (mi *Mining) GetTargetNodePoS(nodes [config.MAX_SC * config.MAX_SC_PEER]dtype.NodeInfo) *dtype.NodeInfo {

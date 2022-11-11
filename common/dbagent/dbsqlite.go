@@ -631,11 +631,20 @@ func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	}
 }
 
-func (a *dbagent) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
+// hash : new block's hash for randomization
+func (a *dbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
+	return -1
+}
+
+func (a *dbagent) GetNonInteractiveProof(hash string) *dtype.PoSProof {
 	return nil
 }
 
-func (a *dbagent) VerifyNonInteractiveProof(proof *dtype.NonInteractiveProof) bool {
+func (a *dbagent) GetInteractiveProof(height int) *dtype.PoSProof {
+	return nil
+}
+
+func (a *dbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 	return false
 }
 

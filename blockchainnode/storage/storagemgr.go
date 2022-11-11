@@ -283,10 +283,10 @@ func (h *StorageMgr) RemoveNoAccessObjects() {
 	}
 }
 
-// proofStorageHandler handles the request of Proof of Storage
+// interactiveProofHandler handles the request of Proof of Storage
 // Request : Hash of block and timestamp
 // Response : Merkel root of transactions to be proven
-func (h *StorageMgr) proofStorageHandler(w http.ResponseWriter, r *http.Request) {
+func (h *StorageMgr) interactiveProofHandler(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -335,19 +335,31 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 	}
 	defer ws.Close()
 
-	var proof dtype.NonInteractiveProof
+	var proof dtype.PoSProof
 	if err := ws.ReadJSON(&proof); err != nil {
 		log.Printf("Read json error : %v", err)
 		return
 	}
 
 	// Todo : Verification of proof
-	h.db.VerifyNonInteractiveProof(&proof)
+	h.VerifyProofStorage(&proof)
 
 }
 
-func (h *StorageMgr) GetNonInteractiveProof(hash string) *dtype.NonInteractiveProof {
+func (h *StorageMgr) GetRandomHeightForNConsecutiveBlocks(hash string) int {
+	return h.db.GetRandomHeightForNConsecutiveBlocks(hash)
+}
+
+func (h *StorageMgr) GetNonInteractiveProof(hash string) *dtype.PoSProof {
 	return h.db.GetNonInteractiveProof(hash)
+}
+
+func (h *StorageMgr) GetInteractiveProof(height int) *dtype.PoSProof {
+	return h.db.GetInteractiveProof(height)
+}
+
+func (h *StorageMgr) VerifyProofStorage(proof *dtype.PoSProof) bool {
+	return h.db.VerifyProofStorage(proof)
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {
@@ -413,7 +425,7 @@ func (h *StorageMgr) GetLatestBlockHash() (string, int) {
 func (sm *StorageMgr) SetHttpRouter(m *mux.Router) {
 	m.HandleFunc("/getobject", sm.getObjectHandler)
 	m.HandleFunc("/statusinfo", sm.statusInfoHandler)
-	m.HandleFunc("/proofstorage", sm.proofStorageHandler)
+	m.HandleFunc("/interactiveproof", sm.interactiveProofHandler)
 	m.HandleFunc("/noninteractiveproof", sm.nonInteractiveProofHandler)
 }
 
