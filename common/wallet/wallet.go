@@ -9,7 +9,7 @@ G is the generator point on the Elliptic curve.
 k is a private key in the form of a randomly generated number.
 K is a public key.
 
-How to generate Bitcoin address
+# How to generate Bitcoin address
 
 Pulick Key --> SHA256 --> RIPEMD160 --> Base58Check Encoding --> Bitcoin Address
 
@@ -19,7 +19,6 @@ Base58Check Encoding
 3. (Version + Payload) --> SHA256 --> SHA256 --> First 4bytes --> Checksum
 3.  Version + Payload + Checksum
 4. (Version + Payload + Checksum) --> Base58 encode
-
 */
 package wallet
 
@@ -100,10 +99,10 @@ func (w *Wallet) GetAddress() []byte {
 	fullPayload := append(verPayload, checksum...)
 	address := Base58Encode(fullPayload)
 
-	ich := binary.LittleEndian.Uint32(checksum)
-	log.Printf("checksum : %v", ich)
-	log.Printf("payload  : %x", payload)
-	log.Printf("version  : %d", version)
+	// ich := binary.LittleEndian.Uint32(checksum)
+	// log.Printf("checksum : %v", ich)
+	// log.Printf("payload  : %x", payload)
+	// log.Printf("version  : %d", version)
 
 	return address
 }

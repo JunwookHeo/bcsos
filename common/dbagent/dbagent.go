@@ -29,6 +29,7 @@ type DBAgent interface {
 	VerifyProofStorage(proof *dtype.PoSProof) bool
 	GetInteractiveProof(height int) *dtype.PoSProof
 	GetRandomHeightForNConsecutiveBlocks(hash string) int
+	GetLastBlockTime() int64
 	// ProofStorage(tidx [32]byte, timestamp int64, tsc int) []byte
 	// ProofStorage2()
 }

@@ -631,7 +631,10 @@ func (a *dbagent) UpdateDBNetworkDelay(addtime int, hop int) {
 	}
 }
 
-// hash : new block's hash for randomization
+func (a *dbagent) GetLastBlockTime() int64 {
+	return 0
+}
+
 func (a *dbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 	return -1
 }

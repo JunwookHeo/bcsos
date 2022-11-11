@@ -327,7 +327,7 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 // hash : new block's hash for randomization
 func (a *btcdbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
-	if a.lastblock.height < config.NUM_CONSECUTIVE_HASHES*2 {
+	if a.lastblock.height <= config.NUM_CONSECUTIVE_HASHES+1 {
 		return -1
 	}
 	// Select block
@@ -344,6 +344,9 @@ func (a *btcdbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.PoSProof {
 	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
 	ri := a.GetRandomHeightForNConsecutiveBlocks(hash)
+	if ri == -1 {
+		return nil
+	}
 
 	return a.generateProof(int(ri))
 }
@@ -370,16 +373,6 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 }
 
 func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
-	if proof.Timestamp > time.Now().UnixNano() {
-		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
-		return false
-	}
-
-	if (proof.Timestamp-a.lastblock.timestamp)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
-		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-a.lastblock.timestamp)/1000000)
-		return false
-	}
-
 	bi := a.getEncryptInfoWithPreviousHash(proof.Hash)
 	if bi == nil {
 		log.Printf("Get Encrypt block info error : %v", proof.Hash)
@@ -409,13 +402,7 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 	// Get Key block(Previous encrypt block) from bk and ebk
 	addr := proof.Address
 	hashkey, _ := a.encryptPoSWithVariableLength(proof.EncBlock, poscipher.CalculateXorWithAddress(addr, b))
-	// hashkey := poscipher.GetHashString(peb)
 	if hashkey == hex.EncodeToString(proof.HashEncs[proof.Selected+1]) {
-		log.Printf("Verifying PoS Success : %v", hashkey)
-		return true
-	}
-
-	if hashkey == hex.EncodeToString(proof.HashKeys[proof.Selected]) {
 		log.Printf("Verifying PoS Success : %v", hashkey)
 		return true
 	}
@@ -427,16 +414,6 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 }
 
 func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
-	if proof.Timestamp > time.Now().UnixNano() {
-		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
-		return false
-	}
-
-	if (proof.Timestamp-a.lastblock.timestamp)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
-		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-a.lastblock.timestamp)/1000000)
-		return false
-	}
-
 	bi := a.getEncryptInfoWithHash(proof.Hash)
 	if bi == nil {
 		log.Printf("Get Encrypt block info error : %v", proof.Hash)
@@ -495,6 +472,10 @@ func (a *btcdbagent) initLastBlock() {
 
 	// TODO : Add to it to db
 	a.addBtcBlocktoList(&a.lastblock)
+}
+
+func (a *btcdbagent) GetLastBlockTime() int64 {
+	return a.lastblock.timestamp
 }
 
 func (a *btcdbagent) GetBlock(hash string, b *blockchain.Block) int64 {

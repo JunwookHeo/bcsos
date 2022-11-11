@@ -378,7 +378,8 @@ func (mi *Mining) nonInteractiveProofStorage(hash string) {
 	h2, _ := hex.DecodeString(local.Hash)
 
 	// Check address and hash
-	mask := byte(0x0F) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
+	mask := byte(config.MASK_SELECT_POS_NODE) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
+	log.Printf("check hash for Pos : %v-%v", h1[len(h1)-1]&mask, h2[len(h2)-1]&mask)
 	if h1[len(h1)-1]&mask != h2[len(h2)-1]&mask {
 		return
 	}
@@ -438,7 +439,9 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 	h2, _ := hex.DecodeString(local.Hash)
 
 	// Check address and hash
-	if h1[len(h1)-1] != h2[len(h2)-1] {
+	mask := byte(config.MASK_SELECT_POS_NODE) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
+	log.Printf("check hash for Pos : %v-%v", h1[len(h1)-1]&mask, h2[len(h2)-1]&mask)
+	if h1[len(h1)-1]&mask != h2[len(h2)-1]&mask {
 		return
 	}
 
@@ -447,12 +450,15 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 	if node == nil {
 		return
 	}
+	log.Printf("check node for Pos : %v-%v", node.IP, node.Port)
 
-	// =============================================================
-	// TODO : POS_IMPL
-	// Request k consecutive hashes
-	// Choose c encrypted blocks
-	// Verify them
+	sm := storage.StorageMgrInst("")
+	height := sm.GetRandomHeightForNConsecutiveBlocks(hash)
+
+	if height == -1 {
+		return
+	}
+
 	url := fmt.Sprintf("ws://%v:%v/interactiveproof", node.IP, node.Port)
 	// log.Printf("Send ping with local info : %v", url)
 
@@ -463,18 +469,26 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 	}
 	defer ws.Close()
 
-	sm := storage.StorageMgrInst("")
-
-	height := sm.GetRandomHeightForNConsecutiveBlocks
-
-	if err := ws.WriteJSON(height); err != nil {
+	req := dtype.ReqConsecutiveHashes{Height: height, Count: config.NUM_CONSECUTIVE_HASHES}
+	if err := ws.WriteJSON(req); err != nil {
 		log.Printf("Write json error : %v", err)
 		return
 	}
+	start := time.Now().UnixNano()
 
 	var proof dtype.PoSProof
 	if err := ws.ReadJSON(&proof); err != nil {
 		log.Printf("Read json error : %v", err)
+		return
+	}
+
+	if proof.Timestamp > time.Now().UnixNano() {
+		log.Printf("Verify Proof : Time error %v", proof.Timestamp)
+		return
+	}
+
+	if (proof.Timestamp-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-start)/1000000)
 		return
 	}
 
@@ -484,20 +498,15 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 func (mi *Mining) GetTargetNodePoS(nodes [config.MAX_SC * config.MAX_SC_PEER]dtype.NodeInfo) *dtype.NodeInfo {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
-	t_sc := local.SC - 1
 
 	if config.MAX_SC < local.SC {
 		return nil
 	}
 
-	if t_sc < 0 {
-		t_sc = 0
-	}
-
 	var t_nodes []dtype.NodeInfo
 	cnt := 0
 	for _, node := range nodes {
-		if node.Hash != "" && node.SC == t_sc {
+		if node.Hash != "" && node.Hash != local.Hash {
 			t_nodes = append(t_nodes, node)
 			cnt++
 		}

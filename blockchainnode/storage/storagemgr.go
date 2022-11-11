@@ -301,24 +301,10 @@ func (h *StorageMgr) interactiveProofHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// TODO : Get k of consecutive hashes and return them
-	hashes := ""
-	if err := ws.WriteJSON(hashes); err != nil {
-		log.Printf("Write json error : %v", err)
-		return
-	}
+	proof := h.GetInteractiveProof(reqHash.Height)
 
-	var reqBlock dtype.ReqEncryptedBlock
-	if err := ws.ReadJSON(&reqBlock); err != nil {
-		log.Printf("Read json error : %v", err)
-		return
-	}
-
-	// TODO : Get the enctypted block and return it
-	resBlock := dtype.ResEncryptedBlock{}
-	resBlock.Block = ""
-	if err := ws.WriteJSON(resBlock); err != nil {
-		log.Printf("Write json error : %v", err)
+	if err := ws.WriteJSON(proof); err != nil {
+		log.Printf("Write proof error : %v", err)
 		return
 	}
 }
@@ -341,7 +327,11 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Todo : Verification of proof
+	start := h.db.GetLastBlockTime()
+	if (proof.Timestamp-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-start)/1000000)
+		return
+	}
 	h.VerifyProofStorage(&proof)
 
 }

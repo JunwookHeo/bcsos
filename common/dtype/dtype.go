@@ -26,8 +26,8 @@ type Command struct {
 }
 
 type ReqConsecutiveHashes struct {
-	Hash  string `json:"Hash"`
-	Count int    `json:"Count"`
+	Height int `json:"Height"`
+	Count  int `json:"Count"`
 }
 
 type ResConsecutiveHashes struct {
