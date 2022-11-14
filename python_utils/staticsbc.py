@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import time
 
 
 def blockchain_stats(name):
@@ -158,16 +159,19 @@ def get_bitcoin_transactions2():
 def get_blocks_from_height():
     import csv
     import json
-    outfile = 'blocks.json'
+    outfile = 'blocks_360.json'
     height = 756450
+    num_block = 360
     with open(outfile, "w") as fo:
-        for h in range(height, height + 10):
+        for i, h in enumerate (range(height, height + num_block)):
+            start = time.time()
             api_url = f'https://api.blockchair.com/bitcoin/raw/block/{h}'
             response = requests.get(api_url)
             res = response.json()
             json.dump(res, fo)
             fo.writelines('\n')
-            print(res)
+            done = time.time() - start
+            print("Downloading {} : {}".format(i, done))
 
     with open(outfile, 'r') as openfile:
         # Reading from json file
