@@ -16,6 +16,9 @@ import (
 var IV = []byte("1234567812345678")
 var TAU = 3100
 
+const PATH_TEST = "../blocks.json"
+const PATH_WALLET = "blocks.json.wallet"
+
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
 }
@@ -56,8 +59,7 @@ func CheckError(err error) {
 }
 
 func test_aes_cbc() {
-	const PATH_TEST = "../blocks.json"
-	w := wallet.NewWallet("blocks.json.wallet")
+	w := wallet.NewWallet(PATH_WALLET)
 	key := w.PublicKey[0:32]
 
 	msg := make(chan bitcoin.BlockPkt)
@@ -104,8 +106,7 @@ func test_aes_cbc() {
 }
 
 func test_encypt_decrypt() {
-	const PATH_TEST = "../blocks.json"
-	w := wallet.NewWallet("blocks.json.wallet")
+	w := wallet.NewWallet(PATH_WALLET)
 	key := w.PublicKey
 	addr := w.PublicKey
 
