@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"flag"
 	"log"
 	"time"
 
@@ -14,13 +15,20 @@ import (
 )
 
 var IV = []byte("1234567812345678")
-var TAU = 3100
+var TAU = 347
 
 const PATH_TEST = "../blocks.json"
 const PATH_WALLET = "blocks.json.wallet"
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
+}
+
+func flagParse() string {
+	ptest := flag.String("test", "ASYM", "AES: Test AES-256, ASYM: Test Asymetric")
+	flag.Parse()
+
+	return *ptest
 }
 
 func EncryptAES(key []byte, pt []byte) []byte {
@@ -68,7 +76,7 @@ func test_aes_cbc() {
 	tenc := int64(0)
 	tdec := int64(0)
 	size := int64(0)
-
+	log.Println("AES-256 Encrypt/Decrypt")
 	for {
 		d, ok := <-msg
 		if !ok {
@@ -115,6 +123,7 @@ func test_encypt_decrypt() {
 
 	tenc := int64(0)
 	tdec := int64(0)
+	log.Println("Asymetric Encrypt/Decrypt")
 	for {
 		d, ok := <-msg
 		if !ok {
@@ -150,6 +159,10 @@ func test_encypt_decrypt() {
 	close(msg)
 }
 func main() {
-	// test_encypt_decrypt()
-	test_aes_cbc()
+	test := flagParse()
+	if test == "AES" {
+		test_aes_cbc()
+	} else {
+		test_encypt_decrypt()
+	}
 }

@@ -15,16 +15,16 @@ class Node:
         self.port = port
         self.test = test
     def toString(self):
-        return 'url={} sc={} port={} test={}'.format(self.url, self.sc, self.port, self.test)
+        return '{} {} {} {}'.format(self.url, self.sc, self.port, self.test)
 
 def getNodes():
     nodes = []
     with open('rpi.nodes') as fp:
         for line in fp.readlines():
             try:
-                url, sc, port = line.split()
+                url, sc, port, test = line.split()
                 if not url.startswith('#'):
-                    nodes.append(Node(url, sc, port))
+                    nodes.append(Node(url, sc, port, test))
             except ValueError as e:
                 print(e)
     
@@ -32,13 +32,13 @@ def getNodes():
 
 def putBinary(nodes):
     for node in nodes:
-        print("Put out/client %s"%(node.toString()))
+        print("Put out/perf %s"%(node.toString()))
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(node.url, 22, USER, PASSWD, timeout=5)
 
         with SCPClient(ssh.get_transport()) as scp:
-            scp.put('out/client', recursive=True)
+            scp.put('out/perf', recursive=True)
 
         ssh.close()
 
@@ -69,9 +69,9 @@ def tmux_shell(pane, command):
 
 def runSim(pane, node):
     tmux_shell(pane, 'sshpass -p %s ssh -o StrictHostKeyChecking=no mldc@%s' %(PASSWD, node.url))
-    tmux_shell(pane, 'cd client')
-    tmux_shell(pane, 'rm -rf db_nodes')
-    tmux_shell(pane, './blockchainnode %s %s'%(node.sc, node.port))
+    tmux_shell(pane, 'cd perf')
+    # tmux_shell(pane, 'rm -rf db_nodes')
+    tmux_shell(pane, './blockchainperf %s'%(node.test))
 
 ### Configuration of GUI with tmux
 ### Split window and connect to each RPI node with ssh

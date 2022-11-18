@@ -1,5 +1,5 @@
-node0.local -sc=0 -port=7001
-node1.local -sc=0 -port=7002
-node2.local -sc=1 -port=7011
-node3.local -sc=3 -port=7031
+node0.local -sc=0 -port=7001 -test="ASYM"
+node1.local -sc=0 -port=7002 -test="AES"
+#node2.local -sc=1 -port=7011 -test="AES"
+#node3.local -sc=3 -port=7031 -test="AES"
 
