@@ -32,14 +32,14 @@ type btcBlock struct {
 }
 
 type btcDBStatus struct {
-	Timestamp      time.Time
-	ID             int
-	TotalBlocks    int
-	TotalSize      int
-	TimeEncryptAcc int
-	TimeDecryptAcc int
-	NumPoSAcc      int
-	TimePosAcc     int
+	Timestamp        time.Time
+	ID               int
+	TotalBlocks      int
+	TotalSize        int
+	TimeGenProof     int
+	TimeVerification int
+	SizeProof        int
+	TimePosAcc       int
 }
 
 type btcdbagent struct {
@@ -50,6 +50,8 @@ type btcdbagent struct {
 	lastblock btcBlock
 	mutex     sync.Mutex
 }
+
+const SIZE_PROOF = 8 + 32 + 32*config.NUM_CONSECUTIVE_HASHES + 32*config.NUM_CONSECUTIVE_HASHES
 
 func (a *btcdbagent) Close() {
 	a.db.Close()
@@ -125,31 +127,31 @@ func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
 }
 
 func (a *btcdbagent) encryptPoSWithVariableLength(key, s []byte) (string, []byte) {
-	start := time.Now().UnixNano()
+	// start := time.Now().UnixNano()
 
 	hash, d := poscipher.EncryptPoSWithVariableLength(key, s)
-	gap := int(time.Now().UnixNano() - start)
-	{
-		a.mutex.Lock()
-		defer a.mutex.Unlock()
-		status := &a.dbstatus
-		status.TimeEncryptAcc += gap
-	}
+	// gap := int(time.Now().UnixNano() - start)
+	// {
+	// 	a.mutex.Lock()
+	// 	defer a.mutex.Unlock()
+	// 	status := &a.dbstatus
+	// 	status.TimeGenProof += gap
+	// }
 
 	return hash, d
 }
 
 func (a *btcdbagent) decryptPoSWithVariableLength(key, s []byte) []byte {
-	start := time.Now().UnixNano()
+	// start := time.Now().UnixNano()
 	d := poscipher.DecryptPoSWithVariableLength(key, s)
 
-	gap := int(time.Now().UnixNano() - start)
-	{
-		a.mutex.Lock()
-		defer a.mutex.Unlock()
-		status := &a.dbstatus
-		status.TimeDecryptAcc += gap
-	}
+	// gap := int(time.Now().UnixNano() - start)
+	// {
+	// 	a.mutex.Lock()
+	// 	defer a.mutex.Unlock()
+	// 	status := &a.dbstatus
+	// 	status.TimeVerification += gap
+	// }
 
 	return d
 }
@@ -289,6 +291,9 @@ func hashToUint32(b []byte) uint32 {
 func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	// List up the encrypted block hash and key hash of encrypted blocks
 	// And calculate Merkle Root
+
+	start := time.Now().UnixNano()
+
 	var hashroots [][]byte
 	proof := dtype.PoSProof{}
 	bis := make([]*btcBlock, config.NUM_CONSECUTIVE_HASHES)
@@ -321,6 +326,17 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	proof.Address = a.getEncryptKeyforGenesis()
 	log.Printf("Proof : %v - %v", proof.Timestamp, proof.Hash)
 
+	gap := int(time.Now().UnixNano() - start)
+	{
+		a.mutex.Lock()
+		status := &a.dbstatus
+		status.TimeGenProof += gap
+		status.SizeProof += len(eb) + SIZE_PROOF
+		a.mutex.Unlock()
+	}
+
+	a.updateDBProof(proof.Hash)
+	log.Printf("Proof stats : %v", a.dbstatus)
 	return &proof
 }
 
@@ -457,8 +473,22 @@ func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
 }
 
 func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
-	// return a.verifyProofStorage_Rev(proof)
-	return a.verifyProofStorage_Fwd(proof)
+	start := time.Now().UnixNano()
+
+	ret := a.verifyProofStorage_Rev(proof)
+	if ret {
+		ret = a.verifyProofStorage_Fwd(proof)
+	}
+
+	gap := int(time.Now().UnixNano() - start)
+	{
+		a.mutex.Lock()
+		status := &a.dbstatus
+		status.TimeVerification += gap
+		a.mutex.Unlock()
+	}
+
+	return ret
 }
 
 func (a *btcdbagent) initLastBlock() {
@@ -532,7 +562,7 @@ func (a *btcdbagent) getLatestDBStatus(status *btcDBStatus) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalSize, &status.TimeEncryptAcc, &status.TimeDecryptAcc, &status.NumPoSAcc, &status.TimePosAcc)
+		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalSize, &status.TimeGenProof, &status.TimeVerification, &status.SizeProof, &status.TimePosAcc)
 
 		return true
 	}
@@ -565,7 +595,7 @@ func (a *btcdbagent) updateDBStatus() {
 
 			last_hash = hash_status
 
-			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totalsize, timeencryptacc, timedecryptacc, numposacc, timeposacc) 
+			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totalsize, timegenproof, timeverification, sizeproof, timeposacc) 
 					VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?)`)
 			if err != nil {
 				log.Printf("Prepare adding dbstatus error : %v", err)
@@ -573,7 +603,7 @@ func (a *btcdbagent) updateDBStatus() {
 			}
 			defer st.Close()
 
-			rst, err := st.Exec(status.TotalBlocks, status.TotalSize, status.TimeEncryptAcc, status.TimeDecryptAcc, status.NumPoSAcc, status.TimePosAcc)
+			rst, err := st.Exec(status.TotalBlocks, status.TotalSize, status.TimeGenProof, status.TimeVerification, status.SizeProof, status.TimePosAcc)
 			if err != nil {
 				log.Panicf("Exec adding dbstatus error : %v", err)
 				return
@@ -586,13 +616,31 @@ func (a *btcdbagent) updateDBStatus() {
 	}
 }
 
+func (a *btcdbagent) updateDBProof(hash string) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	st, err := a.db.Prepare(`INSERT INTO prooftbl (timestamp, proofblock) VALUES ( datetime('now'), ?)`)
+	if err != nil {
+		log.Printf("Prepare adding prooftbl error : %v", err)
+		return
+	}
+	defer st.Close()
+
+	_, err = st.Exec(hash)
+	if err != nil {
+		log.Panicf("Exec adding prooftbl error : %v", err)
+		return
+	}
+	log.Printf("Exec adding prooftbl  : %v", hash)
+}
+
 func newDBBtcSqlite(path string) DBAgent {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		log.Panicf("Open sqlite db error : %v", err)
 	}
 
-	create_objtlb := `CREATE TABLE IF NOT EXISTS btcblocklist (
+	create_objtbl := `CREATE TABLE IF NOT EXISTS btcblocklist (
 		id      	INTEGER  PRIMARY KEY AUTOINCREMENT,
 		timestamp	INTEGER,
 		height		INTEGER,
@@ -602,7 +650,7 @@ func newDBBtcSqlite(path string) DBAgent {
 		hashkey		TEXT
 	);`
 
-	st, err := db.Prepare(create_objtlb)
+	st, err := db.Prepare(create_objtbl)
 	if err != nil {
 		log.Panicf("create_objtlb error %v", err)
 	}
@@ -613,18 +661,32 @@ func newDBBtcSqlite(path string) DBAgent {
 	// totalquery : query objects including local storage
 	// queryfrom : the number of received queries to get deleted transactions
 	// queryto : the number of send queries to get deleted transactions
-	create_statustlb := `CREATE TABLE IF NOT EXISTS dbstatus (
+	create_statustbl := `CREATE TABLE IF NOT EXISTS dbstatus (
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
 		timestamp			DATETIME,
 		totalblocks			INTEGER,
 		totalsize			INTEGER,
-		timeencryptacc		INTEGER,
-		timedecryptacc		INTEGER,
-		numposacc			INTEGER,
+		timegenproof		INTEGER,
+		timeverification	INTEGER,
+		sizeproof			INTEGER,
 		timeposacc			INTEGER
 	);`
 
-	st, err = db.Prepare(create_statustlb)
+	st, err = db.Prepare(create_statustbl)
+	if err != nil {
+		log.Panicf("create_statustlb error %v", err)
+	}
+	defer st.Close()
+
+	st.Exec()
+
+	create_prooftbl := `CREATE TABLE IF NOT EXISTS prooftbl (
+		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
+		timestamp			DATETIME,
+		proofblock			TEXT
+	);`
+
+	st, err = db.Prepare(create_prooftbl)
 	if err != nil {
 		log.Panicf("create_statustlb error %v", err)
 	}
