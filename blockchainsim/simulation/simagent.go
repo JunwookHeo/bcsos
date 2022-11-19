@@ -25,7 +25,7 @@ type Handler struct {
 }
 
 const PATH = "./iotdata/IoT_normal_fridge_1.log"
-const PATH_BTC_BLOCK = "../blocks.json"
+const PATH_BTC_BLOCK = "../blocks_360.json"
 
 func init() {
 }

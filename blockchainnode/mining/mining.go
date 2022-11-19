@@ -435,8 +435,11 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	h1 := hash
-	h2, _ := hex.DecodeString(local.Hash)
+	ht, _ := hex.DecodeString(hash)
+	h1 := sha256.Sum256(ht)
+
+	ht, _ = hex.DecodeString(local.Hash)
+	h2 := sha256.Sum256(ht)
 
 	// Check address and hash
 	mask := byte(config.MASK_SELECT_POS_NODE) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
