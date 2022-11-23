@@ -43,6 +43,22 @@ type btcDBStatus struct {
 	TimePosAcc    int
 }
 
+type btcDBProof struct {
+	Timestamp    time.Time
+	ProofHeight  int
+	ProofBlock   string
+	TimeGenProof int
+	SizeGenProof int
+}
+
+type btcDBVerif struct {
+	Timestamp    time.Time
+	VerifHeight  int
+	VerifBlock   string
+	TimeVerifFwd int
+	TimeVerifRev int
+}
+
 type btcdbagent struct {
 	db        *sql.DB
 	sclass    int
@@ -313,8 +329,13 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 		status.SizeProof += len(eb) + SIZE_PROOF
 		a.mutex.Unlock()
 	}
+	dbproof := btcDBProof{}
+	dbproof.ProofHeight = bis[proof.Selected].height
+	dbproof.ProofBlock = bis[proof.Selected].hash
+	dbproof.SizeGenProof = len(eb) + SIZE_PROOF
+	dbproof.TimeGenProof = gap
 
-	a.updateDBProof(height+proof.Selected, proof.Hash)
+	a.updateDBProof(&dbproof)
 	log.Printf("Proof stats : %v", a.dbstatus)
 	return &proof
 }
@@ -452,6 +473,11 @@ func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
 }
 
 func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
+	bi := a.getEncryptInfoWithHash(proof.Hash)
+	dbverif := btcDBVerif{}
+	dbverif.VerifBlock = bi.hash
+	dbverif.VerifHeight = bi.height
+
 	start := time.Now().UnixNano()
 	ret1 := a.verifyProofStorage_Rev(proof)
 	gap := int(time.Now().UnixNano() - start)
@@ -462,6 +488,7 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 		a.mutex.Unlock()
 	}
 
+	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
 	ret2 := a.verifyProofStorage_Fwd(proof)
 	gap = int(time.Now().UnixNano() - start)
@@ -472,6 +499,8 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 		a.mutex.Unlock()
 	}
 
+	dbverif.TimeVerifFwd = gap
+	a.updateDBVerif(&dbverif)
 	return ret1 && ret2
 }
 
@@ -600,22 +629,40 @@ func (a *btcdbagent) updateDBStatus() {
 	}
 }
 
-func (a *btcdbagent) updateDBProof(height int, hash string) {
+func (a *btcdbagent) updateDBProof(dbproof *btcDBProof) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare(`INSERT INTO prooftbl (timestamp, proofheight, proofblock) VALUES ( datetime('now'), ?, ?)`)
+	st, err := a.db.Prepare(`INSERT INTO prooftbl (timestamp, proofheight, proofblock, timegenproof, sizegenproof) VALUES ( datetime('now'), ?, ?, ?, ?)`)
 	if err != nil {
 		log.Printf("Prepare adding prooftbl error : %v", err)
 		return
 	}
 	defer st.Close()
 
-	_, err = st.Exec(height, hash)
+	_, err = st.Exec(dbproof.ProofHeight, dbproof.ProofBlock, dbproof.TimeGenProof, dbproof.SizeGenProof)
 	if err != nil {
 		log.Panicf("Exec adding prooftbl error : %v", err)
 		return
 	}
-	log.Printf("Exec adding prooftbl  : %v - %v", height, hash)
+	log.Printf("Exec adding prooftbl  : %v, %v, %v, %v", dbproof.ProofHeight, dbproof.ProofBlock, dbproof.TimeGenProof, dbproof.SizeGenProof)
+}
+
+func (a *btcdbagent) updateDBVerif(dbverif *btcDBVerif) {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev) VALUES ( datetime('now'), ?, ?, ?, ?)`)
+	if err != nil {
+		log.Printf("Prepare adding veriftbl error : %v", err)
+		return
+	}
+	defer st.Close()
+
+	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
+	if err != nil {
+		log.Panicf("Exec adding veriftbl error : %v", err)
+		return
+	}
+	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
 }
 
 func newDBBtcSqlite(path string) DBAgent {
@@ -668,11 +715,30 @@ func newDBBtcSqlite(path string) DBAgent {
 	create_prooftbl := `CREATE TABLE IF NOT EXISTS prooftbl (
 		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
 		timestamp			DATETIME,
-		proofheight			int,
-		proofblock			TEXT
+		proofheight			INTEGER,
+		proofblock			TEXT,
+		timegenproof		INTEGER,
+		sizegenproof		INTEGER
 	);`
 
 	st, err = db.Prepare(create_prooftbl)
+	if err != nil {
+		log.Panicf("create_statustlb error %v", err)
+	}
+	defer st.Close()
+
+	st.Exec()
+
+	create_veriftbl := `CREATE TABLE IF NOT EXISTS veriftbl (
+		id      			INTEGER  PRIMARY KEY AUTOINCREMENT,
+		timestamp			DATETIME,
+		verifheight			INTEGER,
+		verifblock			TEXT,
+		timeveriffwd		INTEGER,
+		timeverifrev		INTEGER
+	);`
+
+	st, err = db.Prepare(create_veriftbl)
 	if err != nil {
 		log.Panicf("create_statustlb error %v", err)
 	}

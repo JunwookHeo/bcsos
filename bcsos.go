@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
@@ -271,6 +272,19 @@ func test_encypt_decrypt() {
 	}
 	close(msg)
 }
+func test_bigint() {
+	a := big.NewInt(0)
+	b := big.NewInt(040020000007)
+	log.Printf("big.int(0) : %x", b)
+	b = b.Lsh(big.NewInt(1), 256)
+	log.Printf("big.int(0) : %x", b)
+	b = b.Sub(b, a.Lsh(big.NewInt(1), 32))
+	log.Printf("big.int(0) : %v", b)
+}
+
+func NewInt(i int) {
+	panic("unimplemented")
+}
 func main() {
 	// test_gf_8()
 	// test_gf_16()
@@ -279,5 +293,6 @@ func main() {
 	// test_gf_exp3()
 	// test_gf_div2()
 	// test_encypt_2()
-	test_encypt_decrypt()
+	// test_encypt_decrypt()
+	test_bigint()
 }
