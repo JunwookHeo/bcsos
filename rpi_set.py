@@ -9,13 +9,12 @@ import argparse
 USER = 'mldc'
 PASSWD = 'mldc'
 class Node:
-    def __init__(self, url, sc, port, test):
+    def __init__(self, url, sc, port):
         self.url = url
         self.sc = sc
         self.port = port
-        self.test = test
     def toString(self):
-        return 'url={} sc={} port={} test={}'.format(self.url, self.sc, self.port, self.test)
+        return 'url={} sc={} port={}'.format(self.url, self.sc, self.port)
 
 def getNodes():
     nodes = []
