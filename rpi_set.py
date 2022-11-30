@@ -56,7 +56,8 @@ def getResult(path, nodes):
         with SCPClient(ssh.get_transport(), sanitize=lambda x: x) as scp:
             nodepath= "%s/%s"%(path, node.url)    
             os.mkdir(nodepath)
-            scp.get(remote_path='~/client/db_nodes/*.*', local_path=nodepath, recursive=True)
+            scp.get(remote_path='~/client/db_nodes/*.db', local_path=nodepath, recursive=True)
+            scp.get(remote_path='~/client/db_nodes/*.wallet', local_path=nodepath, recursive=True)
 
         ssh.close()
 

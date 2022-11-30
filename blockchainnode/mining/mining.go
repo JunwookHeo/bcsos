@@ -441,6 +441,8 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 	ht, _ = hex.DecodeString(local.Hash)
 	h2 := sha256.Sum256(ht)
 
+	h2[len(h2)-1] = byte(local.Port & 0xFF)
+
 	// Check address and hash
 	mask := byte(config.MASK_SELECT_POS_NODE) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
 	log.Printf("check hash for Pos : %v-%v", h1[len(h1)-1]&mask, h2[len(h2)-1]&mask)

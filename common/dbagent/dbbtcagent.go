@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"hash/fnv"
 	"io/ioutil"
 	"log"
 	"os"
@@ -274,12 +275,18 @@ func (a *btcdbagent) getEncryptInfoWithHash(hash string) *btcBlock {
 	return nil
 }
 
+// func hashToUint32(b []byte) uint32 {
+// 	x := uint32(0)
+// 	for i := 0; i < len(b); i += 4 {
+// 		x += uint32(b[i+3]) | uint32(b[i+2])<<8 | uint32(b[i+1])<<16 | uint32(b[i])<<24
+// 	}
+// 	return x
+// }
+
 func hashToUint32(b []byte) uint32 {
-	x := uint32(0)
-	for i := 0; i < len(b); i += 4 {
-		x += uint32(b[i+3]) | uint32(b[i+2])<<8 | uint32(b[i+1])<<16 | uint32(b[i])<<24
-	}
-	return x
+	h := fnv.New32a()
+	h.Write(b)
+	return h.Sum32()
 }
 
 // height : the start height of n-consecutive encrypted blocks

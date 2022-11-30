@@ -159,9 +159,10 @@ def get_bitcoin_transactions2():
 def get_blocks_from_height():
     import csv
     import json
-    outfile = 'blocks_360.json'
+    num_block = 720
+    outfile = f'blocks_{num_block}.json'
     height = 756450
-    num_block = 360
+    
     with open(outfile, "w") as fo:
         for i, h in enumerate (range(height, height + num_block)):
             start = time.time()

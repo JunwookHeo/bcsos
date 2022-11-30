@@ -24,8 +24,7 @@ type Handler struct {
 	Nodes *map[string]dtype.NodeInfo
 }
 
-const PATH = "./iotdata/IoT_normal_fridge_1.log"
-const PATH_BTC_BLOCK = "../blocks_360.json"
+const PATH_BTC_BLOCK = "../blocks_720.json"
 
 func init() {
 }
