@@ -9,22 +9,21 @@ import argparse
 USER = 'mldc'
 PASSWD = 'mldc'
 class Node:
-    def __init__(self, url, sc, port, test):
+    def __init__(self, url, sc, port):
         self.url = url
         self.sc = sc
         self.port = port
-        self.test = test
     def toString(self):
-        return '{} {} {} {}'.format(self.url, self.sc, self.port, self.test)
+        return '{} {} {}'.format(self.url, self.sc, self.port)
 
 def getNodes():
     nodes = []
     with open('rpi.nodes') as fp:
         for line in fp.readlines():
             try:
-                url, sc, port, test = line.split()
+                url, sc, port = line.split()
                 if not url.startswith('#'):
-                    nodes.append(Node(url, sc, port, test))
+                    nodes.append(Node(url, sc, port))
             except ValueError as e:
                 print(e)
     

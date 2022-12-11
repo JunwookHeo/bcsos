@@ -3,8 +3,11 @@ package main
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/csv"
 	"flag"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
@@ -113,7 +116,7 @@ func test_aes_cbc() {
 	close(msg)
 }
 
-func test_encypt_decrypt() {
+func test_asymm_ppos() {
 	w := wallet.NewWallet(PATH_WALLET)
 	key := w.PublicKey
 	addr := w.PublicKey
@@ -124,6 +127,15 @@ func test_encypt_decrypt() {
 	tenc := int64(0)
 	tdec := int64(0)
 	log.Println("Asymetric Encrypt/Decrypt")
+
+	fcsv, err := os.Create("ppos.csv")
+	if err != nil {
+		log.Fatalf("failed creating file: %s", err)
+	}
+	defer fcsv.Close()
+	csvwriter := csv.NewWriter(fcsv)
+	defer csvwriter.Flush()
+
 	for {
 		d, ok := <-msg
 		if !ok {
@@ -152,6 +164,9 @@ func test_encypt_decrypt() {
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 
+		row := [2]string{fmt.Sprintf("%v", tenc), fmt.Sprintf("%v", tdec)}
+		csvwriter.Write(row[:])
+
 		log.Printf("Org x:%v", x[0:80])
 		log.Printf("New x:%v", x_t[0:80])
 		key = y
@@ -163,6 +178,6 @@ func main() {
 	if test == "AES" {
 		test_aes_cbc()
 	} else {
-		test_encypt_decrypt()
+		test_asymm_ppos()
 	}
 }
