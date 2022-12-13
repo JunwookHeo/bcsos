@@ -29,3 +29,6 @@ Performance.png
 blocks.json
 db_nodes/
 blocks_360.json
+blocks_720.json
+python_utils/*.png
+ppos.*.csv
