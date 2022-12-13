@@ -20,7 +20,7 @@ import (
 var IV = []byte("1234567812345678")
 var TAU = 347
 
-const PATH_TEST = "../blocks.json"
+const PATH_TEST = "../blocks_720.json"
 const PATH_WALLET = "blocks.json.wallet"
 
 func init() {
@@ -126,6 +126,7 @@ func test_asymm_ppos() {
 
 	tenc := int64(0)
 	tdec := int64(0)
+	size := int64(0)
 	log.Println("Asymetric Encrypt/Decrypt")
 
 	fcsv, err := os.Create("ppos.csv")
@@ -149,6 +150,7 @@ func test_asymm_ppos() {
 
 		rb := bitcoin.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
+		size += int64(len(x))
 		// log.Printf("Block : %v", x[:80])
 
 		// Start Encryption
@@ -164,11 +166,13 @@ func test_asymm_ppos() {
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 
-		row := [2]string{fmt.Sprintf("%v", tenc), fmt.Sprintf("%v", tdec)}
+		row := [3]string{fmt.Sprintf("%v", tenc), fmt.Sprintf("%v", tdec), fmt.Sprintf("%v", size)}
 		csvwriter.Write(row[:])
 
 		log.Printf("Org x:%v", x[0:80])
 		log.Printf("New x:%v", x_t[0:80])
+		log.Printf("Size : %v", size)
+
 		key = y
 	}
 	close(msg)
