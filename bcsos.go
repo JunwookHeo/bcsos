@@ -277,14 +277,68 @@ func test_bigint() {
 	b := big.NewInt(040020000007)
 	log.Printf("big.int(0) : %x", b)
 	b = b.Lsh(big.NewInt(1), 256)
+	log.Printf("bit length : %v", b.BitLen())
 	log.Printf("big.int(0) : %x", b)
 	b = b.Sub(b, a.Lsh(big.NewInt(1), 32))
 	log.Printf("big.int(0) : %v", b)
+	log.Printf("bit length : %v", b.BitLen())
+
+	c := a.Lsh(big.NewInt(1), 256)
+	d := c.Bit(256)
+	log.Printf("bit length : %v", d)
 }
 
-func NewInt(i int) {
-	panic("unimplemented")
+func test_gf256() {
+	gf := galois.GF256()
+
+	start := time.Now().UnixNano()
+	var cal1, cal2 *big.Int
+	max_len := 65536
+	for i := 1; i < max_len; i++ {
+		for j := 1; j < max_len; j++ {
+			cal1 = gf.Mul256(big.NewInt(int64(i)), big.NewInt(int64(j)))
+			cal2 = gf.Div256(cal1, big.NewInt(int64(i)))
+			if cal2.Cmp(big.NewInt(int64(j))) != 0 {
+				log.Printf("Fail (%v, %v) : %x - %x", i, j, cal1, cal2)
+				log.Printf("bit length : %x - %x", cal1.BitLen(), cal2.BitLen())
+				return
+			}
+		}
+		log.Printf("%v done", i)
+	}
+	end := time.Now().UnixNano()
+	log.Printf("Time for EXP1 : %v", (end-start)/1000)
 }
+
+// 2^32 :
+//   - 2P -1 :  7 * 1227133513
+//   - 3P -2 :  2 * 6442450943
+func test_gf256_exp() {
+	gf := galois.GF256()
+	P := big.NewInt(1)
+	P = P.Lsh(P, 256)
+	P = P.Mul(P, big.NewInt(3))
+	P = P.Sub(P, big.NewInt(2))
+
+	start := time.Now().UnixNano()
+	var cal *big.Int
+	max_len := 4294967296
+	for i := 1; i < max_len; i += 4096 {
+		cal = gf.Exp256(big.NewInt(int64(i)), big.NewInt(2))
+	}
+	end := time.Now().UnixNano()
+	log.Printf("Time for EXP1 : %v", (end-start)/1000000)
+	log.Printf("<==> %v", cal)
+
+	start = time.Now().UnixNano()
+	for i := 1; i < max_len; i += 4096 {
+		cal = gf.Exp256(big.NewInt(int64(i)), P)
+	}
+	end = time.Now().UnixNano()
+	log.Printf("Time for EXP2 : %v", (end-start)/1000000)
+	log.Printf("<==> %v", cal)
+}
+
 func main() {
 	// test_gf_8()
 	// test_gf_16()
@@ -294,5 +348,7 @@ func main() {
 	// test_gf_div2()
 	// test_encypt_2()
 	// test_encypt_decrypt()
-	test_bigint()
+	// test_bigint()
+	// test_gf256()
+	test_gf256_exp()
 }
