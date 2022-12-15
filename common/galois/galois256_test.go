@@ -73,3 +73,31 @@ func TestGF256FarmatLittle(t *testing.T) {
 	log.Printf("enc : %v", tenc/1000000)
 
 }
+
+func TestGF256Inv(t *testing.T) {
+	gf := GF256()
+	tm1 := int64(0)
+	tm2 := int64(0)
+
+	for i := 0; i < 1000; i++ {
+		r := rand.Int63()
+		a := big.NewInt(r)
+
+		start := time.Now().UnixNano()
+		inv := gf.Inv256(a)
+		end := time.Now().UnixNano()
+		tm1 += (end - start)
+		log.Printf("x*inv_1 = %x, %x, %x", a, inv, gf.Mul256(a, inv))
+
+		start = time.Now().UnixNano()
+		inv2 := gf.InvF256(a)
+		end = time.Now().UnixNano()
+		tm2 += (end - start)
+		log.Printf("x*inv_2 = %x, %x, %x", a, inv2, gf.Mul256(a, inv2))
+		// assert.Equal(t, exp1, a)
+	}
+
+	log.Printf("Time1 : %v", tm1/1000000)
+	log.Printf("Time2 : %v", tm2/1000000)
+
+}
