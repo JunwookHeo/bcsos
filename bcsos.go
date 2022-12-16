@@ -273,19 +273,14 @@ func test_encypt_decrypt() {
 	close(msg)
 }
 func test_bigint() {
-	a := big.NewInt(0)
-	b := big.NewInt(040020000007)
-	log.Printf("big.int(0) : %x", b)
-	b = b.Lsh(big.NewInt(1), 256)
-	log.Printf("bit length : %v", b.BitLen())
-	log.Printf("big.int(0) : %x", b)
-	b = b.Sub(b, a.Lsh(big.NewInt(1), 32))
-	log.Printf("big.int(0) : %v", b)
-	log.Printf("bit length : %v", b.BitLen())
-
-	c := a.Lsh(big.NewInt(1), 256)
-	d := c.Bit(256)
-	log.Printf("bit length : %v", d)
+	a := big.NewInt(1)
+	b := big.NewInt(2)
+	c := big.NewInt(4)
+	log.Printf("%x, %x, %x", a, b, c)
+	a.Add(a, b)
+	log.Printf("%x, %x, %x", a, b, c)
+	c.Add(c, b)
+	log.Printf("%x, %x, %x", a, b, c)
 }
 
 func test_gf256() {
@@ -348,7 +343,7 @@ func main() {
 	// test_gf_div2()
 	// test_encypt_2()
 	// test_encypt_decrypt()
-	// test_bigint()
+	test_bigint()
 	// test_gf256()
-	test_gf256_exp()
+	// test_gf256_exp()
 }
