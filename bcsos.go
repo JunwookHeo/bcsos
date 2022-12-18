@@ -284,7 +284,7 @@ func test_bigint() {
 }
 
 func test_gf256() {
-	gf := galois.GF256()
+	gf := galois.GF256(256)
 
 	start := time.Now().UnixNano()
 	var cal1, cal2 *big.Int
@@ -309,7 +309,7 @@ func test_gf256() {
 //   - 2P -1 :  7 * 1227133513
 //   - 3P -2 :  2 * 6442450943
 func test_gf256_exp() {
-	gf := galois.GF256()
+	gf := galois.GF256(256)
 	P := big.NewInt(1)
 	P = P.Lsh(P, 256)
 	P = P.Mul(P, big.NewInt(3))
