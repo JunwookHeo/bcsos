@@ -283,7 +283,7 @@ func TestGF256ExtRootUnity(t *testing.T) {
 		for j := i; j <= gf.GMask.Uint64(); j *= j {
 			a := big.NewInt(int64(j))
 			start := time.Now().UnixNano()
-			size, rus := gf.ExtRootUnity(a)
+			size, rus := gf.ExtRootUnity(a, false)
 			end := time.Now().UnixNano()
 			tm1 += (end - start)
 
@@ -302,19 +302,19 @@ func TestGF256ExtFindRootUnity(t *testing.T) {
 	g1 := gf.Exp256(big.NewInt(2), big.NewInt(257))
 	ev := gf.Exp256(g1, big.NewInt(255))
 	log.Printf("==>G(%v): %v", g1, ev)
-	size, rus := gf.ExtRootUnity(g1)
+	size, rus := gf.ExtRootUnity(g1, false)
 	log.Printf("==>G(%v), %v: %v", g1, size, rus)
 
 	g2 := gf.Exp256(big.NewInt(2), big.NewInt(1285))
 	ev2 := gf.Exp256(g2, big.NewInt(51))
 	log.Printf("==>G(%v): %v", g2, ev2)
-	size2, rus2 := gf.ExtRootUnity(g2)
+	size2, rus2 := gf.ExtRootUnity(g2, false)
 	log.Printf("==>G(%v), %v: %v", g2, size2, rus2)
 
 	g3 := gf.Exp256(big.NewInt(2), big.NewInt(3855))
 	ev3 := gf.Exp256(g3, big.NewInt(17))
 	log.Printf("==>G(%v): %v", g3, ev3)
-	size3, rus3 := gf.ExtRootUnity(g2)
+	size3, rus3 := gf.ExtRootUnity(g2, false)
 	log.Printf("==>G(%v), %v: %v", g3, size3, rus3)
 }
 func TestGF256ExtFindRootUnity2(t *testing.T) {
@@ -323,14 +323,14 @@ func TestGF256ExtFindRootUnity2(t *testing.T) {
 	g1 := gf.Exp256(big.NewInt(2), big.NewInt(85))
 	ev := gf.Exp256(g1, big.NewInt(48))
 	log.Printf("==>G(%v): %v", g1, ev)
-	size, rus := gf.ExtRootUnity(g1)
+	size, rus := gf.ExtRootUnity(g1, false)
 	log.Printf("==>G(%v), %v: %v", g1, size, rus)
 
-	g2 := gf.Exp256(big.NewInt(2), big.NewInt(85))
-	ev2 := gf.Exp256(g2, big.NewInt(12))
-	log.Printf("==>G(%v): %v", g2, ev2)
-	size2, rus2 := gf.ExtRootUnity(g2)
-	log.Printf("==>G(%v), %v: %v", g2, size2, rus2)
+	// g2 := gf.Exp256(big.NewInt(2), big.NewInt(85))
+	// ev2 := gf.Exp256(g2, big.NewInt(12))
+	// log.Printf("==>G(%v): %v", g2, ev2)
+	// size2, rus2 := gf.ExtRootUnity(g2, false)
+	// log.Printf("==>G(%v), %v: %v", g2, size2, rus2)
 }
 
 func TestGF256ExtFindRootUnityAll(t *testing.T) {
@@ -339,8 +339,58 @@ func TestGF256ExtFindRootUnityAll(t *testing.T) {
 	for i := int64(1); i <= gf.GMask.Int64(); i++ {
 		g1 := big.NewInt(i)
 		// log.Printf("==>G: %v", g1)
-		size, rus := gf.ExtRootUnity(g1)
-		log.Printf("==>G%v(%v) : %v", g1, size, rus)
+		size, rus := gf.ExtRootUnity(g1, false)
+		log.Printf("==>G(%v, %v)-(%v) : %v", g1, gf.Inv256(g1), size, rus)
 
 	}
+	log.Println("=================================")
+	for i := int64(1); i <= gf.GMask.Int64(); i++ {
+		g1 := big.NewInt(i)
+		// log.Printf("==>G: %v", g1)
+		size, rus := gf.ExtRootUnity(g1, true)
+		log.Printf("==>G(%v, %v)-(%v) : %v", g1, gf.Inv256(g1), size, rus)
+
+	}
+}
+
+func TestGF256ExtFindRootUnityAll2(t *testing.T) {
+	gf := GF256(8)
+
+	for i := int64(1); i <= gf.GMask.Int64(); i++ {
+		g1 := big.NewInt(i)
+		// log.Printf("==>G: %v", g1)
+		size, _ := gf.ExtRootUnity(g1, true)
+		if size != 255 {
+			log.Printf("==>G(%v, %v)-(%v)", g1, gf.Inv256(g1), size)
+		}
+	}
+}
+
+func TestGF256FFT(t *testing.T) {
+	gf := GF256(8)
+
+	g1 := big.NewInt(6)
+	size, xs := gf.ExtRootUnity(g1, false)
+	ys := make([]*big.Int, 0, size)
+
+	for j := 0; j < size; j++ {
+		r := rand.Int63() % (1 << 4)
+		a := big.NewInt(r)
+		ys = append(ys, a)
+	}
+
+	log.Printf("==>xs:%v, ys:%v", xs, ys)
+	start := time.Now().Nanosecond()
+	os1 := gf.LagrangeInterp(xs, ys)
+	end := time.Now().Nanosecond()
+	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
+
+	start = time.Now().Nanosecond()
+	os2 := gf.IDFT(ys, g1)
+	end = time.Now().Nanosecond()
+	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
+
+	os3 := gf.DFT(os1, g1)
+	log.Printf("DFT : %v", os3)
+
 }

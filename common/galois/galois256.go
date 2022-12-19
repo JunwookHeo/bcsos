@@ -249,7 +249,8 @@ func (gf *gf256) LagrangeInterp(xs, ys []*big.Int) []*big.Int {
 		return nil
 	}
 
-	var lp []*big.Int
+	// var lp []*big.Int
+	lp := make([]*big.Int, 0, len(ys))
 	for i := 0; i < len(ys); i++ {
 		lp = append(lp, big.NewInt(0))
 	}
@@ -272,7 +273,7 @@ func (gf *gf256) LagrangeInterp(xs, ys []*big.Int) []*big.Int {
 		// yk = yk * 1/denom
 		yk := gf.Mul256(ys[i], invdenom)
 		// Add all coeficient of each x^n
-		for j, _ := range ys {
+		for j := range ys {
 			lp[j] = gf.Add256(lp[j], gf.Mul256(dp[j], yk))
 		}
 	}
@@ -280,15 +281,60 @@ func (gf *gf256) LagrangeInterp(xs, ys []*big.Int) []*big.Int {
 	return lp
 }
 
-func (gf *gf256) ExtRootUnity(x *big.Int) (int, []*big.Int) {
+func (gf *gf256) ExtRootUnity2(x *big.Int, inv bool) (int, []*big.Int) {
 	maxc := 65536
 	if gf.Size < 16 {
 		maxc = int(gf.GMask.Uint64()) + 1
+	}
+	var cmpos int
+
+	roots := make([]*big.Int, 2, maxc)
+	if inv {
+		roots[0] = x
+		roots[1] = big.NewInt(1)
+		cmpos = 0
+	} else {
+		roots[0] = big.NewInt(1)
+		roots[1] = x
+		cmpos = len(roots) - 1
+	}
+
+	one := big.NewInt(1)
+	i := 2
+	for ; one.Cmp(roots[cmpos]) != 0; i++ {
+		if i < maxc {
+			if inv {
+				roots = append([]*big.Int{gf.Mul256(x, roots[cmpos])}, roots...)
+			} else {
+				roots = append(roots, gf.Mul256(x, roots[cmpos]))
+			}
+		} else {
+			return -1, roots
+		}
+		if !inv {
+			cmpos = len(roots) - 1
+		}
+	}
+	// return i - 1, roots[:len(roots)-1]
+	return i, roots
+}
+
+func (gf *gf256) ExtRootUnity(root *big.Int, inv bool) (int, []*big.Int) {
+	maxc := 65536
+	if gf.Size < 16 {
+		maxc = int(gf.GMask.Uint64()) + 1
+	}
+	x := new(big.Int)
+	if inv {
+		x.Set(gf.Inv256(root))
+	} else {
+		x.Set(root)
 	}
 
 	roots := make([]*big.Int, 2, maxc)
 	roots[0] = big.NewInt(1)
 	roots[1] = x
+
 	one := big.NewInt(1)
 	i := 2
 	for ; one.Cmp(roots[len(roots)-1]) != 0; i++ {
@@ -299,5 +345,57 @@ func (gf *gf256) ExtRootUnity(x *big.Int) (int, []*big.Int) {
 		}
 	}
 	return i - 1, roots[:len(roots)-1]
-	// return i, roots
+	// return i-1, roots
+}
+
+// FFT algorithm with root of unity
+// xs should be root of unit : x^n = 1
+func (gf *gf256) fft(xs, ys []*big.Int, inv bool) []*big.Int {
+	l := len(xs)
+	os := make([]*big.Int, 0, l) // outputs
+	// invlen := big.NewInt(int64(l))
+	// if inv {
+	// 	invlen = gf.Inv256(invlen)
+	// 	// log.Printf("invlen : %v", invlen)
+	// }
+
+	// log.Printf("xs[%v], ys[%v]", xs, ys)
+	for i := 0; i < l; i++ {
+		sum := big.NewInt(0)
+		for j := 0; j < len(ys); j++ {
+			m := gf.Mul256(ys[j], xs[(i*j)%l])
+			sum = gf.Add256(sum, m)
+		}
+		// if inv {
+		// 	sum = gf.Mul256(sum, invlen)
+		// }
+		os = append(os, sum)
+	}
+	return os
+}
+
+// DFT evaluates a polynomial at xs(root of unity)
+// cs is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
+// xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
+func (gf *gf256) DFT(cs []*big.Int, root *big.Int) []*big.Int {
+	size, xs := gf.ExtRootUnity(root, false)
+	if size == -1 {
+		log.Printf("Wrong root of unity !!!")
+		return nil
+	}
+	return gf.fft(xs, cs, false)
+}
+
+// IDFT generates a polynomial with points [(x0, y0), (x1, y1)....(xn-1, yn-1)]
+// xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
+// ys : [y0, y1, y2, y3 ... yn-1]
+// Output is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
+func (gf *gf256) IDFT(ys []*big.Int, root *big.Int) []*big.Int {
+	size, xs := gf.ExtRootUnity(root, true)
+	if size != len(ys) {
+		log.Println("The length of xs and ys should be the same")
+		return nil
+	}
+
+	return gf.fft(xs, ys, true)
 }
