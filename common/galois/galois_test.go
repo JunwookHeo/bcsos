@@ -20,16 +20,16 @@ func TestGFNAdd(t *testing.T) {
 }
 
 func TestGFNExpInv(t *testing.T) {
-	gf := GFN(32)
-	P := uint64(1 << 32)
-	P = (3*P - 2)/2
-
+	gf := GFN(8)
+	P := uint64(1 << 8)
+	P = (3*P - 2) / 2
+	P = 128
 	b := 2
 	tenc := int64(0)
 	tdec := int64(0)
 
-	for i := 0; i < 1000; i++ {
-		a := uint64(rand.Int31())
+	for i := 0; i < 10; i++ {
+		a := uint64(rand.Int31() & (1<<8 - 1))
 
 		start := time.Now().UnixNano()
 		exp1 := gf.Exp(a, uint64(b))
@@ -41,6 +41,7 @@ func TestGFNExpInv(t *testing.T) {
 		end = time.Now().UnixNano()
 		tdec += (end - start)
 
+		log.Printf("%v, %v, %v", a, exp1, exp2)
 		assert.Equal(t, a, exp2)
 	}
 
@@ -71,10 +72,10 @@ func TestGFNFarmatLittle(t *testing.T) {
 func TestGFNExpInv2(t *testing.T) {
 	gf := GFN(32)
 	P1 := uint64(1 << 32)
-	P1 = (3*P1 - 2)/2
+	P1 = (3*P1 - 2) / 2
 
 	P2 := uint64(1 << 32)
-	P2 = P1%(P2-1)
+	P2 = P1 % (P2 - 1)
 	log.Printf("enc : %x, dec : %x, %x", P1, P2, 6442450943)
 
 	tenc := int64(0)

@@ -3,13 +3,16 @@ package galois
 import (
 	"log"
 	"math/big"
+
+	"github.com/holiman/uint256"
 )
 
 type gf256 struct {
-	Size  uint
-	Prime *big.Int
-	GMask *big.Int
-	GInv  *big.Int
+	Size    uint
+	PrimeW  *big.Int     // with the highest bit
+	PrimeWo *uint256.Int // without the highest bit
+	GMask   *uint256.Int
+	GInv    *uint256.Int
 }
 
 // http://poincare.matf.bg.ac.rs/~ezivkovm/publications/primpol1.pdf
@@ -20,15 +23,13 @@ type gf256 struct {
 // var P256 = []uint{128, 77, 35, 11}
 
 var P256 = map[int][]uint{
-	4:    {4, 1},
-	8:    {8, 7, 2, 1},
-	16:   {16, 15, 12, 10},
-	32:   {32, 16, 7, 2},
-	64:   {64, 61, 34, 9},
-	128:  {128, 77, 35, 11},
-	256:  {256, 241, 178, 121},
-	512:  {512, 419, 321, 125},
-	1024: {1024, 333, 135, 73},
+	4:   {4, 1},
+	8:   {8, 7, 2, 1},
+	16:  {16, 15, 12, 10},
+	32:  {32, 16, 7, 2},
+	64:  {64, 61, 34, 9},
+	128: {128, 77, 35, 11},
+	256: {256, 241, 178, 121},
 }
 
 func GF256(id int) *gf256 {
@@ -38,111 +39,121 @@ func GF256(id int) *gf256 {
 		return nil
 	}
 
-	prime := big.NewInt(1)
+	pw := big.NewInt(1)
 	for _, x := range field {
 		p := big.NewInt(1)
-		prime.Add(p.Lsh(p, x), prime)
+		pw.Add(p.Lsh(p, x), pw)
 	}
-	size := uint(prime.BitLen() - 1)
+	size := uint(pw.BitLen() - 1)
 	log.Printf("Prime %v", size)
 
-	mask := big.NewInt(1)
+	mask := uint256.NewInt(1)
 	mask.Lsh(mask, size)
-	mask.Sub(mask, big.NewInt(1))
+	mask.Sub(mask, uint256.NewInt(1))
 
-	inv := big.NewInt(1)
+	inv := uint256.NewInt(1)
 	inv.Lsh(inv, size)
-	inv.Sub(inv, big.NewInt(2))
+	inv.Sub(inv, uint256.NewInt(2))
 
-	gf := gf256{size, prime, mask, inv}
+	pwo, err := uint256.FromBig(pw)
+	pwo.And(pwo, mask)
+	log.Printf("%b, %b, %v", pw, pwo, err)
+
+	gf := gf256{size, pw, pwo, mask, inv}
 	return &gf
 }
 
-func (gf *gf256) Add256(x, y *big.Int) *big.Int {
-	// s := big.NewInt(0)
-	s := new(big.Int)
+func (gf *gf256) Add256(x, y *uint256.Int) *uint256.Int {
+	s := new(uint256.Int)
 	return s.Xor(x, y)
 }
 
-func (gf *gf256) Sub256(x, y *big.Int) *big.Int {
-	// s := big.NewInt(0)
-	s := new(big.Int)
+func (gf *gf256) Sub256(x, y *uint256.Int) *uint256.Int {
+	s := new(uint256.Int)
 	return s.Xor(x, y)
 }
 
-func (gf *gf256) lsh256(x *big.Int) *big.Int {
-	t := new(big.Int)
-	t = t.Set(x)
+func (gf *gf256) lsh256(x *uint256.Int) *uint256.Int {
+	t := x.Clone()
 	if x.BitLen() < int(gf.Size) {
 		t.Lsh(t, 1)
 	} else {
 		t.Lsh(t, 1)
-		t.Xor(t, gf.Prime)
+		t.And(t, gf.GMask)
+		t.Xor(t, gf.PrimeWo)
 	}
 
 	return t
 }
 
-func (gf *gf256) Mul256(x, y *big.Int) *big.Int {
-	r := big.NewInt(0)
-	t := new(big.Int)
-	t = t.Set(x)
+func (gf *gf256) Mul256(x, y *uint256.Int) *uint256.Int {
+	r := uint256.NewInt(0)
+	t := x.Clone()
+	m := y.Clone()
 	max := y.BitLen()
 
 	for i := 0; i < max; i++ {
-		if y.Bit(i) == 1 {
+		um := m.Uint64()
+		if um&0x1 == 1 {
 			r.Xor(r, t)
 		}
 
 		t = gf.lsh256(t)
+		m.Rsh(m, uint(1))
 	}
 
 	return r
 }
 
 // x**p = x, so x**(p-2) = x**(-1)
-func (gf *gf256) Div256(x, y *big.Int) *big.Int {
+func (gf *gf256) Div256(x, y *uint256.Int) *uint256.Int {
 	if y.BitLen() == 0 {
 		log.Printf("Div by zero")
-		return big.NewInt(0)
+		return uint256.NewInt(0)
 	}
 
 	inv := gf.Exp256(y, gf.GInv)
 	return gf.Mul256(x, inv)
 }
 
-func (gf *gf256) Exp256(x, y *big.Int) *big.Int {
-	p := new(big.Int)
-	p = p.Set(x)
-	q := new(big.Int)
+func (gf *gf256) Exp256(x, y *uint256.Int) *uint256.Int {
+	p := x.Clone()
+	q := new(uint256.Int)
 	q = q.Mod(y, gf.GMask)
-
-	b := big.NewInt(1)
+	b := uint256.NewInt(1)
 	max := q.BitLen()
 
 	for i := 0; i < max; i++ {
-		if q.Bit(i) != 0 {
+		um := q.Uint64()
+		if um&0x01 != 0 {
 			b = gf.Mul256(b, p)
 		}
 		p = gf.Mul256(p, p)
+		q.Rsh(q, 1)
 	}
 
 	return b
 }
 
 // y/x = q*x + r
-func (gf *gf256) divid(x, y *big.Int) (*big.Int, *big.Int) {
-	d := new(big.Int)
+// carry is true for 256bit irreducable polynomials
+func (gf *gf256) divid(x, y *uint256.Int, carry bool) (*uint256.Int, *uint256.Int) {
+	d := new(uint256.Int)
 	d = d.Set(x)
-	q := new(big.Int)
+	q := new(uint256.Int)
 	q = q.Set(y)
-	r := new(big.Int)
+	r := new(uint256.Int)
 	// log.Printf("x : %x", x)
-	nq := big.NewInt(0)
+	nq := uint256.NewInt(0)
 
 	for {
-		lq := big.NewInt(1)
+		lq := uint256.NewInt(1)
 		dif := q.BitLen() - d.BitLen()
+		if carry {
+			dif = 257 - d.BitLen()
+			carry = false
+		}
+
 		if dif < 0 {
 			break
 		}
@@ -156,31 +167,38 @@ func (gf *gf256) divid(x, y *big.Int) (*big.Int, *big.Int) {
 }
 
 // Farmat's Little Theorem to calculate Inverse
-func (gf *gf256) InvF256(x *big.Int) *big.Int {
+func (gf *gf256) InvF256(x *uint256.Int) *uint256.Int {
 	return gf.Exp256(x, gf.GInv)
 }
 
 // Extended Euclidian Algorithm to calculate Inverse
-func (gf *gf256) Inv256(x *big.Int) *big.Int {
+func (gf *gf256) Inv256(x *uint256.Int) *uint256.Int {
 	if x.BitLen() == 0 {
-		return big.NewInt(0)
+		return uint256.NewInt(0)
 	}
 
-	b := new(big.Int)
+	b := new(uint256.Int)
 	b = b.Set(x)
-	a := new(big.Int)
-	a = a.Set(gf.Prime)
-	t := big.NewInt(1)
-	t1 := big.NewInt(0)
-	t2 := big.NewInt(1)
+	a := new(uint256.Int)
+	// a = a.Set(gf.PrimeWo) // TODO : deal with prime
+	a.SetFromBig(gf.PrimeW)
+	ca := false
+	if gf.PrimeW.BitLen() == 257 {
+		ca = true
+	}
+
+	t := uint256.NewInt(1)
+	t1 := uint256.NewInt(0)
+	t2 := uint256.NewInt(1)
 
 	for b.BitLen() > 1 {
-		q, r := gf.divid(b, a)
+		q, r := gf.divid(b, a, ca) // TODO :: fist thereis no the highest field.
 		t = gf.Sub256(t1, gf.Mul256(q, t2))
 		a.Set(b)
 		b.Set(r)
 		t1.Set(t2)
 		t2.Set(t)
+		ca = false
 	}
 
 	// log.Printf("b : %x, x : %x, Inv : %x", b, x, t)
@@ -188,9 +206,9 @@ func (gf *gf256) Inv256(x *big.Int) *big.Int {
 }
 
 // Evaluate Polynomial at a point x
-func (gf *gf256) EvalPolyAt(poly []*big.Int, x *big.Int) *big.Int {
-	y := big.NewInt(0)
-	pox := big.NewInt(1)
+func (gf *gf256) EvalPolyAt(poly []*uint256.Int, x *uint256.Int) *uint256.Int {
+	y := uint256.NewInt(0)
+	pox := uint256.NewInt(1)
 
 	for _, c := range poly {
 		y = gf.Add256(gf.Mul256(c, pox), y)
@@ -201,12 +219,12 @@ func (gf *gf256) EvalPolyAt(poly []*big.Int, x *big.Int) *big.Int {
 }
 
 // Z(x) = (x -a1)(x-a2)(x-a3)....(x-an)
-func (gf *gf256) ZPoly(xs []*big.Int) []*big.Int {
-	var poly []*big.Int
-	poly = append(poly, big.NewInt(1))
+func (gf *gf256) ZPoly(xs []*uint256.Int) []*uint256.Int {
+	var poly []*uint256.Int
+	poly = append(poly, uint256.NewInt(1))
 
 	for _, x := range xs {
-		poly = append([]*big.Int{big.NewInt(0)}, poly...)
+		poly = append([]*uint256.Int{uint256.NewInt(0)}, poly...)
 		for i := 0; i < len(poly)-1; i++ {
 			t := gf.Mul256(poly[i+1], x)
 			poly[i] = gf.Sub256(poly[i], t)
@@ -218,13 +236,13 @@ func (gf *gf256) ZPoly(xs []*big.Int) []*big.Int {
 
 // div polys
 // D(x) = (x-1)(x-2)(x-3)....(x-n)/(x-k)
-func (gf *gf256) DivPolys(a, b []*big.Int) []*big.Int {
+func (gf *gf256) DivPolys(a, b []*uint256.Int) []*uint256.Int {
 	if len(a) < len(b) {
 		return nil
 	}
 
-	var out []*big.Int
-	var ad []*big.Int
+	var out []*uint256.Int
+	var ad []*uint256.Int
 	ad = append(ad, a...)
 
 	apos := len(ad) - 1
@@ -233,7 +251,7 @@ func (gf *gf256) DivPolys(a, b []*big.Int) []*big.Int {
 
 	for diff >= 0 {
 		qout := gf.Div256(ad[apos], b[bpos])
-		out = append([]*big.Int{qout}, out...)
+		out = append([]*uint256.Int{qout}, out...)
 		for i := 1; i >= 0; i-- {
 			ad[diff+i] = gf.Sub256(ad[diff+i], gf.Mul256(b[i], qout))
 		}
@@ -243,28 +261,28 @@ func (gf *gf256) DivPolys(a, b []*big.Int) []*big.Int {
 	return out
 }
 
-func (gf *gf256) LagrangeInterp(xs, ys []*big.Int) []*big.Int {
+func (gf *gf256) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 	zp := gf.ZPoly(xs)
 	if len(zp) != len(ys)+1 {
 		return nil
 	}
 
-	// var lp []*big.Int
-	lp := make([]*big.Int, 0, len(ys))
+	// var lp []*uint256.Int
+	lp := make([]*uint256.Int, 0, len(ys))
 	for i := 0; i < len(ys); i++ {
-		lp = append(lp, big.NewInt(0))
+		lp = append(lp, uint256.NewInt(0))
 	}
 
-	// var dps [][]*big.Int
+	// var dps [][]*uint256.Int
 	for i, x := range xs {
-		var ps []*big.Int
+		var ps []*uint256.Int
 		ps = append(ps, x)
-		ps = append(ps, big.NewInt(1))
+		ps = append(ps, uint256.NewInt(1))
 
 		// Get divid polynomial
 		// dp = (x-x1)(x-x2).....(x-xn) / (x-xk)
 		dp := gf.DivPolys(zp, ps)
-		// dps = append([]*big.Int{dp}, dps...)
+		// dps = append([]*uint256.Int{dp}, dps...)
 		// Evaluate each divided polynomial
 		// denom = (xk-x1)(xk-x2)....(xk-xn)  without (xk-xk)
 		denom := gf.EvalPolyAt(dp, x)
@@ -281,30 +299,30 @@ func (gf *gf256) LagrangeInterp(xs, ys []*big.Int) []*big.Int {
 	return lp
 }
 
-func (gf *gf256) ExtRootUnity2(x *big.Int, inv bool) (int, []*big.Int) {
+func (gf *gf256) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 	maxc := 65536
 	if gf.Size < 16 {
 		maxc = int(gf.GMask.Uint64()) + 1
 	}
 	var cmpos int
 
-	roots := make([]*big.Int, 2, maxc)
+	roots := make([]*uint256.Int, 2, maxc)
 	if inv {
 		roots[0] = x
-		roots[1] = big.NewInt(1)
+		roots[1] = uint256.NewInt(1)
 		cmpos = 0
 	} else {
-		roots[0] = big.NewInt(1)
+		roots[0] = uint256.NewInt(1)
 		roots[1] = x
 		cmpos = len(roots) - 1
 	}
 
-	one := big.NewInt(1)
+	one := uint256.NewInt(1)
 	i := 2
 	for ; one.Cmp(roots[cmpos]) != 0; i++ {
 		if i < maxc {
 			if inv {
-				roots = append([]*big.Int{gf.Mul256(x, roots[cmpos])}, roots...)
+				roots = append([]*uint256.Int{gf.Mul256(x, roots[cmpos])}, roots...)
 			} else {
 				roots = append(roots, gf.Mul256(x, roots[cmpos]))
 			}
@@ -319,23 +337,23 @@ func (gf *gf256) ExtRootUnity2(x *big.Int, inv bool) (int, []*big.Int) {
 	return i, roots
 }
 
-func (gf *gf256) ExtRootUnity(root *big.Int, inv bool) (int, []*big.Int) {
+func (gf *gf256) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
 	maxc := 65536
 	if gf.Size < 16 {
 		maxc = int(gf.GMask.Uint64()) + 1
 	}
-	x := new(big.Int)
+	x := new(uint256.Int)
 	if inv {
 		x.Set(gf.Inv256(root))
 	} else {
 		x.Set(root)
 	}
 
-	roots := make([]*big.Int, 2, maxc)
-	roots[0] = big.NewInt(1)
+	roots := make([]*uint256.Int, 2, maxc)
+	roots[0] = uint256.NewInt(1)
 	roots[1] = x
 
-	one := big.NewInt(1)
+	one := uint256.NewInt(1)
 	i := 2
 	for ; one.Cmp(roots[len(roots)-1]) != 0; i++ {
 		if i < maxc {
@@ -350,25 +368,16 @@ func (gf *gf256) ExtRootUnity(root *big.Int, inv bool) (int, []*big.Int) {
 
 // FFT algorithm with root of unity
 // xs should be root of unit : x^n = 1
-func (gf *gf256) fft(xs, ys []*big.Int, inv bool) []*big.Int {
+func (gf *gf256) fft(xs, ys []*uint256.Int, inv bool) []*uint256.Int {
 	l := len(xs)
-	os := make([]*big.Int, 0, l) // outputs
-	// invlen := big.NewInt(int64(l))
-	// if inv {
-	// 	invlen = gf.Inv256(invlen)
-	// 	// log.Printf("invlen : %v", invlen)
-	// }
+	os := make([]*uint256.Int, 0, l) // outputs
 
-	// log.Printf("xs[%v], ys[%v]", xs, ys)
 	for i := 0; i < l; i++ {
-		sum := big.NewInt(0)
+		sum := uint256.NewInt(0)
 		for j := 0; j < len(ys); j++ {
 			m := gf.Mul256(ys[j], xs[(i*j)%l])
 			sum = gf.Add256(sum, m)
 		}
-		// if inv {
-		// 	sum = gf.Mul256(sum, invlen)
-		// }
 		os = append(os, sum)
 	}
 	return os
@@ -377,7 +386,7 @@ func (gf *gf256) fft(xs, ys []*big.Int, inv bool) []*big.Int {
 // DFT evaluates a polynomial at xs(root of unity)
 // cs is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
 // xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
-func (gf *gf256) DFT(cs []*big.Int, root *big.Int) []*big.Int {
+func (gf *gf256) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 	size, xs := gf.ExtRootUnity(root, false)
 	if size == -1 {
 		log.Printf("Wrong root of unity !!!")
@@ -390,7 +399,7 @@ func (gf *gf256) DFT(cs []*big.Int, root *big.Int) []*big.Int {
 // xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
 // ys : [y0, y1, y2, y3 ... yn-1]
 // Output is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
-func (gf *gf256) IDFT(ys []*big.Int, root *big.Int) []*big.Int {
+func (gf *gf256) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
 	size, xs := gf.ExtRootUnity(root, true)
 	if size != len(ys) {
 		log.Println("The length of xs and ys should be the same")
