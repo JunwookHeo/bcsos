@@ -337,13 +337,13 @@ func TestGF256ExtFindRootUnity2(t *testing.T) {
 }
 
 func TestGF256ExtFindRootUnityAll(t *testing.T) {
-	gf := GF256(16)
+	gf := GF256(6)
 
 	for i := uint64(1); i <= gf.GMask.Uint64(); i++ {
 		g1 := uint256.NewInt(i)
 		// log.Printf("==>G: %v", g1)
 		size, rus := gf.ExtRootUnity(g1, false)
-		log.Printf("==>G(%v, %v) :(%v) %v", g1, gf.Inv256(g1), size, rus)
+		log.Printf("==>G(%v, %v) :(%v) %v", g1, gf.Inv256(g1), size, rus[:3])
 	}
 
 	// log.Println("=================================")
@@ -423,7 +423,7 @@ func TestGF256FFT(t *testing.T) {
 }
 
 func TestGF256FFTPerf(t *testing.T) {
-	gf := GF256(4)
+	gf := GF256(8)
 
 	g1 := uint256.NewInt(3)
 	size, xs := gf.ExtRootUnity(g1, false)

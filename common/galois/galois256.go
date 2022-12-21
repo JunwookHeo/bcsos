@@ -24,6 +24,9 @@ type gf256 struct {
 
 var P256 = map[int][]uint{
 	4:   {4, 1},
+	5:   {5, 3, 2, 1},
+	6:   {6, 5, 4, 1},
+	7:   {7, 4, 3, 2},
 	8:   {8, 7, 2, 1},
 	16:  {16, 15, 12, 10},
 	32:  {32, 16, 7, 2},
@@ -375,82 +378,18 @@ func (gf *gf256) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int)
 
 // FFT algorithm with root of unity
 // xs should be root of unit : x^n = 1
-func (gf *gf256) fft_org(xs, ys []*uint256.Int) []*uint256.Int {
-	l := len(xs)
-	os := make([]*uint256.Int, l) // outputs
-
-	for i := 0; i < l; i++ {
-		sum := uint256.NewInt(0)
-		for j := 0; j < len(ys); j++ {
-			m := gf.Mul256(ys[j], xs[(i*j)%l])
-			sum = gf.Add256(sum, m)
-		}
-		os[i] = sum
-	}
-	return os
-}
-
-func (gf *gf256) _fft(xs, ys []*uint256.Int) []*uint256.Int {
-	l := len(xs)
-	os := make([]*uint256.Int, l) // outputs
-
-	for i := 0; i < l; i++ {
-		sum := uint256.NewInt(0)
-		for j := 0; j < len(ys); j++ {
-			m := gf.Mul256(ys[j], xs[(i*j)%l])
-			sum = gf.Add256(sum, m)
-		}
-		// os = append(os, sum)
-		os[i] = sum
-	}
-	return os
-}
-
 func (gf *gf256) fft(xs, ys []*uint256.Int) []*uint256.Int {
-	if len(ys) <= 4 {
-		return gf._fft(xs, ys)
-	}
+	l := len(xs)
+	os := make([]*uint256.Int, l) // outputs
 
-	loop := (len(ys) + 1) / 4
-
-	for i := 0; i < loop; i++ {
+	for i := 0; i < l; i++ {
 		sum := uint256.NewInt(0)
-		for j := 0; j < 4; j++ {
-			pos := loop*j + i
+		for j := 0; j < len(ys); j++ {
 			m := gf.Mul256(ys[j], xs[(i*j)%l])
 			sum = gf.Add256(sum, m)
 		}
-
+		os[i] = sum
 	}
-
-	eys := make([]*uint256.Int, (len(ys)+1)/2)
-	oys := make([]*uint256.Int, (len(ys)+1)/2)
-
-	for i := 0; i < len(ys); i++ {
-		if i%2 == 0 {
-			eys[i>>1] = ys[i]
-		} else {
-			oys[i>>1] = ys[i]
-		}
-	}
-	if len(ys)%2 == 1 {
-		oys[len(oys)-1] = uint256.NewInt(1)
-	}
-
-	L := gf.fft(xs, eys)
-	R := gf.fft(xs, oys)
-	os := make([]*uint256.Int, len(L)*2)
-
-	for i := 0; i < len(L); i++ {
-		ytr := gf.Mul256(R[i], xs[i])
-		os[i] = gf.Add256(L[i], ytr)
-		os[i+len(L)] = gf.Sub256(L[i], ytr)
-	}
-
-	if len(ys)%2 == 1 {
-		return os[:len(os)-1]
-	}
-
 	return os
 }
 
