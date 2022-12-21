@@ -21,9 +21,9 @@ func TestGFNAdd(t *testing.T) {
 
 func TestGFNExpInv(t *testing.T) {
 	gf := GFN(8)
-	P := uint64(1 << 8)
-	P = (3*P - 2) / 2
-	P = 128
+	// P := uint64(1 << 8)
+	// P = (3*P - 2) / 2
+	P := uint64(128)
 	b := 2
 	tenc := int64(0)
 	tdec := int64(0)

@@ -337,15 +337,38 @@ func TestGF256ExtFindRootUnity2(t *testing.T) {
 }
 
 func TestGF256ExtFindRootUnityAll(t *testing.T) {
-	gf := GF256(4)
+	gf := GF256(16)
 
 	for i := uint64(1); i <= gf.GMask.Uint64(); i++ {
 		g1 := uint256.NewInt(i)
 		// log.Printf("==>G: %v", g1)
 		size, rus := gf.ExtRootUnity(g1, false)
-		log.Printf("==>G(%v, %v)-(%v) : %v", g1, gf.Inv256(g1), size, rus)
-
+		log.Printf("==>G(%v, %v) :(%v) %v", g1, gf.Inv256(g1), size, rus)
 	}
+
+	// log.Println("=================================")
+	// for i := int64(1); i <= gf.GMask.Int64(); i++ {
+	// 	g1 := uint256.NewInt(i)
+	// 	// log.Printf("==>G: %v", g1)
+	// 	size, rus := gf.ExtRootUnity(g1, true)
+	// 	log.Printf("==>G(%v, %v)-(%v) : %v", g1, gf.Inv256(g1), size, rus)
+
+	// }
+}
+
+func TestGF256ExtFindRootUnityAny(t *testing.T) {
+	fd := 32
+	gf := GF256(fd)
+
+	for i := uint64(100); i <= 1000; i++ {
+		any := ((1<<fd - 1) * i) / 3 % (1<<fd - 1)
+
+		g1 := uint256.NewInt(any)
+		// log.Printf("==>G: %v", g1)
+		size, _ := gf.ExtRootUnity(g1, false)
+		log.Printf("==>G(%v, %v) : %v", g1, gf.Inv256(g1), size)
+	}
+
 	// log.Println("=================================")
 	// for i := int64(1); i <= gf.GMask.Int64(); i++ {
 	// 	g1 := uint256.NewInt(i)
@@ -357,22 +380,23 @@ func TestGF256ExtFindRootUnityAll(t *testing.T) {
 }
 
 func TestGF256ExtFindRootUnityAll2(t *testing.T) {
-	gf := GF256(4)
+	gf := GF256(8)
 
 	for i := uint64(1); i <= gf.GMask.Uint64(); i++ {
+		// for i := uint64(1<<16 - 100); i <= uint64(1<<16+10); i++ {
 		g1 := uint256.NewInt(i)
 		// log.Printf("==>G: %v", g1)
 		size, _ := gf.ExtRootUnity(g1, false)
-		if size != int(gf.GMask.Uint64()) {
-			log.Printf("==>G(%v, %v)-(%v)", g1, gf.Inv256(g1), size)
+		if 0 < size {
+			log.Printf("==>G(%b, %v)-(%v)", g1, gf.Inv256(g1), size)
 		}
 	}
 }
 
 func TestGF256FFT(t *testing.T) {
-	gf := GF256(8)
+	gf := GF256(4)
 
-	g1 := uint256.NewInt(7)
+	g1 := uint256.NewInt(3)
 	size, xs := gf.ExtRootUnity(g1, false)
 	ys := make([]*uint256.Int, 0, size)
 
@@ -399,9 +423,9 @@ func TestGF256FFT(t *testing.T) {
 }
 
 func TestGF256FFTPerf(t *testing.T) {
-	gf := GF256(16)
+	gf := GF256(4)
 
-	g1 := uint256.NewInt(2)
+	g1 := uint256.NewInt(3)
 	size, xs := gf.ExtRootUnity(g1, false)
 	log.Printf("xs(%v) :  %v", size, xs[:10])
 

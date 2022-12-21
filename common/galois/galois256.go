@@ -138,10 +138,12 @@ func (gf *gf256) Exp256(x, y *uint256.Int) *uint256.Int {
 // y/x = q*x + r
 // carry is true for 256bit irreducable polynomials
 func (gf *gf256) divid(x, y *uint256.Int, carry bool) (*uint256.Int, *uint256.Int) {
-	d := new(uint256.Int)
-	d = d.Set(x)
-	q := new(uint256.Int)
-	q = q.Set(y)
+	// d := new(uint256.Int)
+	// d = d.Set(x)
+	d := x.Clone()
+	// q := new(uint256.Int)
+	// q = q.Set(y)
+	q := y.Clone()
 	r := new(uint256.Int)
 	// log.Printf("x : %x", x)
 	nq := uint256.NewInt(0)
@@ -177,8 +179,9 @@ func (gf *gf256) Inv256(x *uint256.Int) *uint256.Int {
 		return uint256.NewInt(0)
 	}
 
-	b := new(uint256.Int)
-	b = b.Set(x)
+	// b := new(uint256.Int)
+	// b = b.Set(x)
+	b := x.Clone()
 	a := new(uint256.Int)
 	// a = a.Set(gf.PrimeWo) // TODO : deal with prime
 	a.SetFromBig(gf.PrimeW)
@@ -268,16 +271,18 @@ func (gf *gf256) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 	}
 
 	// var lp []*uint256.Int
-	lp := make([]*uint256.Int, 0, len(ys))
+	lp := make([]*uint256.Int, len(ys))
 	for i := 0; i < len(ys); i++ {
-		lp = append(lp, uint256.NewInt(0))
+		lp[i] = uint256.NewInt(0)
 	}
 
 	// var dps [][]*uint256.Int
 	for i, x := range xs {
-		var ps []*uint256.Int
-		ps = append(ps, x)
-		ps = append(ps, uint256.NewInt(1))
+		ps := make([]*uint256.Int, 2)
+		// var ps []*uint256.Int
+		// ps = append(ps, x)
+		// ps = append(ps, uint256.NewInt(1))
+		ps[0], ps[1] = x, uint256.NewInt(1)
 
 		// Get divid polynomial
 		// dp = (x-x1)(x-x2).....(x-xn) / (x-xk)
@@ -349,28 +354,30 @@ func (gf *gf256) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int)
 		x.Set(root)
 	}
 
-	roots := make([]*uint256.Int, 2, maxc)
+	roots := make([]*uint256.Int, maxc)
 	roots[0] = uint256.NewInt(1)
 	roots[1] = x
 
 	one := uint256.NewInt(1)
 	i := 2
-	for ; one.Cmp(roots[len(roots)-1]) != 0; i++ {
+	// for ; one.Cmp(roots[len(roots)-1]) != 0; i++ {
+	for ; one.Cmp(roots[i-1]) != 0; i++ {
 		if i < maxc {
-			roots = append(roots, gf.Mul256(x, roots[len(roots)-1]))
+			// roots = append(roots, gf.Mul256(x, roots[len(roots)-1]))
+			roots[i] = gf.Mul256(x, roots[i-1])
 		} else {
 			return -1, roots
 		}
 	}
-	return i - 1, roots[:len(roots)-1]
-	// return i-1, roots
+	return i - 1, roots[:i-1]
+	// return i, roots[:i]
 }
 
 // FFT algorithm with root of unity
 // xs should be root of unit : x^n = 1
-func (gf *gf256) fft(xs, ys []*uint256.Int, inv bool) []*uint256.Int {
+func (gf *gf256) fft_org(xs, ys []*uint256.Int) []*uint256.Int {
 	l := len(xs)
-	os := make([]*uint256.Int, 0, l) // outputs
+	os := make([]*uint256.Int, l) // outputs
 
 	for i := 0; i < l; i++ {
 		sum := uint256.NewInt(0)
@@ -378,8 +385,72 @@ func (gf *gf256) fft(xs, ys []*uint256.Int, inv bool) []*uint256.Int {
 			m := gf.Mul256(ys[j], xs[(i*j)%l])
 			sum = gf.Add256(sum, m)
 		}
-		os = append(os, sum)
+		os[i] = sum
 	}
+	return os
+}
+
+func (gf *gf256) _fft(xs, ys []*uint256.Int) []*uint256.Int {
+	l := len(xs)
+	os := make([]*uint256.Int, l) // outputs
+
+	for i := 0; i < l; i++ {
+		sum := uint256.NewInt(0)
+		for j := 0; j < len(ys); j++ {
+			m := gf.Mul256(ys[j], xs[(i*j)%l])
+			sum = gf.Add256(sum, m)
+		}
+		// os = append(os, sum)
+		os[i] = sum
+	}
+	return os
+}
+
+func (gf *gf256) fft(xs, ys []*uint256.Int) []*uint256.Int {
+	if len(ys) <= 4 {
+		return gf._fft(xs, ys)
+	}
+
+	loop := (len(ys) + 1) / 4
+
+	for i := 0; i < loop; i++ {
+		sum := uint256.NewInt(0)
+		for j := 0; j < 4; j++ {
+			pos := loop*j + i
+			m := gf.Mul256(ys[j], xs[(i*j)%l])
+			sum = gf.Add256(sum, m)
+		}
+
+	}
+
+	eys := make([]*uint256.Int, (len(ys)+1)/2)
+	oys := make([]*uint256.Int, (len(ys)+1)/2)
+
+	for i := 0; i < len(ys); i++ {
+		if i%2 == 0 {
+			eys[i>>1] = ys[i]
+		} else {
+			oys[i>>1] = ys[i]
+		}
+	}
+	if len(ys)%2 == 1 {
+		oys[len(oys)-1] = uint256.NewInt(1)
+	}
+
+	L := gf.fft(xs, eys)
+	R := gf.fft(xs, oys)
+	os := make([]*uint256.Int, len(L)*2)
+
+	for i := 0; i < len(L); i++ {
+		ytr := gf.Mul256(R[i], xs[i])
+		os[i] = gf.Add256(L[i], ytr)
+		os[i+len(L)] = gf.Sub256(L[i], ytr)
+	}
+
+	if len(ys)%2 == 1 {
+		return os[:len(os)-1]
+	}
+
 	return os
 }
 
@@ -392,7 +463,7 @@ func (gf *gf256) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 		log.Printf("Wrong root of unity !!!")
 		return nil
 	}
-	return gf.fft(xs, cs, false)
+	return gf.fft(xs, cs)
 }
 
 // IDFT generates a polynomial with points [(x0, y0), (x1, y1)....(xn-1, yn-1)]
@@ -406,5 +477,5 @@ func (gf *gf256) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
 		return nil
 	}
 
-	return gf.fft(xs, ys, true)
+	return gf.fft(xs, ys)
 }
