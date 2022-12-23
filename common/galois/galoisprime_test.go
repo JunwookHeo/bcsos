@@ -11,21 +11,117 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGFPAdd(t *testing.T) {
+func TestGFPAddSub(t *testing.T) {
 	gf := GFP()
-	a := uint256.NewInt(4)
-	b := uint256.NewInt(100)
-	p1 := uint256.NewInt(1)
-	p1.Lsh(p1, 32)
-	p1.Mul(p1, uint256.NewInt(351))
 
-	a.Set(gf.Prime)
-	b.Add(b, p1)
-	sum := gf.Add(a, b)
-	log.Printf("%v, %v", sum, p1)
+	tenc := int64(0)
+	tdec := int64(0)
+
+	for i := 0; i < 100000; i++ {
+		r := rand.Int63() % int64(gf.Prime.Uint64())
+		a := uint256.NewInt(uint64(r))
+		r = rand.Int63() % int64(gf.Prime.Uint64())
+		b := uint256.NewInt(uint64(r))
+
+		start := time.Now().UnixNano()
+		exp1 := gf.Add(a, b)
+		end := time.Now().UnixNano()
+		tenc += (end - start)
+
+		start = time.Now().UnixNano()
+		exp2 := gf.Sub(exp1, b)
+		end = time.Now().UnixNano()
+		tdec += (end - start)
+
+		start = time.Now().UnixNano()
+		exp3 := gf.Sub(b, exp1)
+		end = time.Now().UnixNano()
+		tdec += (end - start)
+
+		start = time.Now().UnixNano()
+		exp4 := gf.Add(exp3, exp1)
+		end = time.Now().UnixNano()
+		tenc += (end - start)
+
+		assert.Equal(t, a, exp2)
+		assert.Equal(t, b, exp4)
+		// log.Printf("%v, %v, %v", a, exp1, exp2)
+	}
+	log.Printf("enc : %v, dec : %v", tenc/1000000, tdec/1000000)
 }
 
-func TestGFPExpInv(t *testing.T) {
+func TestGFPMulDiv(t *testing.T) {
+	gf := GFP()
+
+	tenc := int64(0)
+	tdec := int64(0)
+
+	for i := 0; i < 100000; i++ {
+		r := rand.Int63() % int64(gf.Prime.Uint64())
+		a := uint256.NewInt(uint64(r))
+		r = rand.Int63() % int64(gf.Prime.Uint64())
+		b := uint256.NewInt(uint64(r))
+
+		start := time.Now().UnixNano()
+		exp1 := gf.Mul(a, b)
+		end := time.Now().UnixNano()
+		tenc += (end - start)
+
+		start = time.Now().UnixNano()
+		exp2 := gf.Div(exp1, b)
+		end = time.Now().UnixNano()
+		tdec += (end - start)
+
+		start = time.Now().UnixNano()
+		exp3 := gf.Div(b, exp1)
+		end = time.Now().UnixNano()
+		tdec += (end - start)
+
+		start = time.Now().UnixNano()
+		exp4 := gf.Mul(exp3, exp1)
+		end = time.Now().UnixNano()
+		tenc += (end - start)
+
+		assert.Equal(t, a, exp2)
+		assert.Equal(t, b, exp4)
+		// log.Printf("%v, %v, %v", a, exp1, exp2)
+	}
+	log.Printf("enc : %v, dec : %v", tenc/1000000, tdec/1000000)
+}
+
+func TestGFPExp(t *testing.T) {
+	gf := GFP()
+
+	tenc := int64(0)
+	tdec := int64(0)
+
+	for i := 0; i < 10000; i++ {
+		r := rand.Int63() % int64(gf.Prime.Uint64())
+		a := uint256.NewInt(uint64(r))
+		// r = rand.Int63() % int64(gf.Prime.Uint64())
+		b := uint256.NewInt(uint64(i))
+
+		start := time.Now().UnixNano()
+		exp1 := gf.Exp(a, b)
+		end := time.Now().UnixNano()
+		tenc += (end - start)
+
+		start = time.Now().UnixNano()
+		exp2 := uint256.NewInt(1)
+		for j := 0; j < int(b.Uint64()); j++ {
+			exp2 = gf.Mul(exp2, a)
+		}
+
+		end = time.Now().UnixNano()
+		tdec += (end - start)
+
+		assert.Equal(t, exp1, exp2)
+		// log.Printf("%v, %v, %v", a, exp1, exp2)
+	}
+	log.Printf("enc : %v, dec : %v", tenc/1000000, tdec/1000000)
+}
+
+func TestGFPX3Inv(t *testing.T) {
 	gf := GFP()
 	// Inv x^3 = x^((2P-1)/3)
 	P1 := gf.Prime.ToBig()
@@ -40,7 +136,7 @@ func TestGFPExpInv(t *testing.T) {
 	tenc := int64(0)
 	tdec := int64(0)
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		r := rand.Int63() % int64(gf.Prime.Uint64())
 		// r := 3
 		a := uint256.NewInt(uint64(r))
@@ -56,7 +152,7 @@ func TestGFPExpInv(t *testing.T) {
 		tdec += (end - start)
 
 		assert.Equal(t, a, exp2)
-		log.Printf("%v, %v, %v", a, exp1, exp2)
+		// log.Printf("%v, %v, %v", a, exp1, exp2)
 	}
 
 	log.Printf("enc : %v, dec : %v", tenc/1000000, tdec/1000000)
@@ -85,27 +181,26 @@ func TestGFPFarmatLittle(t *testing.T) {
 
 }
 
-func TestGFPInv(t *testing.T) {
+func TestGFPInvInvF(t *testing.T) {
 	gf := GFP()
 	tm1 := int64(0)
 	tm2 := int64(0)
 
-	for i := 2; i < 1000; i++ {
+	for i := 2; i < 100000; i++ {
 		r := rand.Uint64() % gf.Prime.Uint64()
-		// r := i + 1
 		a := uint256.NewInt(uint64(r))
 
 		start := time.Now().UnixNano()
 		inv := gf.Inv(a)
 		end := time.Now().UnixNano()
 		tm1 += (end - start)
-		log.Printf("x*inv_1 = %x, %x, %x", a, inv, gf.Mul(a, inv))
+		// log.Printf("x*inv_1 = %x, %x, %x", a, inv, gf.Mul(a, inv))
 
 		start = time.Now().UnixNano()
 		inv2 := gf.InvF(a)
 		end = time.Now().UnixNano()
 		tm2 += (end - start)
-		log.Printf("x*inv_2 = %x, %x, %x", a, inv2, gf.Mul(a, inv2))
+		// log.Printf("x*inv_2 = %x, %x, %x", a, inv2, gf.Mul(a, inv2))
 		assert.Equal(t, inv, inv2)
 	}
 
@@ -114,145 +209,86 @@ func TestGFPInv(t *testing.T) {
 
 }
 
-// func TestGFPInv2(t *testing.T) {
-// 	gf := GFP(256)
-// 	tm1 := int64(0)
-// 	tm2 := int64(0)
+func TestGFPZPoly(t *testing.T) {
+	gf := GFP()
+	tm1 := int64(0)
+	tm2 := int64(0)
 
-// 	for i := 0; i < 100; i++ {
-// 		r := rand.Uint64()
-// 		a := uint256.NewInt(r)
-// 		// a := uint256.NewInt(uint64(i))
+	for i := 0; i < 1; i++ {
+		var xs []*uint256.Int
+		for j := 0; j < 3; j++ {
+			r := rand.Uint64() % gf.Prime.Uint64()
+			a := uint256.NewInt(r)
+			a = uint256.NewInt(uint64(j + 1))
+			xs = append(xs, a)
+		}
 
-// 		start := time.Now().UnixNano()
-// 		inv := gf.Inv256(a)
-// 		end := time.Now().UnixNano()
-// 		tm1 += (end - start)
-// 		log.Printf("x*inv_1 = %x, %x, %x", a, inv, gf.Mul256(a, inv))
+		start := time.Now().UnixNano()
+		zp := gf.ZPoly(xs)
+		end := time.Now().UnixNano()
+		tm1 += (end - start)
 
-// 		start = time.Now().UnixNano()
-// 		inv2 := gf.InvF256(a)
-// 		end = time.Now().UnixNano()
-// 		tm2 += (end - start)
-// 		log.Printf("x*inv_2 = %x, %x, %x", a, inv2, gf.Mul256(a, inv2))
-// 		assert.Equal(t, inv, inv2)
-// 	}
+		log.Printf("zpoly : %v", zp)
 
-// 	log.Printf("Time1 : %v", tm1/1000000)
-// 	log.Printf("Time2 : %v", tm2/1000000)
+		start = time.Now().UnixNano()
+		for k := 0; k < len(xs); k++ {
+			// xs[k].Add(xs[k], uint256.NewInt(1))
+			ev := gf.EvalPolyAt(zp, xs[k])
+			log.Printf("%v - ev : %v", xs[k], ev)
+			assert.Equal(t, 0, ev.BitLen())
+		}
 
-// }
+		end = time.Now().UnixNano()
+		tm2 += (end - start)
 
-// func TestGFPInvF2Inv(t *testing.T) {
-// 	gf := GFP(256)
-// 	tm1 := int64(0)
-// 	tm2 := int64(0)
+	}
 
-// 	// P1 = (3*P - 2)/2  <--> Inverse of x^2
-// 	P1 := uint256.NewInt(1)
-// 	P1.Lsh(P1, gf.Size-1)
+	log.Printf("enc : %v, dec : %v", tm1/1000000, tm2/1000000)
+}
 
-// 	// X^2
-// 	P2 := uint256.NewInt(2)
+func TestGFPDivPolys(t *testing.T) {
+	gf := GFP()
+	tm1 := int64(0)
 
-// 	log.Printf("P1 : %x, P2 : %x", P1, P2)
+	for i := 0; i < 100; i++ {
+		var xs []*uint256.Int
+		for j := 0; j < 100; j++ {
+			r := rand.Uint64() % gf.Prime.Uint64()
+			a := uint256.NewInt(r)
+			// a = uint256.NewInt(uint64(j + 1))
 
-// 	for i := 0; i < 100; i++ {
-// 		r := rand.Uint64()
-// 		a := uint256.NewInt(r)
+			xs = append(xs, a)
+		}
 
-// 		start := time.Now().UnixNano()
-// 		exp1 := gf.Exp256(a, P1)
-// 		end := time.Now().UnixNano()
-// 		tm1 += (end - start)
+		start := time.Now().UnixNano()
+		zp := gf.ZPoly(xs)
+		// log.Printf("xs %v", xs)
+		// log.Printf("zp %v", zp)
+		for k := 0; k < len(xs); k++ {
+			var sub []*uint256.Int
+			for l := 0; l < len(xs); l++ {
+				if l != k {
+					sub = append(sub, xs[l])
+				}
+			}
+			// log.Printf("sub : %v", sub)
 
-// 		start = time.Now().UnixNano()
-// 		exp2 := gf.Exp256(exp1, P2)
-// 		end = time.Now().UnixNano()
-// 		tm2 += (end - start)
+			sp := gf.ZPoly(sub)
+			ix := gf.Sub(gf.Prime, xs[k])
+			dp := gf.DivPolys(zp, []*uint256.Int{ix, uint256.NewInt(1)})
+			// log.Printf("sp %v", sp)
+			// log.Printf("dp %v", dp)
+			assert.Equal(t, sp, dp)
+		}
 
-// 		assert.Equal(t, a, exp2)
-// 	}
+		end := time.Now().UnixNano()
+		tm1 += (end - start)
 
-// 	log.Printf("enc : %v, dec : %v", tm1/1000000, tm2/1000000)
+		// log.Printf("div polys : %v, %v", poly, zp)
+	}
 
-// }
-
-// func TestGFPZPoly(t *testing.T) {
-// 	gf := GFP(256)
-// 	tm1 := int64(0)
-// 	tm2 := int64(0)
-
-// 	for i := 0; i < 1; i++ {
-// 		var xs []*uint256.Int
-// 		for j := 0; j < 100; j++ {
-// 			r := rand.Uint64() & (1<<gf.Size - 1)
-// 			a := uint256.NewInt(r)
-// 			// a := uint256.NewInt(uint64(2*j + 1))
-// 			xs = append(xs, a)
-// 		}
-
-// 		start := time.Now().UnixNano()
-// 		zp := gf.ZPoly(xs)
-// 		end := time.Now().UnixNano()
-// 		tm1 += (end - start)
-
-// 		log.Printf("zpoly : %v", zp)
-
-// 		start = time.Now().UnixNano()
-// 		for k := 0; k < len(xs); k++ {
-// 			ev := gf.EvalPolyAt(zp, xs[k])
-// 			log.Printf("%v - ev : %v", k, ev)
-// 			assert.Equal(t, 0, ev.BitLen())
-// 		}
-
-// 		end = time.Now().UnixNano()
-// 		tm2 += (end - start)
-
-// 	}
-
-// 	log.Printf("enc : %v, dec : %v", tm1/1000000, tm2/1000000)
-// }
-
-// func TestGFPDivPolys(t *testing.T) {
-// 	gf := GFP(64)
-// 	tm1 := int64(0)
-
-// 	for i := 0; i < 100; i++ {
-// 		var poly []*uint256.Int
-// 		for j := 0; j < 10; j++ {
-// 			r := rand.Uint64()
-// 			a := uint256.NewInt(r)
-// 			// a := uint256.NewInt(int64(j + 1))
-
-// 			poly = append(poly, a)
-// 		}
-
-// 		start := time.Now().UnixNano()
-// 		zp := gf.ZPoly(poly)
-// 		for k := 0; k < len(poly); k++ {
-// 			var sub []*uint256.Int
-// 			for l := 0; l < len(poly); l++ {
-// 				if l != k {
-// 					sub = append(sub, poly[l])
-// 				}
-// 			}
-
-// 			sp := gf.ZPoly(sub)
-// 			dp := gf.DivPolys(zp, []*uint256.Int{poly[k], uint256.NewInt(1)})
-// 			// log.Printf("sp %v", sp)
-// 			// log.Printf("dp %v", dp)
-// 			assert.Equal(t, sp, dp)
-// 		}
-
-// 		end := time.Now().UnixNano()
-// 		tm1 += (end - start)
-
-// 		// log.Printf("div polys : %v, %v", poly, zp)
-// 	}
-
-// 	log.Printf("enc : %v", tm1/1000000)
-// }
+	log.Printf("enc : %v", tm1/1000000)
+}
 
 // func TestGFPLagrangeInterp(t *testing.T) {
 // 	gf := GFP(256)

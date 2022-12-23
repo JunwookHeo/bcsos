@@ -110,7 +110,7 @@ func (gf *gfp) EvalPolyAt(cs []*uint256.Int, x *uint256.Int) *uint256.Int {
 }
 
 func (gf *gfp) ZPoly(xs []*uint256.Int) []*uint256.Int {
-	cs := make([]*uint256.Int, len(xs)+1)
+	cs := make([]*uint256.Int, 1, len(xs)+1)
 	// cs = append(cs, uint256.NewInt(1))
 	cs[0] = uint256.NewInt(1)
 	for j, x := range xs {
@@ -124,32 +124,49 @@ func (gf *gfp) ZPoly(xs []*uint256.Int) []*uint256.Int {
 	return cs
 }
 
-// // div polys
-// // D(x) = (x-1)(x-2)(x-3)....(x-n)/(x-k)
-// func (gf *gfp) DivPolys(a, b []*uint256.Int) []*uint256.Int {
-// 	if len(a) < len(b) {
-// 		return nil
-// 	}
-
-// 	var out []*uint256.Int
-// 	var ad []*uint256.Int
-// 	ad = append(ad, a...)
-
-// 	apos := len(ad) - 1
-// 	bpos := len(b) - 1
-// 	diff := apos - bpos
-
-// 	for diff >= 0 {
-// 		qout := gf.Div256(ad[apos], b[bpos])
-// 		out = append([]*uint256.Int{qout}, out...)
-// 		for i := 1; i >= 0; i-- {
-// 			ad[diff+i] = gf.Sub256(ad[diff+i], gf.Mul256(b[i], qout))
-// 		}
+// def div_polys(self, a, b):
+// 	a = [x for x in a]
+// 	o = []
+// 	apos = len(a) - 1
+// 	bpos = len(b) - 1
+// 	diff = apos - bpos
+// 	while diff >= 0:
+// 		quot = self.div(a[apos], b[bpos])
+// 		o.insert(0, quot)
+// 		for i in range(bpos, -1, -1):
+// 			a[diff+i] -= b[i] * quot
 // 		apos -= 1
 // 		diff -= 1
-// 	}
-// 	return out
-// }
+// 	return [x % self.modulus for x in o]
+
+// div polys
+// D(x) = (x-1)(x-2)(x-3)....(x-n)/(x-k)
+func (gf *gfp) DivPolys(a, b []*uint256.Int) []*uint256.Int {
+	if len(a) < len(b) {
+		return nil
+	}
+
+	var out []*uint256.Int
+	cs := make([]*uint256.Int, len(a))
+	for i := 0; i < len(a); i++ {
+		cs[i] = a[i]
+	}
+
+	apos := len(cs) - 1
+	bpos := len(b) - 1
+	diff := apos - bpos
+
+	for diff >= 0 {
+		qout := gf.Div(cs[apos], b[bpos])
+		out = append([]*uint256.Int{qout}, out...)
+		for i := bpos; i >= 0; i-- {
+			cs[diff+i] = gf.Sub(cs[diff+i], gf.Mul(b[i], qout))
+		}
+		apos -= 1
+		diff -= 1
+	}
+	return out
+}
 
 // func (gf *gfp) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 // 	zp := gf.ZPoly(xs)
