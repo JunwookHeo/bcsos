@@ -124,21 +124,6 @@ func (gf *gfp) ZPoly(xs []*uint256.Int) []*uint256.Int {
 	return cs
 }
 
-// def div_polys(self, a, b):
-// 	a = [x for x in a]
-// 	o = []
-// 	apos = len(a) - 1
-// 	bpos = len(b) - 1
-// 	diff = apos - bpos
-// 	while diff >= 0:
-// 		quot = self.div(a[apos], b[bpos])
-// 		o.insert(0, quot)
-// 		for i in range(bpos, -1, -1):
-// 			a[diff+i] -= b[i] * quot
-// 		apos -= 1
-// 		diff -= 1
-// 	return [x % self.modulus for x in o]
-
 // div polys
 // D(x) = (x-1)(x-2)(x-3)....(x-n)/(x-k)
 func (gf *gfp) DivPolys(a, b []*uint256.Int) []*uint256.Int {
@@ -168,83 +153,88 @@ func (gf *gfp) DivPolys(a, b []*uint256.Int) []*uint256.Int {
 	return out
 }
 
-// func (gf *gfp) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
-// 	zp := gf.ZPoly(xs)
-// 	if len(zp) != len(ys)+1 {
-// 		return nil
-// 	}
+func (gf *gfp) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
+	zp := gf.ZPoly(xs)
+	if len(zp) != len(ys)+1 {
+		return nil
+	}
 
-// 	// var lp []*uint256.Int
-// 	lp := make([]*uint256.Int, len(ys))
-// 	for i := 0; i < len(ys); i++ {
-// 		lp[i] = uint256.NewInt(0)
-// 	}
+	lp := make([]*uint256.Int, len(ys))
+	for i := 0; i < len(ys); i++ {
+		lp[i] = uint256.NewInt(0)
+	}
 
-// 	// var dps [][]*uint256.Int
-// 	for i, x := range xs {
-// 		ps := make([]*uint256.Int, 2)
-// 		// var ps []*uint256.Int
-// 		// ps = append(ps, x)
-// 		// ps = append(ps, uint256.NewInt(1))
-// 		ps[0], ps[1] = x, uint256.NewInt(1)
+	for i, x := range xs {
+		ps := make([]*uint256.Int, 2)
+		ps[0], ps[1] = gf.Sub(gf.Prime, x), uint256.NewInt(1)
 
-// 		// Get divid polynomial
-// 		// dp = (x-x1)(x-x2).....(x-xn) / (x-xk)
-// 		dp := gf.DivPolys(zp, ps)
-// 		// dps = append([]*uint256.Int{dp}, dps...)
-// 		// Evaluate each divided polynomial
-// 		// denom = (xk-x1)(xk-x2)....(xk-xn)  without (xk-xk)
-// 		denom := gf.EvalPolyAt(dp, x)
-// 		// invdenom = 1/denom
-// 		invdenom := gf.Inv256(denom)
-// 		// yk = yk * 1/denom
-// 		yk := gf.Mul256(ys[i], invdenom)
-// 		// Add all coeficient of each x^n
-// 		for j := range ys {
-// 			lp[j] = gf.Add256(lp[j], gf.Mul256(dp[j], yk))
-// 		}
-// 	}
+		// Get divid polynomial
+		// dp = (x-x1)(x-x2).....(x-xn) / (x-xk)
+		dp := gf.DivPolys(zp, ps)
+		// dps = append([]*uint256.Int{dp}, dps...)
+		// Evaluate each divided polynomial
+		// denom = (xk-x1)(xk-x2)....(xk-xn)  without (xk-xk)
+		denom := gf.EvalPolyAt(dp, x)
+		// invdenom = 1/denom
+		invdenom := gf.Inv(denom)
+		// yk = yk * 1/denom
+		yk := gf.Mul(ys[i], invdenom)
+		// Add all coeficient of each x^n
+		for j := range ys {
+			lp[j] = gf.Add(lp[j], gf.Mul(dp[j], yk))
+		}
+	}
 
-// 	return lp
-// }
+	return lp
+}
 
-// func (gf *gfp) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
-// 	maxc := 65536
-// 	if gf.Size < 16 {
-// 		maxc = int(gf.GMask.Uint64()) + 1
-// 	}
-// 	var cmpos int
+func (gf *gfp) ExtRootUnity(x *uint256.Int, inv bool) (int, []*uint256.Int) {
+	maxc := 65537
+	if gf.Size < 16 {
+		maxc = int(1<<gf.Size) + 1
+	}
+	var cmpos int
 
-// 	roots := make([]*uint256.Int, 2, maxc)
-// 	if inv {
-// 		roots[0] = x
-// 		roots[1] = uint256.NewInt(1)
-// 		cmpos = 0
-// 	} else {
-// 		roots[0] = uint256.NewInt(1)
-// 		roots[1] = x
-// 		cmpos = len(roots) - 1
-// 	}
+	roots := make([]*uint256.Int, maxc)
+	if inv {
+		roots[maxc-1] = uint256.NewInt(1)
+		roots[maxc-2] = x
+		cmpos = maxc - 2
+	} else {
+		roots[0] = uint256.NewInt(1)
+		roots[1] = x
+		cmpos = 1
+	}
 
-// 	one := uint256.NewInt(1)
-// 	i := 2
-// 	for ; one.Cmp(roots[cmpos]) != 0; i++ {
-// 		if i < maxc {
-// 			if inv {
-// 				roots = append([]*uint256.Int{gf.Mul256(x, roots[cmpos])}, roots...)
-// 			} else {
-// 				roots = append(roots, gf.Mul256(x, roots[cmpos]))
-// 			}
-// 		} else {
-// 			return -1, roots
-// 		}
-// 		if !inv {
-// 			cmpos = len(roots) - 1
-// 		}
-// 	}
-// 	// return i - 1, roots[:len(roots)-1]
-// 	return i, roots
-// }
+	one := uint256.NewInt(1)
+	i := 2
+	for ; one.Cmp(roots[cmpos]) != 0; i++ {
+		if i < maxc {
+			if inv {
+				// roots = append([]*uint256.Int{gf.Mul(x, roots[cmpos])}, roots...)
+				roots[maxc-i-1] = gf.Mul(x, roots[cmpos])
+			} else {
+				// roots = append(roots, gf.Mul(x, roots[cmpos]))
+				roots[i] = gf.Mul(x, roots[cmpos])
+			}
+		} else {
+			return -1, roots
+		}
+		if !inv {
+			cmpos = i
+		} else {
+			cmpos = maxc - i - 1
+		}
+	}
+
+	if inv {
+		return i, roots[maxc-i:]
+	} else {
+		// return i - 1, roots[:len(roots)-1]
+		return i, roots
+	}
+
+}
 
 // func (gf *gfp) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
 // 	maxc := 65536
