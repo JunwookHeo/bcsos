@@ -23,7 +23,7 @@ func GFP() *gfp {
 	p.Sub(p, p1)
 	p.Add(p, big.NewInt(1))
 	size := p.BitLen()
-	// p.Set(big.NewInt(11))
+	// p.Set(big.NewInt(17))
 
 	log.Printf("Prime : %x", p)
 	prime, _ := uint256.FromBig(p)
@@ -188,7 +188,7 @@ func (gf *gfp) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 	return lp
 }
 
-func (gf *gfp) ExtRootUnity(x *uint256.Int, inv bool) (int, []*uint256.Int) {
+func (gf *gfp) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 	maxc := 65537
 	if gf.Size < 16 {
 		maxc = int(1<<gf.Size) + 1
@@ -211,10 +211,8 @@ func (gf *gfp) ExtRootUnity(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 	for ; one.Cmp(roots[cmpos]) != 0; i++ {
 		if i < maxc {
 			if inv {
-				// roots = append([]*uint256.Int{gf.Mul(x, roots[cmpos])}, roots...)
 				roots[maxc-i-1] = gf.Mul(x, roots[cmpos])
 			} else {
-				// roots = append(roots, gf.Mul(x, roots[cmpos]))
 				roots[i] = gf.Mul(x, roots[cmpos])
 			}
 		} else {
@@ -236,76 +234,121 @@ func (gf *gfp) ExtRootUnity(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 
 }
 
-// func (gf *gfp) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
-// 	maxc := 65536
-// 	if gf.Size < 16 {
-// 		maxc = int(gf.GMask.Uint64()) + 1
-// 	}
-// 	x := new(uint256.Int)
-// 	if inv {
-// 		x.Set(gf.Inv256(root))
-// 	} else {
-// 		x.Set(root)
-// 	}
+func (gf *gfp) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
+	maxc := 65537
+	if gf.Size < 16 {
+		maxc = int(1<<gf.Size) + 1
+	}
 
-// 	roots := make([]*uint256.Int, maxc)
-// 	roots[0] = uint256.NewInt(1)
-// 	roots[1] = x
+	x := new(uint256.Int)
+	if inv {
+		x.Set(gf.Inv(root))
+	} else {
+		x.Set(root)
+	}
 
-// 	one := uint256.NewInt(1)
-// 	i := 2
-// 	// for ; one.Cmp(roots[len(roots)-1]) != 0; i++ {
-// 	for ; one.Cmp(roots[i-1]) != 0; i++ {
-// 		if i < maxc {
-// 			// roots = append(roots, gf.Mul256(x, roots[len(roots)-1]))
-// 			roots[i] = gf.Mul256(x, roots[i-1])
-// 		} else {
-// 			return -1, roots
-// 		}
-// 	}
-// 	return i - 1, roots[:i-1]
-// 	// return i, roots[:i]
-// }
+	roots := make([]*uint256.Int, maxc)
+	roots[0] = uint256.NewInt(1)
+	roots[1] = x
 
-// // FFT algorithm with root of unity
-// // xs should be root of unit : x^n = 1
-// func (gf *gfp) fft(xs, ys []*uint256.Int) []*uint256.Int {
-// 	l := len(xs)
-// 	os := make([]*uint256.Int, l) // outputs
+	one := uint256.NewInt(1)
+	i := 2
+	for ; one.Cmp(roots[i-1]) != 0; i++ {
+		if i < maxc {
+			roots[i] = gf.Mul(x, roots[i-1])
+		} else {
+			return -1, roots
+		}
+	}
+	// return i - 1, roots[:i-1]
+	return i, roots[:i]
+}
 
-// 	for i := 0; i < l; i++ {
-// 		sum := uint256.NewInt(0)
-// 		for j := 0; j < len(ys); j++ {
-// 			m := gf.Mul256(ys[j], xs[(i*j)%l])
-// 			sum = gf.Add256(sum, m)
-// 		}
-// 		os[i] = sum
-// 	}
-// 	return os
-// }
+// FFT algorithm with root of unity
+// xs should be root of unit : x^n = 1
+func (gf *gfp) fft_t(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
+	l := len(xs)
+	os := make([]*uint256.Int, l) // outputs
 
-// // DFT evaluates a polynomial at xs(root of unity)
-// // cs is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
-// // xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
-// func (gf *gfp) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
-// 	size, xs := gf.ExtRootUnity(root, false)
-// 	if size == -1 {
-// 		log.Printf("Wrong root of unity !!!")
-// 		return nil
-// 	}
-// 	return gf.fft(xs, cs)
-// }
+	for i := 0; i < l; i++ {
+		sum := uint256.NewInt(0)
+		for j := 0; j < len(ys); j++ {
+			m := gf.Mul(ys[j], xs[(i*j)%l])
+			sum = gf.Add(sum, m)
+		}
+		os[i] = gf.Mul(sum, w)
+	}
+	return os
+}
 
-// // IDFT generates a polynomial with points [(x0, y0), (x1, y1)....(xn-1, yn-1)]
-// // xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
-// // ys : [y0, y1, y2, y3 ... yn-1]
-// // Output is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
-// func (gf *gfp``) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
-// 	size, xs := gf.ExtRootUnity(root, true)
-// 	if size != len(ys) {
-// 		log.Println("The length of xs and ys should be the same")
-// 		return nil
-// 	}
+func (gf *gfp) _fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
+	l := len(xs)
+	os := make([]*uint256.Int, l) // outputs
 
-// 	return gf.fft(xs, ys)
-// }
+	for i := 0; i < l; i++ {
+		sum := uint256.NewInt(0)
+		for j := 0; j < len(ys); j++ {
+			m := gf.Mul(ys[j], xs[(i*j)%l])
+			sum = gf.Add(sum, m)
+		}
+		os[i] = gf.Mul(sum, w)
+	}
+	return os
+}
+func (gf *gfp) fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
+	if len(ys) <= 4 {
+		return gf._fft(xs, ys, w)
+	}
+
+	exs := make([]*uint256.Int, (len(ys)+1)>>1)
+	eys := make([]*uint256.Int, (len(ys)+1)>>1)
+	oys := make([]*uint256.Int, (len(ys)+1)>>1)
+
+	for i := 0; i < len(ys); i++ {
+		if i%2 == 0 {
+			exs[i>>1] = xs[i]
+			eys[i>>1] = ys[i]
+		} else {
+			oys[i>>1] = ys[i]
+		}
+	}
+
+	L := gf.fft(exs, eys, w)
+	R := gf.fft(exs, oys, w)
+
+	os := make([]*uint256.Int, len(ys))
+	for i := 0; i < len(L); i++ {
+		yt := gf.Mul(R[i], xs[i])
+		os[i] = gf.Add(L[i], yt)
+		os[i+len(L)] = gf.Sub(L[i], yt)
+	}
+	return os
+}
+
+// DFT evaluates a polynomial at xs(root of unity)
+// cs is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
+// xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
+func (gf *gfp) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
+	size, xs := gf.ExtRootUnity(root, false)
+	if size == -1 {
+		log.Printf("Wrong root of unity !!!")
+		return nil
+	}
+	w := uint256.NewInt(1) // No inverse
+	return gf.fft(xs[:size-1], cs, w)
+}
+
+// IDFT generates a polynomial with points [(x0, y0), (x1, y1)....(xn-1, yn-1)]
+// xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
+// ys : [y0, y1, y2, y3 ... yn-1]
+// Output is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
+func (gf *gfp) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
+	size, xs := gf.ExtRootUnity(root, true)
+	if size != len(ys)+1 {
+		log.Println("The length of xs and ys should be the same")
+		return nil
+	}
+
+	w := gf.Inv(uint256.NewInt(uint64(size - 1))) // Divid by inverse
+	return gf.fft(xs[:size-1], ys, w)
+}

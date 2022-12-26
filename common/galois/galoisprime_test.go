@@ -350,155 +350,158 @@ func TestGFPExtRootUnity(t *testing.T) {
 	log.Printf("lp : %v", tm1/1000000)
 }
 
-// func TestGFPExtFindRootUnity(t *testing.T) {
-// 	gf := GFP(16)
+func TestGFPExtRootUnity2(t *testing.T) {
+	gf := GFP()
+	g := gf.Prime.Clone()
+	g.Sub(g, uint256.NewInt(1))
+	g.Div(g, uint256.NewInt(65536))
+	G2 := gf.Exp(uint256.NewInt(7), g)
 
-// 	g1 := gf.Exp256(uint256.NewInt(2), uint256.NewInt(257))
-// 	ev := gf.Exp256(g1, uint256.NewInt(255))
-// 	log.Printf("==>G(%v): %v", g1, ev)
-// 	size, rus := gf.ExtRootUnity(g1, false)
-// 	log.Printf("==>G(%v), %v: %v", g1, size, rus)
+	tm1 := int64(0)
 
-// 	g2 := gf.Exp256(uint256.NewInt(2), uint256.NewInt(1285))
-// 	ev2 := gf.Exp256(g2, uint256.NewInt(51))
-// 	log.Printf("==>G(%v): %v", g2, ev2)
-// 	size2, rus2 := gf.ExtRootUnity(g2, false)
-// 	log.Printf("==>G(%v), %v: %v", g2, size2, rus2)
+	log.Printf("g : %v", G2)
+	start := time.Now().UnixNano()
+	size1, xs1 := gf.ExtRootUnity2(G2, false)
+	end := time.Now().UnixNano()
+	log.Printf("Forward Size : %v, Start : %v, .... End : %v", size1, xs1[:10], xs1[len(xs1)-10:])
+	tm1 = end - start
 
-// 	g3 := gf.Exp256(uint256.NewInt(2), uint256.NewInt(3855))
-// 	ev3 := gf.Exp256(g3, uint256.NewInt(17))
-// 	log.Printf("==>G(%v): %v", g3, ev3)
-// 	size3, rus3 := gf.ExtRootUnity(g2, false)
-// 	log.Printf("==>G(%v), %v: %v", g3, size3, rus3)
-// }
-// func TestGFPExtFindRootUnity2(t *testing.T) {
-// 	gf := GFP(8)
+	start = time.Now().UnixNano()
+	size2, xs2 := gf.ExtRootUnity2(G2, true)
+	end = time.Now().UnixNano()
+	log.Printf("Revers Size : %v, Start : %v, .... End : %v", size2, xs2[:10], xs2[len(xs2)-10:])
+	tm1 += end - start
 
-// 	g1 := gf.Exp256(uint256.NewInt(2), uint256.NewInt(85))
-// 	ev := gf.Exp256(g1, uint256.NewInt(48))
-// 	log.Printf("==>G(%v): %v", g1, ev)
-// 	size, rus := gf.ExtRootUnity(g1, false)
-// 	log.Printf("==>G(%v), %v: %v", g1, size, rus)
+	assert.Equal(t, size1, size2)
+	assert.Equal(t, xs1[0], xs2[size1-1])
 
-// 	// g2 := gf.Exp256(uint256.NewInt(2), uint256.NewInt(85))
-// 	// ev2 := gf.Exp256(g2, uint256.NewInt(12))
-// 	// log.Printf("==>G(%v): %v", g2, ev2)
-// 	// size2, rus2 := gf.ExtRootUnity(g2, false)
-// 	// log.Printf("==>G(%v), %v: %v", g2, size2, rus2)
-// }
+	log.Printf("lp : %v", tm1/1000000)
+}
 
-// func TestGFPExtFindRootUnityAll(t *testing.T) {
-// 	gf := GFP(6)
+func TestGFPExtRootUnity2_2(t *testing.T) {
+	gf := GFP()
+	g := gf.Prime.Clone()
+	g.Sub(g, uint256.NewInt(1))
+	g.Div(g, uint256.NewInt(65536))
+	G2 := gf.Exp(uint256.NewInt(7), g)
 
-// 	for i := uint64(1); i <= gf.GMask.Uint64(); i++ {
-// 		g1 := uint256.NewInt(i)
-// 		// log.Printf("==>G: %v", g1)
-// 		size, rus := gf.ExtRootUnity(g1, false)
-// 		log.Printf("==>G(%v, %v) :(%v) %v", g1, gf.Inv256(g1), size, rus[:3])
-// 	}
+	tm1 := int64(0)
 
-// 	// log.Println("=================================")
-// 	// for i := int64(1); i <= gf.GMask.Int64(); i++ {
-// 	// 	g1 := uint256.NewInt(i)
-// 	// 	// log.Printf("==>G: %v", g1)
-// 	// 	size, rus := gf.ExtRootUnity(g1, true)
-// 	// 	log.Printf("==>G(%v, %v)-(%v) : %v", g1, gf.Inv256(g1), size, rus)
+	log.Printf("g : %v", G2)
+	start := time.Now().UnixNano()
+	size1, xs1 := gf.ExtRootUnity(G2, true)
+	end := time.Now().UnixNano()
+	log.Printf("Forward Size : %v, Start : %v, .... End : %v", size1, xs1[:10], xs1[len(xs1)-10:])
+	tm1 = end - start
 
-// 	// }
-// }
+	start = time.Now().UnixNano()
+	size2, xs2 := gf.ExtRootUnity2(G2, true)
+	end = time.Now().UnixNano()
+	log.Printf("Revers Size : %v, Start : %v, .... End : %v", size2, xs2[:10], xs2[len(xs2)-10:])
+	tm1 += end - start
 
-// func TestGFPExtFindRootUnityAny(t *testing.T) {
-// 	fd := 32
-// 	gf := GFP(fd)
+	assert.Equal(t, size1, size2)
+	assert.Equal(t, xs1[0], xs2[size1-1])
 
-// 	for i := uint64(100); i <= 1000; i++ {
-// 		any := ((1<<fd - 1) * i) / 3 % (1<<fd - 1)
+	log.Printf("lp : %v", tm1/1000000)
+}
+func TestGFPDTF(t *testing.T) {
+	gf := GFP()
 
-// 		g1 := uint256.NewInt(any)
-// 		// log.Printf("==>G: %v", g1)
-// 		size, _ := gf.ExtRootUnity(g1, false)
-// 		log.Printf("==>G(%v, %v) : %v", g1, gf.Inv256(g1), size)
-// 	}
+	g1 := uint256.NewInt(5)
+	size, xs := gf.ExtRootUnity(g1, false)
+	xs = xs[:size-1]
+	size -= 1
+	ys := make([]*uint256.Int, 0, size)
 
-// 	// log.Println("=================================")
-// 	// for i := int64(1); i <= gf.GMask.Int64(); i++ {
-// 	// 	g1 := uint256.NewInt(i)
-// 	// 	// log.Printf("==>G: %v", g1)
-// 	// 	size, rus := gf.ExtRootUnity(g1, true)
-// 	// 	log.Printf("==>G(%v, %v)-(%v) : %v", g1, gf.Inv256(g1), size, rus)
+	for j := 0; j < size; j++ {
+		r := rand.Uint64() % gf.Prime.Uint64()
+		a := uint256.NewInt(r)
+		ys = append(ys, a)
+	}
 
-// 	// }
-// }
+	log.Printf("xs : %v, ys : %v", xs, ys)
+	os1 := make([]*uint256.Int, len(xs))
+	start := time.Now().Nanosecond()
+	for i, x := range xs {
+		os1[i] = gf.EvalPolyAt(ys, x)
 
-// func TestGFPExtFindRootUnityAll2(t *testing.T) {
-// 	gf := GFP(8)
+	}
+	end := time.Now().Nanosecond()
+	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
 
-// 	for i := uint64(1); i <= gf.GMask.Uint64(); i++ {
-// 		// for i := uint64(1<<16 - 100); i <= uint64(1<<16+10); i++ {
-// 		g1 := uint256.NewInt(i)
-// 		// log.Printf("==>G: %v", g1)
-// 		size, _ := gf.ExtRootUnity(g1, false)
-// 		if 0 < size {
-// 			log.Printf("==>G(%b, %v)-(%v)", g1, gf.Inv256(g1), size)
-// 		}
-// 	}
-// }
+	start = time.Now().Nanosecond()
+	os2 := gf.DFT(ys, g1)
+	end = time.Now().Nanosecond()
+	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
 
-// func TestGFPFFT(t *testing.T) {
-// 	gf := GFP(4)
+}
 
-// 	g1 := uint256.NewInt(3)
-// 	size, xs := gf.ExtRootUnity(g1, false)
-// 	ys := make([]*uint256.Int, 0, size)
+func TestGFPFFT(t *testing.T) {
+	gf := GFP()
 
-// 	for j := 0; j < size; j++ {
-// 		r := rand.Uint64() % (1 << 4)
-// 		a := uint256.NewInt(r)
-// 		ys = append(ys, a)
-// 	}
+	g1 := uint256.NewInt(3)
 
-// 	log.Printf("==>xs:%v, ys:%v", xs, ys)
-// 	start := time.Now().Nanosecond()
-// 	os1 := gf.LagrangeInterp(xs, ys)
-// 	end := time.Now().Nanosecond()
-// 	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
+	size, xs := gf.ExtRootUnity(g1, false)
+	xs = xs[:size-1]
+	size -= 1
+	ys := make([]*uint256.Int, 0, size)
 
-// 	start = time.Now().Nanosecond()
-// 	os2 := gf.IDFT(ys, g1)
-// 	end = time.Now().Nanosecond()
-// 	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
+	for j := 0; j < size; j++ {
+		r := rand.Uint64() % gf.Prime.Uint64()
+		a := uint256.NewInt(r)
+		ys = append(ys, a)
+	}
 
-// 	os3 := gf.DFT(os1, g1)
-// 	log.Printf("DFT : %v", os3)
+	log.Printf("==>xs:%v, ys:%v", xs, ys)
+	start := time.Now().Nanosecond()
+	os1 := gf.LagrangeInterp(xs, ys)
+	end := time.Now().Nanosecond()
+	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
 
-// }
+	start = time.Now().Nanosecond()
+	os2 := gf.IDFT(ys, g1)
+	end = time.Now().Nanosecond()
+	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
 
-// func TestGFPFFTPerf(t *testing.T) {
-// 	gf := GFP(8)
+	os3 := gf.DFT(os1, g1)
+	log.Printf("DFT : %v", os3)
 
-// 	g1 := uint256.NewInt(3)
-// 	size, xs := gf.ExtRootUnity(g1, false)
-// 	log.Printf("xs(%v) :  %v", size, xs[:10])
+}
 
-// 	if size == -1 {
-// 		return
-// 	}
+func TestGFPFFTPerf(t *testing.T) {
+	gf := GFP()
 
-// 	ys := make([]*uint256.Int, 0, size)
-// 	for j := 0; j < size; j++ {
-// 		r := rand.Uint64() % (1 << gf.Size)
-// 		a := uint256.NewInt(r)
-// 		ys = append(ys, a)
-// 	}
+	g := gf.Prime.Clone()
+	g.Sub(g, uint256.NewInt(1))
+	g.Div(g, uint256.NewInt(65536))
+	g1 := gf.Exp(uint256.NewInt(7), g)
+	g1 = g1.Set(uint256.NewInt(5))
 
-// 	log.Printf("ys(%v) :  %v", size, ys[:10])
+	size, xs := gf.ExtRootUnity(g1, false)
+	xs = xs[:size-1]
+	size -= 1
+	log.Printf("xs(%v) :  %v", size, xs[:10])
 
-// 	start := time.Now().Nanosecond()
-// 	os2 := gf.IDFT(ys, g1)
-// 	end := time.Now().Nanosecond()
-// 	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2[:10])
+	if size == -1 {
+		return
+	}
 
-// 	os3 := gf.DFT(os2, g1)
-// 	log.Printf("DFT :  %v", os3[:10])
+	ys := make([]*uint256.Int, size)
+	for j := 0; j < size; j++ {
+		r := rand.Uint64() % gf.Prime.Uint64()
+		a := uint256.NewInt(r)
+		ys[j] = a
+	}
 
-// }
+	log.Printf("ys(%v) :  %v", size, ys[:10])
+
+	start := time.Now().Nanosecond()
+	os2 := gf.IDFT(ys, g1)
+	end := time.Now().Nanosecond()
+	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2[:10])
+
+	os3 := gf.DFT(os2, g1)
+	log.Printf("DFT :  %v", os3[:10])
+
+}
