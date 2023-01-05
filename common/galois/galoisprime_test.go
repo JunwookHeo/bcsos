@@ -476,7 +476,6 @@ func TestGFPFFTPerf(t *testing.T) {
 	g.Sub(g, uint256.NewInt(1))
 	g.Div(g, uint256.NewInt(65536))
 	g1 := gf.Exp(uint256.NewInt(7), g)
-	g1 = g1.Set(uint256.NewInt(5))
 
 	size, xs := gf.ExtRootUnity(g1, false)
 	xs = xs[:size-1]
@@ -487,21 +486,30 @@ func TestGFPFFTPerf(t *testing.T) {
 		return
 	}
 
-	ys := make([]*uint256.Int, size)
-	for j := 0; j < size; j++ {
-		r := rand.Uint64() % gf.Prime.Uint64()
-		a := uint256.NewInt(r)
-		ys[j] = a
+	tm1 := int(0)
+
+	for i := 0; i < 1000; i++ {
+		ys := make([]*uint256.Int, size)
+		for j := 0; j < size; j++ {
+			r := rand.Uint64() % gf.Prime.Uint64()
+			a := uint256.NewInt(r)
+			ys[j] = a
+		}
+
+		start := time.Now().Nanosecond()
+		os1 := gf.IDFT(ys, g1)
+		end := time.Now().Nanosecond()
+		tm1 += end - start
+		log.Printf("Running : %v", i)
+		start = time.Now().Nanosecond()
+		os2 := gf.DFT(os1, g1)
+		end = time.Now().Nanosecond()
+		tm1 += end - start
+
+		assert.Equal(t, ys[10], os2[10])
+
 	}
 
-	log.Printf("ys(%v) :  %v", size, ys[:10])
-
-	start := time.Now().Nanosecond()
-	os2 := gf.IDFT(ys, g1)
-	end := time.Now().Nanosecond()
-	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2[:10])
-
-	os3 := gf.DFT(os2, g1)
-	log.Printf("DFT :  %v", os3[:10])
+	log.Printf("DFT/IDFT : %v", tm1/1000000)
 
 }
