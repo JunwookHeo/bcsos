@@ -7,14 +7,14 @@ import (
 	"github.com/holiman/uint256"
 )
 
-type gfp struct {
+type GFP struct {
 	Size  uint
 	Prime *uint256.Int
 }
 
 // PRIME = 2^256 - 351*2^32 + 1
 
-func GFP() *gfp {
+func NewGFP() *GFP {
 	p := big.NewInt(1)
 	p1 := big.NewInt(1)
 	p1.Lsh(p1, 32)
@@ -28,16 +28,22 @@ func GFP() *gfp {
 	log.Printf("Prime : %x", p)
 	prime, _ := uint256.FromBig(p)
 
-	gf := gfp{uint(size), prime}
+	gf := GFP{uint(size), prime}
 	return &gf
 }
 
-func (gf *gfp) Add(x, y *uint256.Int) *uint256.Int {
+func (gf *GFP) IntFromBytes(x []byte) *uint256.Int {
+	s := new(uint256.Int)
+	s.SetBytes(x)
+	return s.Mod(s, gf.Prime)
+}
+
+func (gf *GFP) Add(x, y *uint256.Int) *uint256.Int {
 	s := new(uint256.Int)
 	return s.AddMod(x, y, gf.Prime)
 }
 
-func (gf *gfp) Sub(x, y *uint256.Int) *uint256.Int {
+func (gf *GFP) Sub(x, y *uint256.Int) *uint256.Int {
 	s := new(uint256.Int)
 	if x.Lt(y) {
 		s.Sub(y, x)
@@ -47,17 +53,17 @@ func (gf *gfp) Sub(x, y *uint256.Int) *uint256.Int {
 	}
 }
 
-func (gf *gfp) Mul(x, y *uint256.Int) *uint256.Int {
+func (gf *GFP) Mul(x, y *uint256.Int) *uint256.Int {
 	s := new(uint256.Int)
 	return s.MulMod(x, y, gf.Prime)
 }
 
-func (gf *gfp) Div(x, y *uint256.Int) *uint256.Int {
+func (gf *GFP) Div(x, y *uint256.Int) *uint256.Int {
 	return gf.Mul(x, gf.Inv(y))
 
 }
 
-func (gf *gfp) Exp(x, y *uint256.Int) *uint256.Int {
+func (gf *GFP) Exp(x, y *uint256.Int) *uint256.Int {
 	a := x.ToBig()
 	b := y.ToBig()
 	m := gf.Prime.ToBig()
@@ -67,7 +73,7 @@ func (gf *gfp) Exp(x, y *uint256.Int) *uint256.Int {
 }
 
 // Extended Euclidian Algorithm to calculate Inverse
-func (gf *gfp) Inv(x *uint256.Int) *uint256.Int {
+func (gf *GFP) Inv(x *uint256.Int) *uint256.Int {
 	if x.BitLen() == 0 {
 		return uint256.NewInt(0)
 	}
@@ -87,7 +93,7 @@ func (gf *gfp) Inv(x *uint256.Int) *uint256.Int {
 	return lm.Mod(lm, gf.Prime)
 }
 
-func (gf *gfp) InvF(x *uint256.Int) *uint256.Int {
+func (gf *GFP) InvF(x *uint256.Int) *uint256.Int {
 	if x.BitLen() == 0 {
 		return uint256.NewInt(0)
 	}
@@ -97,7 +103,7 @@ func (gf *gfp) InvF(x *uint256.Int) *uint256.Int {
 }
 
 // Evaluate Polynomial at a point x
-func (gf *gfp) EvalPolyAt(cs []*uint256.Int, x *uint256.Int) *uint256.Int {
+func (gf *GFP) EvalPolyAt(cs []*uint256.Int, x *uint256.Int) *uint256.Int {
 	y := uint256.NewInt(0)
 	pox := uint256.NewInt(1)
 
@@ -109,7 +115,7 @@ func (gf *gfp) EvalPolyAt(cs []*uint256.Int, x *uint256.Int) *uint256.Int {
 	return y
 }
 
-func (gf *gfp) ZPoly(xs []*uint256.Int) []*uint256.Int {
+func (gf *GFP) ZPoly(xs []*uint256.Int) []*uint256.Int {
 	cs := make([]*uint256.Int, 1, len(xs)+1)
 	// cs = append(cs, uint256.NewInt(1))
 	cs[0] = uint256.NewInt(1)
@@ -126,7 +132,7 @@ func (gf *gfp) ZPoly(xs []*uint256.Int) []*uint256.Int {
 
 // div polys
 // D(x) = (x-1)(x-2)(x-3)....(x-n)/(x-k)
-func (gf *gfp) DivPolys(a, b []*uint256.Int) []*uint256.Int {
+func (gf *GFP) DivPolys(a, b []*uint256.Int) []*uint256.Int {
 	if len(a) < len(b) {
 		return nil
 	}
@@ -153,7 +159,7 @@ func (gf *gfp) DivPolys(a, b []*uint256.Int) []*uint256.Int {
 	return out
 }
 
-func (gf *gfp) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
+func (gf *GFP) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 	zp := gf.ZPoly(xs)
 	if len(zp) != len(ys)+1 {
 		return nil
@@ -188,7 +194,7 @@ func (gf *gfp) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 	return lp
 }
 
-func (gf *gfp) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
+func (gf *GFP) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 	maxc := 65537
 	if gf.Size < 16 {
 		maxc = int(1<<gf.Size) + 1
@@ -234,7 +240,7 @@ func (gf *gfp) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 
 }
 
-func (gf *gfp) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
+func (gf *GFP) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
 	maxc := 65537
 	if gf.Size < 16 {
 		maxc = int(1<<gf.Size) + 1
@@ -266,7 +272,7 @@ func (gf *gfp) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
 
 // FFT algorithm with root of unity
 // xs should be root of unit : x^n = 1
-func (gf *gfp) fft_t(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
+func (gf *GFP) fft_org(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
 	l := len(xs)
 	os := make([]*uint256.Int, l) // outputs
 
@@ -281,7 +287,7 @@ func (gf *gfp) fft_t(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
 	return os
 }
 
-func (gf *gfp) _fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
+func (gf *GFP) _fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
 	l := len(xs)
 	os := make([]*uint256.Int, l) // outputs
 
@@ -295,7 +301,7 @@ func (gf *gfp) _fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
 	}
 	return os
 }
-func (gf *gfp) fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
+func (gf *GFP) fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
 	if len(ys) <= 4 {
 		return gf._fft(xs, ys, w)
 	}
@@ -328,7 +334,7 @@ func (gf *gfp) fft(xs, ys []*uint256.Int, w *uint256.Int) []*uint256.Int {
 // DFT evaluates a polynomial at xs(root of unity)
 // cs is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
 // xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
-func (gf *gfp) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
+func (gf *GFP) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 	size, xs := gf.ExtRootUnity(root, false)
 	if size == -1 {
 		log.Printf("Wrong root of unity !!!")
@@ -342,7 +348,7 @@ func (gf *gfp) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 // xs is root of unity, so x^n = 1 : [x^0, x^1, x^2, .... x^n-1]
 // ys : [y0, y1, y2, y3 ... yn-1]
 // Output is coefficients of a polynominal : [c0, c1, c2, c3 ... cn-1]
-func (gf *gfp) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
+func (gf *GFP) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
 	size, xs := gf.ExtRootUnity(root, true)
 	if size != len(ys)+1 {
 		log.Println("The length of xs and ys should be the same")

@@ -11,8 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGFPIntFromBytes(t *testing.T) {
+	gf := NewGFP()
+	x := gf.Prime.Bytes()
+	for i := uint64(1); i < 255; i++ {
+		x[len(x)-1] += 1
+		y := gf.IntFromBytes(x)
+		log.Printf("%v, %v", i, y)
+		assert.Equal(t, uint256.NewInt(i), y)
+	}
+}
+
 func TestGFPAddSub(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -51,7 +62,7 @@ func TestGFPAddSub(t *testing.T) {
 }
 
 func TestGFPMulDiv(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -90,7 +101,7 @@ func TestGFPMulDiv(t *testing.T) {
 }
 
 func TestGFPExp(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -122,7 +133,7 @@ func TestGFPExp(t *testing.T) {
 }
 
 func TestGFPX3Inv(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	// Inv x^3 = x^((2P-1)/3)
 	P1 := gf.Prime.ToBig()
 	P1.Mul(P1, big.NewInt(2))
@@ -160,7 +171,7 @@ func TestGFPX3Inv(t *testing.T) {
 }
 
 func TestGFPFarmatLittle(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	P := gf.Prime.Clone()
 	P.Sub(P, uint256.NewInt(1))
 	tenc := int64(0)
@@ -182,7 +193,7 @@ func TestGFPFarmatLittle(t *testing.T) {
 }
 
 func TestGFPInvInvF(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	tm1 := int64(0)
 	tm2 := int64(0)
 
@@ -210,7 +221,7 @@ func TestGFPInvInvF(t *testing.T) {
 }
 
 func TestGFPZPoly(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	tm1 := int64(0)
 	tm2 := int64(0)
 
@@ -247,7 +258,7 @@ func TestGFPZPoly(t *testing.T) {
 }
 
 func TestGFPDivPolys(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	tm1 := int64(0)
 
 	for i := 0; i < 100; i++ {
@@ -291,7 +302,7 @@ func TestGFPDivPolys(t *testing.T) {
 }
 
 func TestGFPLagrangeInterp(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	tm1 := int64(0)
 
 	for i := 0; i < 100; i++ {
@@ -323,7 +334,7 @@ func TestGFPLagrangeInterp(t *testing.T) {
 }
 
 func TestGFPExtRootUnity(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	g := gf.Prime.Clone()
 	g.Sub(g, uint256.NewInt(1))
 	g.Div(g, uint256.NewInt(65536))
@@ -351,7 +362,7 @@ func TestGFPExtRootUnity(t *testing.T) {
 }
 
 func TestGFPExtRootUnity2(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	g := gf.Prime.Clone()
 	g.Sub(g, uint256.NewInt(1))
 	g.Div(g, uint256.NewInt(65536))
@@ -379,7 +390,7 @@ func TestGFPExtRootUnity2(t *testing.T) {
 }
 
 func TestGFPExtRootUnity2_2(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 	g := gf.Prime.Clone()
 	g.Sub(g, uint256.NewInt(1))
 	g.Div(g, uint256.NewInt(65536))
@@ -406,7 +417,7 @@ func TestGFPExtRootUnity2_2(t *testing.T) {
 	log.Printf("lp : %v", tm1/1000000)
 }
 func TestGFPDTF(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 
 	g1 := uint256.NewInt(5)
 	size, xs := gf.ExtRootUnity(g1, false)
@@ -438,7 +449,7 @@ func TestGFPDTF(t *testing.T) {
 }
 
 func TestGFPFFT(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 
 	g1 := uint256.NewInt(3)
 
@@ -470,7 +481,7 @@ func TestGFPFFT(t *testing.T) {
 }
 
 func TestGFPFFTPerf(t *testing.T) {
-	gf := GFP()
+	gf := NewGFP()
 
 	g := gf.Prime.Clone()
 	g.Sub(g, uint256.NewInt(1))
