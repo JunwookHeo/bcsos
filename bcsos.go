@@ -3,13 +3,16 @@ package main
 import (
 	"log"
 	"math/big"
+	"math/rand"
 	"time"
 
+	"github.com/holiman/uint256"
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/galois"
 	"github.com/junwookheo/bcsos/common/poscipher"
+	"github.com/junwookheo/bcsos/common/starks"
 	"github.com/junwookheo/bcsos/common/wallet"
 )
 
@@ -283,6 +286,33 @@ func test_bigint() {
 	log.Printf("%x, %x, %x", a, b, c)
 }
 
+func test_fri_prove_low_degree() {
+	f := starks.NewFri()
+	length := 65536
+	ys := make([]*uint256.Int, length)
+	for i := 0; i < len(ys); i++ {
+		r := rand.Int63()
+		ys[i] = uint256.NewInt(uint64(r))
+	}
+
+	g := f.GFP.Prime.Clone()
+	g.Sub(g, uint256.NewInt(1))
+	g.Div(g, uint256.NewInt(uint64(length)))
+	g1 := f.GFP.Exp(uint256.NewInt(7), g)
+
+	tm1 := int64(0)
+	start := time.Now().UnixNano()
+	proof := f.ProveLowDegree(ys, g1, length)
+	end := time.Now().UnixNano()
+	tm1 = end - start
+	log.Printf("size of Proof : %v, %v", len(proof), tm1/1000000)
+	// for i:=0; i<len(proof); i++{
+	// 	log.Printf("Proof ======= %v", i)
+	// 	log.Printf("Proof : %v", proof[i])
+	// }
+
+}
+
 func main() {
 	// test_gf_8()
 	// test_gf_16()
@@ -292,7 +322,8 @@ func main() {
 	// test_gf_div2()
 	// test_encypt_2()
 	// test_encypt_decrypt()
-	test_bigint()
+	// test_bigint()
 	// test_gf256()
 	// test_gf256_exp()
+	test_fri_prove_low_degree()
 }

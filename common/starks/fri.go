@@ -81,13 +81,14 @@ func (f *fri) GetPseudorandomIndices(seed []byte, modulus uint32, count int) []u
 func (f *fri) ProveLowDegree(values []*uint256.Int, rou *uint256.Int, maxdeg int) []interface{} {
 	if maxdeg <= 16 {
 		log.Println("Produced FRI proof")
-		ms := make([]interface{}, len(values))
+		ms := make([][]byte, len(values))
 		for i := 0; i < len(values); i++ {
 			ms[i] = values[i].Bytes() //   blockchain.CalHashSha256(values[i].Bytes())
 		}
-		return ms
+		return []interface{}{ms}
 	}
 
+	log.Printf("maxdeg : %v", maxdeg)
 	size, xs := f.GFP.ExtRootUnity(rou, false)
 	if len(values) != size-1 {
 		log.Panicf("Mismatch the size of values and xs : %v, %v", len(values), len(xs)-1)
@@ -121,7 +122,7 @@ func (f *fri) ProveLowDegree(values []*uint256.Int, rou *uint256.Int, maxdeg int
 	output[1] = f.MakeMultiBranch(m2, ys)
 	output[2] = f.MakeMultiBranch(m1, poly_positions)
 
-	f.ProveLowDegree(colums, f.GFP.Exp(rou, uint256.NewInt(4)), maxdeg>>2)
-
+	o := f.ProveLowDegree(colums, f.GFP.Exp(rou, uint256.NewInt(4)), maxdeg>>2)
+	output = append(output, o...)
 	return output
 }
