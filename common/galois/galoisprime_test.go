@@ -230,7 +230,7 @@ func TestGFPZPoly(t *testing.T) {
 		for j := 0; j < 3; j++ {
 			r := rand.Uint64() % gf.Prime.Uint64()
 			a := uint256.NewInt(r)
-			a = uint256.NewInt(uint64(j + 1))
+			// a = uint256.NewInt(uint64(j + 1))
 			xs = append(xs, a)
 		}
 

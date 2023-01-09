@@ -32,6 +32,10 @@ func NewGFP() *GFP {
 	return &gf
 }
 
+func (gf *GFP) Cmp(x, y *uint256.Int) int {
+	return x.Cmp(y)
+}
+
 func (gf *GFP) IntFromBytes(x []byte) *uint256.Int {
 	s := new(uint256.Int)
 	s.SetBytes(x)

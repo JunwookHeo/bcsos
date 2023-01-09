@@ -45,7 +45,7 @@ func TestFriGetPseudorandomIndices(t *testing.T) {
 
 func TestFriProveLowDegree(t *testing.T) {
 	f := NewFri()
-	length := 65536
+	length := 16384
 	ys := make([]*uint256.Int, length)
 	for i := 0; i < len(ys); i++ {
 		r := rand.Int63()
@@ -59,13 +59,12 @@ func TestFriProveLowDegree(t *testing.T) {
 
 	tm1 := int64(0)
 	start := time.Now().UnixNano()
-	proof := f.ProveLowDegree(ys, g1, length)
+	proof := f.ProveLowDegree(ys, g1)
 	end := time.Now().UnixNano()
 	tm1 = end - start
 	log.Printf("size of Proof : %v, %v", len(proof), tm1/1000000)
-	// for i:=0; i<len(proof); i++{
-	// 	log.Printf("Proof ======= %v", i)
-	// 	log.Printf("Proof : %v", proof[i])
-	// }
 
+	m1 := f.Merklize(ys)
+	eval := f.VerifyLowDegreeProof(m1[1], proof, g1)
+	assert.Equal(t, eval, true)
 }

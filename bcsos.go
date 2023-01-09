@@ -302,10 +302,19 @@ func test_fri_prove_low_degree() {
 
 	tm1 := int64(0)
 	start := time.Now().UnixNano()
-	proof := f.ProveLowDegree(ys, g1, length)
+	proof := f.ProveLowDegree(ys, g1)
 	end := time.Now().UnixNano()
 	tm1 = end - start
 	log.Printf("size of Proof : %v, %v", len(proof), tm1/1000000)
+
+	m1 := f.Merklize(ys)
+	tm2 := int64(0)
+	start = time.Now().UnixNano()
+	eval := f.VerifyLowDegreeProof(m1[1], proof, g1)
+	end = time.Now().UnixNano()
+	tm2 = end - start
+	log.Printf("Eval : %v", eval)
+	log.Printf("Verify: %v", tm2/1000000)
 	// for i:=0; i<len(proof); i++{
 	// 	log.Printf("Proof ======= %v", i)
 	// 	log.Printf("Proof : %v", proof[i])
