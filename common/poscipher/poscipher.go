@@ -12,10 +12,12 @@ import (
 	"github.com/junwookheo/bcsos/common/galois"
 )
 
+// Binary Field
 const ALIGN = 4
-const PALIGN = 8
-
+const Ix2 = 2147483648 //6442450943  // (3P-2)/2 Mod (P-1)
 var GF = galois.GFN(32)
+
+// Prime Field
 var GFP = galois.NewGFP()
 var Ix3 = GetInverseX3()
 
@@ -57,26 +59,33 @@ func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 
 	y := make([]uint32, ls)
 
-	pre := uint32(0)
+	// pre := uint32(0)
+	pre := uint32(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			// y[i] = k[i%lk] ^ x[i]
-			d := (x[i] ^ k[i%lk]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
-			pre = y[i]
+			// d := (x[i] ^ k[i%lk]) ^ pre
+			d := (x[i] ^ k[i%lk])
+			d = uint32(GF.Div(uint64(d), uint64(pre)))
+			y[i] = uint32(GF.Exp(uint64(d), Ix2))
+
+			if y[i] == 0 {
+				pre = uint32(1)
+			} else {
+				pre = y[i]
+			}
 		}
 	} else if lk > ls {
 		for i := 0; i < ls; i++ {
 			// y[i] = k[i] ^ x[i]
 			d := (x[i] ^ k[i]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
 			// y[i] = k[i] ^ x[i]
 			d := (x[i] ^ k[i]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
 	}
@@ -121,12 +130,19 @@ func DecryptPoSWithVariableLength(key, s []byte) []byte {
 	}
 
 	y := make([]uint32, ls)
-	pre := uint32(0)
+	// pre := uint32(0)
+	pre := uint32(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			// ui_d[i] = ui_key[i%lk] ^ ui_s[i]
 			d := uint32(GF.Exp(uint64(x[i]), 2))
-			y[i] = (d ^ pre) ^ k[i%lk]
+			// y[i] = (d ^ pre) ^ k[i%lk]
+			if pre == 0 {
+				y[i] = uint32(GF.Mul(uint64(d), uint64(1)))
+			} else {
+				y[i] = uint32(GF.Mul(uint64(d), uint64(pre)))
+			}
+
+			y[i] = y[i] ^ k[i%lk]
 			pre = x[i]
 		}
 	} else if lk > ls {
@@ -187,14 +203,12 @@ func CalculateXorWithAddress(addr, s []byte) []byte {
 	d := make([]byte, ls)
 
 	for i := 0; i < ls; i++ {
-		// y[i] = k[i%lk] ^ x[i]
 		d[i] = s[i] ^ addr[i%lk]
 	}
 
 	return d
 }
 
-const PSIZE = 31 // Prime field with 32byte so 31bytes is max to convert Prime field
 func GetInverseX3() *uint256.Int {
 	p := GFP.Prime.ToBig()
 	p = p.Mul(p, big.NewInt(2))
@@ -206,71 +220,41 @@ func GetInverseX3() *uint256.Int {
 }
 
 func EncryptPoSWithPrimeField(key, s []byte) (string, []byte) {
-	lk := len(key) // assume key is aligned
-	if lk%PALIGN != 0 {
-		log.Panicf("Error Key length ALIGN: %v", lk)
-	}
-	ls := len(s)
-	lpad := ls % PSIZE
-	if lpad != 0 {
-		for i := 0; i < PSIZE-lpad; i++ { // Add Padding
-			s = append(s, 0x0)
-		}
-	}
-
-	ls = len(s)
-	if ls%PSIZE != 0 {
-		log.Panicf("Error Source length ALIGN : %v", ls)
-	}
-
-	lk /= PALIGN // 4bytes of key is used for encryption
-	ls /= PSIZE
-
-	key_reader := bytes.NewReader(key)
-	s_reader := bytes.NewReader(s)
-
-	k := make([]uint64, lk)
-	err := binary.Read(key_reader, binary.LittleEndian, &k)
-	if err != nil {
-		log.Panicf("converting key to uint32 error : %v", err)
-		return "", nil
-	}
-
-	x := make([][PSIZE]byte, ls)
-	err = binary.Read(s_reader, binary.LittleEndian, &x)
-	if err != nil {
-		log.Panicf("converting source to uint32 error : %v", err)
-		return "", nil
-	}
+	ks := GFP.LoadUint256FromKey(key)
+	xs := GFP.LoadUint256FromStream31(s)
+	lk := len(ks)
+	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
 	pre := uint256.NewInt(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			xu := uint256.NewInt(0)
-			xu.SetBytes31(x[i][:])
-			ku := uint256.NewInt(k[i%lk])
-			d := GFP.Add(xu, ku)
+			d := GFP.Add(xs[i], ks[i%lk])
 			// d = GFP.Add(d, pre)
 			d = GFP.Div(d, pre)
 			y[i] = GFP.Exp(d, Ix3)
-			pre = y[i]
+			if y[i].IsZero() {
+				pre = uint256.NewInt(1)
+			} else {
+				pre = y[i]
+			}
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			xu := uint256.NewInt(0)
-			xu.SetBytes31(x[i][:])
-			ku := uint256.NewInt(k[i])
-			d := GFP.Add(xu, ku)
+			d := GFP.Add(xs[i], ks[i])
 			d = GFP.Add(d, pre)
 			y[i] = GFP.Exp(d, Ix3)
-			pre = y[i]
+			if y[i].IsZero() {
+				pre = uint256.NewInt(1)
+			} else {
+				pre = y[i]
+			}
 		}
 	}
 
 	buf := new(bytes.Buffer)
 	for i := 0; i < len(y); i++ {
-		err = binary.Write(buf, binary.LittleEndian, y[i].Bytes32())
+		err := binary.Write(buf, binary.LittleEndian, y[i].Bytes32())
 		if err != nil {
 			log.Panicf("convert uint32 to byte error : %v", err)
 			return "", nil
@@ -281,64 +265,42 @@ func EncryptPoSWithPrimeField(key, s []byte) (string, []byte) {
 }
 
 func DecryptPoSWithPrimeField(key, s []byte) []byte {
-	lk := len(key) // assume key is aligned
-	if lk%PALIGN != 0 {
-		log.Panicf("Error Key length ALIGN: %v", lk)
-	}
-	ls := len(s)
-	if lk%(PSIZE+1) != 0 {
-		log.Panicf("Error Source length ALIGN : %v", ls)
-	}
-
-	lk /= PALIGN
-	ls /= (PSIZE + 1)
-
-	key_reader := bytes.NewReader(key)
-	s_reader := bytes.NewReader(s)
-
-	k := make([]uint64, lk)
-	err := binary.Read(key_reader, binary.LittleEndian, &k)
-	if err != nil {
-		log.Panicf("converting key to uint32 error : %v", err)
-		return nil
-	}
-
-	x := make([][32]byte, ls)
-	err = binary.Read(s_reader, binary.LittleEndian, &x)
-	if err != nil {
-		log.Panicf("converting source to uint32 error : %v", err)
-		return nil
-	}
+	ks := GFP.LoadUint256FromKey(key)
+	xs := GFP.LoadUint256FromStream32(s)
+	lk := len(ks)
+	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
 	pre := uint256.NewInt(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			xu := uint256.NewInt(0)
-			xu.SetBytes32(x[i][:])
-			ku := uint256.NewInt(k[i%lk])
-			d := GFP.Exp(xu, uint256.NewInt(3))
+			d := GFP.Exp(xs[i], uint256.NewInt(3))
 			// d = GFP.Sub(d, pre)
 			d = GFP.Mul(d, pre)
-			y[i] = GFP.Sub(d, ku)
-			pre = xu
+			y[i] = GFP.Sub(d, ks[i%lk])
+			if xs[i].IsZero() {
+				pre = uint256.NewInt(1)
+			} else {
+				pre = xs[i]
+			}
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			xu := uint256.NewInt(0)
-			xu.SetBytes32(x[i][:])
-			ku := uint256.NewInt(k[i%lk])
-			d := GFP.Exp(xu, uint256.NewInt(3))
+			d := GFP.Exp(xs[i], uint256.NewInt(3))
 			d = GFP.Sub(d, pre)
-			y[i] = GFP.Sub(d, ku)
-			pre = xu
+			y[i] = GFP.Sub(d, ks[i])
+			if xs[i].IsZero() {
+				pre = uint256.NewInt(1)
+			} else {
+				pre = xs[i]
+			}
 		}
 	}
 
 	buf := new(bytes.Buffer)
 	for i := 0; i < len(y); i++ {
 		yu := y[i].Bytes32()
-		err = binary.Write(buf, binary.LittleEndian, yu[1:])
+		err := binary.Write(buf, binary.LittleEndian, yu[1:])
 		if err != nil {
 			log.Panicf("convert uint32 to byte error : %v", err)
 			return nil

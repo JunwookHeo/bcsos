@@ -9,18 +9,22 @@ import (
 	"github.com/junwookheo/bcsos/common/galois"
 )
 
-type fri struct {
-	GFP    *galois.GFP
-	numIdx int
+type starks struct {
+	GFP       *galois.GFP
+	numIdx    int
+	steps     int
+	extFactor int
 }
 
-func NewFri() *fri {
-	f := fri{GFP: galois.NewGFP(), numIdx: 40}
+const PSIZE = 31
+
+func NewStarks() *starks {
+	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: 8192, extFactor: 8}
 
 	return &f
 }
 
-func (f *fri) Merklize(values []*uint256.Int) [][]byte {
+func (f *starks) Merklize(values []*uint256.Int) [][]byte {
 	L := len(values)
 	ms := make([][]byte, L*2)
 	for i := 0; i < L; i++ {
@@ -34,7 +38,7 @@ func (f *fri) Merklize(values []*uint256.Int) [][]byte {
 	return ms
 }
 
-func (f *fri) makeMerkleBranch(tree [][]byte, index int) [][]byte {
+func (f *starks) makeMerkleBranch(tree [][]byte, index int) [][]byte {
 	output := make([][]byte, 0)
 
 	index += len(tree) >> 1
@@ -48,7 +52,7 @@ func (f *fri) makeMerkleBranch(tree [][]byte, index int) [][]byte {
 	return output
 }
 
-func (f *fri) MakeMultiBranch(tree [][]byte, indices []uint32) [][][]byte {
+func (f *starks) MakeMultiBranch(tree [][]byte, indices []uint32) [][][]byte {
 	output := make([][][]byte, len(indices))
 	for i := 0; i < len(indices); i++ {
 		branch := f.makeMerkleBranch(tree, int(indices[i]))
@@ -57,7 +61,7 @@ func (f *fri) MakeMultiBranch(tree [][]byte, indices []uint32) [][][]byte {
 	return output
 }
 
-func (f *fri) verifyMerkleBranch(root []byte, index int, proof [][]byte) []byte {
+func (f *starks) verifyMerkleBranch(root []byte, index int, proof [][]byte) []byte {
 	index += 1 << len(proof)
 	v := proof[0]
 	for i := 1; i < len(proof); i++ {
@@ -76,7 +80,7 @@ func (f *fri) verifyMerkleBranch(root []byte, index int, proof [][]byte) []byte 
 	return proof[0]
 }
 
-func (f *fri) VerifyMultiBranch(root []byte, indices []uint32, proof [][][]byte) [][]byte {
+func (f *starks) VerifyMultiBranch(root []byte, indices []uint32, proof [][][]byte) [][]byte {
 	output := make([][]byte, len(proof))
 	for i := 0; i < len(proof); i++ {
 		output[i] = f.verifyMerkleBranch(root, int(indices[i]), proof[i])
@@ -84,7 +88,7 @@ func (f *fri) VerifyMultiBranch(root []byte, indices []uint32, proof [][][]byte)
 	return output
 }
 
-func (f *fri) GetPseudorandomIndices(seed []byte, modulus uint32, count int) []uint32 {
+func (f *starks) GetPseudorandomIndices(seed []byte, modulus uint32, count int) []uint32 {
 	data := make([]byte, 4*count)
 	r := seed
 	size := 0
@@ -107,7 +111,7 @@ func (f *fri) GetPseudorandomIndices(seed []byte, modulus uint32, count int) []u
 	return indices
 }
 
-func (f *fri) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []interface{} {
+func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []interface{} {
 	L := len(values)
 	if (L >> 2) <= 16 {
 		log.Println("Produced FRI proof")
@@ -167,7 +171,7 @@ func (f *fri) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []interfac
 	return proof
 }
 
-func (f *fri) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uint256.Int) bool {
+func (f *starks) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uint256.Int) bool {
 	testval := rou.Clone()
 	roudeg := uint64(1)
 
@@ -229,4 +233,40 @@ func (f *fri) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uint25
 
 	log.Println("Evaluation success")
 	return true
+}
+
+// Vis : Input values
+// Vos : Output values
+// key : Adress of Prover
+func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []interface{} {
+	visu := f.GFP.LoadUint256FromStream31(vis)
+	vosu := f.GFP.LoadUint256FromStream32(vos)
+	ks := f.GFP.LoadUint256FromKey(key)
+	log.Printf("%v, %v, %v", len(ks), len(visu), len(vosu))
+
+	precision := f.steps * f.extFactor
+	skips := precision / f.steps
+	log.Printf("precision : %v, skips : %v", precision, skips)
+
+	g := f.GFP.Prime.Clone()
+	g = g.Sub(g, uint256.NewInt(1))
+	g = f.GFP.Div(g, uint256.NewInt(uint64(precision)))
+	G2 := f.GFP.Exp(uint256.NewInt(7), g)
+	log.Printf("G2 : %v", G2)
+	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
+	log.Printf("G1 : %v", G1)
+
+	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
+	size -= 1
+	xs = xs[0:size]
+	log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
+
+	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
+	eval_visu := f.GFP.DFT(poly_visu, G2)
+	log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
+	for i := 0; i < 10; i++ {
+		log.Printf("%v, %v", visu[i], eval_visu[i*f.extFactor])
+	}
+
+	return nil
 }

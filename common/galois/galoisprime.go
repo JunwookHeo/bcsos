@@ -7,6 +7,10 @@ import (
 	"github.com/holiman/uint256"
 )
 
+const ALIGN31 = 31
+const ALIGN32 = 32
+const ALIGN08 = 8
+
 type GFP struct {
 	Size  uint
 	Prime *uint256.Int
@@ -345,7 +349,14 @@ func (gf *GFP) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 		return nil
 	}
 	w := uint256.NewInt(1) // No inverse
-	return gf.fft(xs[:size-1], cs, w)
+	vs := make([]*uint256.Int, size-1)
+	for i := 0; i < len(cs); i++ {
+		vs[i] = cs[i]
+	}
+	for i := len(cs); i < len(vs); i++ {
+		vs[i] = uint256.NewInt(0)
+	}
+	return gf.fft(xs[:size-1], vs, w)
 }
 
 // IDFT generates a polynomial with points [(x0, y0), (x1, y1)....(xn-1, yn-1)]
@@ -361,4 +372,36 @@ func (gf *GFP) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
 
 	w := gf.Inv(uint256.NewInt(uint64(size - 1))) // Divid by inverse
 	return gf.fft(xs[:size-1], ys, w)
+}
+
+func (gf *GFP) loadUint256FromStream(s []byte, align int) []*uint256.Int {
+	ls := len(s)
+	lpad := ls % align
+	if lpad != 0 {
+		for i := 0; i < align-lpad; i++ { // Add Padding
+			s = append(s, 0x0)
+		}
+	}
+	ls = len(s) / align
+
+	visu := make([]*uint256.Int, ls)
+	for i := 0; i < ls; i++ {
+		x := s[i*align : i*align+align]
+		visu[i] = uint256.NewInt(0)
+		visu[i].SetBytes(x)
+	}
+
+	return visu
+}
+
+func (gf *GFP) LoadUint256FromStream31(s []byte) []*uint256.Int {
+	return gf.loadUint256FromStream(s, ALIGN31)
+}
+
+func (gf *GFP) LoadUint256FromStream32(s []byte) []*uint256.Int {
+	return gf.loadUint256FromStream(s, ALIGN32)
+}
+
+func (gf *GFP) LoadUint256FromKey(key []byte) []*uint256.Int {
+	return gf.loadUint256FromStream(key, ALIGN08)
 }

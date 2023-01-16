@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFriMerklize(t *testing.T) {
-	f := NewFri()
+func TestStarksMerklize(t *testing.T) {
+	f := NewStarks()
 
 	xs := make([]*uint256.Int, 65536)
 	for i := 0; i < len(xs); i++ {
@@ -23,14 +23,14 @@ func TestFriMerklize(t *testing.T) {
 	assert.Equal(t, len(xs)*2, len(ys))
 }
 
-func TestFriDivid(t *testing.T) {
+func TestStarksDivid(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		log.Printf("%v, %v", i, i>>2)
 	}
 }
 
-func TestFriGetPseudorandomIndices(t *testing.T) {
-	f := NewFri()
+func TestStarksGetPseudorandomIndices(t *testing.T) {
+	f := NewStarks()
 	r := make([]byte, 32)
 	for i := 0; i < len(r); i++ {
 		r[i] = byte(rand.Int() % 256)
@@ -43,8 +43,8 @@ func TestFriGetPseudorandomIndices(t *testing.T) {
 	log.Printf("%v", dices)
 }
 
-func TestFriProveLowDegree(t *testing.T) {
-	f := NewFri()
+func TestStarksProveLowDegree(t *testing.T) {
+	f := NewStarks()
 	length := 16384
 	ys := make([]*uint256.Int, length)
 	for i := 0; i < len(ys); i++ {
@@ -67,4 +67,9 @@ func TestFriProveLowDegree(t *testing.T) {
 	m1 := f.Merklize(ys)
 	eval := f.VerifyLowDegreeProof(m1[1], proof, g1)
 	assert.Equal(t, eval, true)
+}
+
+func TestStarksGenerateStarksProof(t *testing.T) {
+	f := NewStarks()
+	f.GenerateStarksProof(nil, nil, nil)
 }

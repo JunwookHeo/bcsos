@@ -21,7 +21,7 @@ func init() {
 }
 
 func test_encypt_decrypt() {
-	const PATH_TEST = "blocks.json"
+	const PATH_TEST = "blocks_360.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	key := w.PublicKey
 	addr := w.PublicKey
@@ -163,7 +163,7 @@ func test_encypt_decrypt_prime() {
 		// Start Decryption
 		start = time.Now().UnixNano()
 		x_t := poscipher.DecryptPoSWithPrimeField(key, y)
-		x_t = poscipher.CalculateXorWithAddress(addr, x_t)
+		x_t = poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 
@@ -175,7 +175,7 @@ func test_encypt_decrypt_prime() {
 }
 
 func test_fri_prove_low_degree() {
-	f := starks.NewFri()
+	f := starks.NewStarks()
 	length := 65536
 	ys := make([]*uint256.Int, length)
 	for i := 0; i < len(ys); i++ {
@@ -210,6 +210,57 @@ func test_fri_prove_low_degree() {
 
 }
 
+func test_starks_prime() {
+	const PATH_TEST = "blocks_360.json"
+	w := wallet.NewWallet("blocks.json.wallet")
+	key := w.PublicKey
+	addr := w.PublicKey
+
+	msg := make(chan bitcoin.BlockPkt)
+	go simulation.LoadBtcData(PATH_TEST, msg)
+
+	tenc := int64(0)
+	tdec := int64(0)
+	f := starks.NewStarks()
+
+	for {
+		d, ok := <-msg
+		if !ok {
+			log.Println("Channle closed")
+			break
+		}
+
+		if d.Block == config.END_TEST {
+			break
+		}
+
+		rb := bitcoin.NewRawBlock(d.Block)
+		x := rb.GetBlockBytes()
+		// log.Printf("Block : %v", x[:80])
+
+		// Start Encryption
+		vis := poscipher.CalculateXorWithAddress(addr, x)
+		_, y := poscipher.EncryptPoSWithPrimeField(key, vis)
+		start := time.Now().UnixNano()
+		f.GenerateStarksProof(vis, y, key)
+		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Encryption Time : %v", tenc)
+		log.Printf("Enc y %v :%v", len(y), y[len(y)-80:])
+		// Start Decryption
+		start = time.Now().UnixNano()
+		x_t := poscipher.DecryptPoSWithPrimeField(key, y)
+		x_t = poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
+		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Decryption Time : %v", tdec)
+
+		log.Printf("Org x %v :%v", len(x), x[len(x)-80:])
+		log.Printf("New x %v :%v", len(x_t), x_t[len(x_t)-80:])
+		key = y
+		break
+	}
+	close(msg)
+}
+
 func main() {
 	// test_gf_8()
 	// test_gf_16()
@@ -218,10 +269,11 @@ func main() {
 	// test_gf_exp3()
 	// test_gf_div2()
 	// test_encypt_2()
-	// test_encypt_decrypt()?
+	// test_encypt_decrypt()
 	// test_bigint()
 	// test_gf256()
 	// test_gf256_exp()
 	// test_fri_prove_low_degree()
-	test_encypt_decrypt_prime()
+	// test_encypt_decrypt_prime()
+	test_starks_prime()
 }
