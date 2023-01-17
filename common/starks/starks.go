@@ -256,16 +256,59 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	log.Printf("G1 : %v", G1)
 
+	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
+	eval_visu := f.GFP.DFT(poly_visu, G2)
+	log.Printf("vosu : %v, %v", len(poly_visu), len(eval_visu))
+	// for i := 0; i < 10; i++ {
+	// 	log.Printf("eval_visu : %v, %v", visu[i], eval_visu[i*f.extFactor])
+	// }
+
+	poly_vosu := f.GFP.IDFT(vosu[0:f.steps], G1)
+	eval_vosu := f.GFP.DFT(poly_vosu, G2)
+	log.Printf("visu : %v, %v", len(poly_vosu), len(eval_vosu))
+	// for i := 0; i < 10; i++ {
+	// 	log.Printf("eval_vosu : %v, %v", vosu[i], eval_vosu[i*f.extFactor])
+	// }
+
+	skip2 := f.steps / len(ks)
+	log.Printf("skip for key : %v", skip2)
+
+	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G1, uint256.NewInt(uint64(skip2))))
+	evel_key := f.GFP.DFT(poly_key, f.GFP.Exp(G2, uint256.NewInt(uint64(skip2))))
+	log.Printf("skip for key : %v", len(evel_key))
+
+	evel_cp := make([]*uint256.Int, precision)
+	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
+	// C(P(x)) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+	pre := uint256.NewInt(1)
+	for i := 0; i < precision; i++ {
+		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
+		c = f.GFP.Mul(c, pre)
+		c = f.GFP.Sub(c, evel_key[i%len(evel_key)])
+		evel_cp[i] = f.GFP.Sub(eval_visu[i], c)
+		if i+1-f.extFactor < 0 {
+			pre = eval_vosu[(i+1-f.extFactor)+precision]
+		} else {
+			pre = eval_vosu[i+1-f.extFactor]
+		}
+	}
+
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
 	size -= 1
 	xs = xs[0:size]
 	log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
 
-	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
-	eval_visu := f.GFP.DFT(poly_visu, G2)
-	log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
-	for i := 0; i < 10; i++ {
-		log.Printf("%v, %v", visu[i], eval_visu[i*f.extFactor])
+	evel_inv_z := make([]*uint256.Int, precision)
+	for i := 0; i < skips; i++ {
+		evel_inv_z[i] = f.GFP.Inv(f.GFP.Sub(xs[(i*f.steps)%precision], uint256.NewInt(1)))
+	}
+	for i := skips; i < precision; i++ {
+		evel_inv_z[i] = evel_inv_z[i%skips]
+	}
+
+	evel_d := make([]*uint256.Int, precision)
+	for i := 0; i < precision; i++ {
+		evel_d[i] = f.GFP.Mul(evel_cp[i], evel_inv_z[i])
 	}
 
 	return nil

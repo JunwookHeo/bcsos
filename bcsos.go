@@ -262,17 +262,8 @@ func test_starks_prime() {
 }
 
 func main() {
-	// test_gf_8()
-	// test_gf_16()
-	// test_gf()
-	// test_gf_div()
-	// test_gf_exp3()
-	// test_gf_div2()
 	// test_encypt_2()
 	// test_encypt_decrypt()
-	// test_bigint()
-	// test_gf256()
-	// test_gf256_exp()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	test_starks_prime()
