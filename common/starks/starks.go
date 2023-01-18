@@ -24,6 +24,10 @@ func NewStarks() *starks {
 	return &f
 }
 
+func (f *starks) GetHashBytes(b []byte) []byte {
+	return blockchain.CalHashSha256(b)
+}
+
 func (f *starks) Merklize(values []*uint256.Int) [][]byte {
 	L := len(values)
 	ms := make([][]byte, L*2)
@@ -256,16 +260,18 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	log.Printf("G1 : %v", G1)
 
+	// Vi(x)
 	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
 	eval_visu := f.GFP.DFT(poly_visu, G2)
-	log.Printf("vosu : %v, %v", len(poly_visu), len(eval_visu))
+	log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
 	// for i := 0; i < 10; i++ {
 	// 	log.Printf("eval_visu : %v, %v", visu[i], eval_visu[i*f.extFactor])
 	// }
 
+	// Vo(x)
 	poly_vosu := f.GFP.IDFT(vosu[0:f.steps], G1)
 	eval_vosu := f.GFP.DFT(poly_vosu, G2)
-	log.Printf("visu : %v, %v", len(poly_vosu), len(eval_vosu))
+	log.Printf("vosu : %v, %v", len(poly_vosu), len(eval_vosu))
 	// for i := 0; i < 10; i++ {
 	// 	log.Printf("eval_vosu : %v, %v", vosu[i], eval_vosu[i*f.extFactor])
 	// }
@@ -273,23 +279,28 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	skip2 := f.steps / len(ks)
 	log.Printf("skip for key : %v", skip2)
 
+	// K(x)
 	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G1, uint256.NewInt(uint64(skip2))))
-	evel_key := f.GFP.DFT(poly_key, f.GFP.Exp(G2, uint256.NewInt(uint64(skip2))))
-	log.Printf("skip for key : %v", len(evel_key))
+	eval_key := f.GFP.DFT(poly_key, f.GFP.Exp(G2, uint256.NewInt(uint64(skip2))))
+	log.Printf("skip for key : %v", len(eval_key))
 
-	evel_cp := make([]*uint256.Int, precision)
+	// C(x) = C(Vi(x), Vo(x), K(x))
 	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
-	// C(P(x)) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+	eval_cp := make([]*uint256.Int, precision)
 	pre := uint256.NewInt(1)
 	for i := 0; i < precision; i++ {
 		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
 		c = f.GFP.Mul(c, pre)
-		c = f.GFP.Sub(c, evel_key[i%len(evel_key)])
-		evel_cp[i] = f.GFP.Sub(eval_visu[i], c)
+		c = f.GFP.Sub(c, eval_key[i%len(eval_key)])
+		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
 		if i+1-f.extFactor < 0 {
 			pre = eval_vosu[(i+1-f.extFactor)+precision]
 		} else {
 			pre = eval_vosu[i+1-f.extFactor]
+		}
+		if pre.IsZero() {
+			pre = uint256.NewInt(1)
 		}
 	}
 
@@ -298,18 +309,107 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	xs = xs[0:size]
 	log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
 
-	evel_inv_z := make([]*uint256.Int, precision)
+	// Z(x)
+	eval_inv_z := make([]*uint256.Int, precision)
 	for i := 0; i < skips; i++ {
-		evel_inv_z[i] = f.GFP.Inv(f.GFP.Sub(xs[(i*f.steps)%precision], uint256.NewInt(1)))
+		eval_inv_z[i] = f.GFP.Inv(f.GFP.Sub(xs[(i*f.steps)%precision], uint256.NewInt(1)))
 	}
 	for i := skips; i < precision; i++ {
-		evel_inv_z[i] = evel_inv_z[i%skips]
+		eval_inv_z[i] = eval_inv_z[i%skips]
 	}
 
-	evel_d := make([]*uint256.Int, precision)
+	// D(x)
+	eval_d := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
-		evel_d[i] = f.GFP.Mul(evel_cp[i], evel_inv_z[i])
+		eval_d[i] = f.GFP.Mul(eval_cp[i], eval_inv_z[i])
 	}
 
-	return nil
+	// Compute polynomial for Vos
+	// Compute interpolant of ((1, input), (x_atlast_step, output))
+	xos := []*uint256.Int{xs[0], xs[(f.steps-1)*f.extFactor]}
+	yos := []*uint256.Int{vosu[0], vosu[f.steps-1]}
+
+	// Io(x)
+	poly_io := f.GFP.LagrangeInterp(xos, yos)
+	eval_io := make([]*uint256.Int, precision)
+	for i := 0; i < precision; i++ {
+		eval_io[i] = f.GFP.EvalPolyAt(poly_io, xs[i])
+	}
+
+	f1 := []*uint256.Int{f.GFP.Sub(f.GFP.Prime, uint256.NewInt(1)), uint256.NewInt(1)}           // (x - 1)
+	f2 := []*uint256.Int{f.GFP.Sub(f.GFP.Prime, xs[(f.steps-1)*f.extFactor]), uint256.NewInt(1)} // (x - lastpoint)
+
+	// Zo(x)
+	poly_zo := f.GFP.MulPolys(f1, f2)
+	eval_inv_zo := make([]*uint256.Int, precision)
+	for i := 0; i < precision; i++ {
+		eval_inv_zo[i] = f.GFP.Inv(f.GFP.EvalPolyAt(poly_zo, xs[i]))
+	}
+
+	// B(x) = (Vo(x) - Io(x)) / Zo(x)
+	eval_b := make([]*uint256.Int, precision)
+	for i := 0; i < precision; i++ {
+		eval_b[i] = f.GFP.Sub(eval_vosu[i], eval_io[i])
+		eval_b[i] = f.GFP.Mul(eval_b[i], eval_inv_zo[i])
+	}
+
+	// Compute Merkle Root
+	tree_vosu := f.Merklize(eval_vosu)
+	tree_d := f.Merklize(eval_d)
+	tree_b := f.Merklize(eval_b)
+	mr := tree_vosu[1]
+	mr = append(mr, tree_d[1]...)
+	mr = append(mr, tree_b[1]...)
+	m_root := f.GetHashBytes(mr)
+
+	// L(x) : Linear combination
+	k1 := uint256.NewInt(0)
+	k1.SetBytes8(m_root[0:])
+	k2 := uint256.NewInt(0)
+	k2.SetBytes8(m_root[8:])
+	k3 := uint256.NewInt(0)
+	k3.SetBytes8(m_root[16:])
+	k4 := uint256.NewInt(0)
+	k4.SetBytes8(m_root[24:])
+
+	G2_steps := f.GFP.Exp(G2, uint256.NewInt(uint64(f.steps)))
+	powers := make([]*uint256.Int, f.extFactor)
+	powers[0] = uint256.NewInt(1)
+	for i := 1; i < len(powers); i++ {
+		powers[i] = f.GFP.Mul(powers[i-1], G2_steps)
+	}
+
+	eval_l := make([]*uint256.Int, precision)
+	for i := 0; i < precision; i++ {
+		p := f.GFP.Add(f.GFP.Mul(eval_vosu[i], k1), f.GFP.Mul(eval_vosu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
+		b := f.GFP.Add(f.GFP.Mul(eval_b[i], k3), f.GFP.Mul(eval_b[i], f.GFP.Mul(k4, powers[i%f.extFactor])))
+		eval_l[i] = f.GFP.Add(eval_d[i], p)
+		eval_l[i] = f.GFP.Add(eval_l[i], b)
+	}
+
+	// Compute Merkle root of L(x)
+	tree_l := f.Merklize(eval_l)
+
+	log.Printf("mtree : %v", m_root)
+	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80)
+	augmented_positions := make([]uint32, len(positions)*4)
+	for i := 0; i < len(positions); i++ {
+		for j := 0; j < 4; j++ {
+			augmented_positions[i*4+j] = positions[i] + uint32(skips*j)
+		}
+	}
+	// log.Printf("positions : %v", positions)
+	// log.Printf("augmented_positions : %v", augmented_positions)
+	// log.Printf("tree_l : %v", tree_l[1])
+
+	proof := make([]interface{}, 7)
+	proof[0] = m_root
+	proof[1] = tree_l[1]
+	proof[2] = f.MakeMultiBranch(tree_vosu, augmented_positions)
+	proof[3] = f.MakeMultiBranch(tree_d, augmented_positions)
+	proof[4] = f.MakeMultiBranch(tree_b, augmented_positions)
+	proof[5] = f.MakeMultiBranch(tree_l, positions)
+	proof[6] = f.ProveLowDegree(eval_l, G2)
+
+	return proof
 }

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"math/big"
 	"math/rand"
+	"os"
+	"runtime/pprof"
 	"time"
 
 	"github.com/holiman/uint256"
@@ -244,7 +247,7 @@ func test_starks_prime() {
 		start := time.Now().UnixNano()
 		f.GenerateStarksProof(vis, y, key)
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Encryption Time : %v", tenc)
+		log.Printf("Generating Proof Time : %v", tenc)
 		log.Printf("Enc y %v :%v", len(y), y[len(y)-80:])
 		// Start Decryption
 		start = time.Now().UnixNano()
@@ -256,15 +259,66 @@ func test_starks_prime() {
 		log.Printf("Org x %v :%v", len(x), x[len(x)-80:])
 		log.Printf("New x %v :%v", len(x_t), x_t[len(x_t)-80:])
 		key = y
-		break
+		return
 	}
 	close(msg)
 }
 
+func test_prime_field() {
+	g := galois.NewGFP()
+
+	length := 65536
+	xs := make([]*uint256.Int, length)
+	ys := make([]*uint256.Int, length)
+	for i := 0; i < len(ys); i++ {
+		r1 := rand.Int63()
+		xs[i] = uint256.NewInt(uint64(r1))
+		r2 := rand.Int63()
+		ys[i] = uint256.NewInt(uint64(r2))
+	}
+
+	tm1 := int64(0)
+	start := time.Now().UnixNano()
+	for i := 0; i < length/16; i++ {
+		for j := 0; j < length; j++ {
+			g.Add(xs[j], ys[j])
+		}
+	}
+	end := time.Now().UnixNano()
+	tm1 = end - start
+	log.Printf("Mul : %v", tm1/1000)
+
+	tm2 := int64(0)
+	start = time.Now().UnixNano()
+	for i := 0; i < length/16; i++ {
+		for j := 0; j < length; j++ {
+			g.Add(xs[j], ys[j])
+		}
+	}
+	end = time.Now().UnixNano()
+	tm2 = end - start
+	log.Printf("Mul : %v", tm2/1000)
+}
+
+// running with cpu profiling
+// eg) go run bcsos.go -cpuprofile=cpu.prof
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+
 func main() {
+	flag.Parse()
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	// test_encypt_2()
 	// test_encypt_decrypt()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	test_starks_prime()
+	// test_prime_field()
 }

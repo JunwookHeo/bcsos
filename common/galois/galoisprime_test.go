@@ -208,7 +208,7 @@ func TestGFPInvInvF(t *testing.T) {
 		// log.Printf("x*inv_1 = %x, %x, %x", a, inv, gf.Mul(a, inv))
 
 		start = time.Now().UnixNano()
-		inv2 := gf.InvF(a)
+		inv2 := gf.InvE(a)
 		end = time.Now().UnixNano()
 		tm2 += (end - start)
 		// log.Printf("x*inv_2 = %x, %x, %x", a, inv2, gf.Mul(a, inv2))
@@ -301,6 +301,18 @@ func TestGFPDivPolys(t *testing.T) {
 	log.Printf("enc : %v", tm1/1000000)
 }
 
+func TestGFPMulPolys(t *testing.T) {
+	gf := NewGFP()
+	a := gf.Prime.Clone()
+	a.Sub(a, uint256.NewInt(3))
+	b := gf.Prime.Clone()
+	b.Sub(b, uint256.NewInt(2))
+	f1 := []*uint256.Int{a, uint256.NewInt(1)}
+	f2 := []*uint256.Int{b, uint256.NewInt(1)}
+
+	f3 := gf.MulPolys(f1, f2)
+	log.Printf("F3 : %v", f3)
+}
 func TestGFPLagrangeInterp(t *testing.T) {
 	gf := NewGFP()
 	tm1 := int64(0)

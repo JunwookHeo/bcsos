@@ -68,7 +68,6 @@ func (gf *GFP) Mul(x, y *uint256.Int) *uint256.Int {
 
 func (gf *GFP) Div(x, y *uint256.Int) *uint256.Int {
 	return gf.Mul(x, gf.Inv(y))
-
 }
 
 func (gf *GFP) Exp(x, y *uint256.Int) *uint256.Int {
@@ -81,7 +80,7 @@ func (gf *GFP) Exp(x, y *uint256.Int) *uint256.Int {
 }
 
 // Extended Euclidian Algorithm to calculate Inverse
-func (gf *GFP) Inv(x *uint256.Int) *uint256.Int {
+func (gf *GFP) InvE(x *uint256.Int) *uint256.Int {
 	if x.BitLen() == 0 {
 		return uint256.NewInt(0)
 	}
@@ -101,7 +100,7 @@ func (gf *GFP) Inv(x *uint256.Int) *uint256.Int {
 	return lm.Mod(lm, gf.Prime)
 }
 
-func (gf *GFP) InvF(x *uint256.Int) *uint256.Int {
+func (gf *GFP) Inv(x *uint256.Int) *uint256.Int {
 	if x.BitLen() == 0 {
 		return uint256.NewInt(0)
 	}
@@ -164,6 +163,21 @@ func (gf *GFP) DivPolys(a, b []*uint256.Int) []*uint256.Int {
 		apos -= 1
 		diff -= 1
 	}
+	return out
+}
+
+func (gf *GFP) MulPolys(a, b []*uint256.Int) []*uint256.Int {
+	out := make([]*uint256.Int, len(a)+len(b)-1)
+	for i := 0; i < len(out); i++ {
+		out[i] = uint256.NewInt(0)
+	}
+
+	for i := 0; i < len(a); i++ {
+		for j := 0; j < len(b); j++ {
+			out[i+j] = gf.Add(out[i+j], gf.Mul(a[i], b[j]))
+		}
+	}
+
 	return out
 }
 
