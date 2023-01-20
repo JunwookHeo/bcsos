@@ -32,15 +32,18 @@ func TestStarksDivid(t *testing.T) {
 func TestStarksGetPseudorandomIndices(t *testing.T) {
 	f := NewStarks()
 	r := make([]byte, 32)
-	for i := 0; i < len(r); i++ {
-		r[i] = byte(rand.Int() % 256)
+
+	for i := 0; i < 1000; i++ {
+		for j := 0; j < len(r); j++ {
+			r[j] = byte(rand.Int() % 256)
+		}
+
+		count := 40
+		dices := f.GetPseudorandomIndices(r, 32, count, 8)
+		assert.Equal(t, len(dices), count)
+
+		log.Printf("%v", dices)
 	}
-
-	count := 40
-	dices := f.GetPseudorandomIndices(r, 32, count)
-	assert.Equal(t, len(dices), count)
-
-	log.Printf("%v", dices)
 }
 
 func TestStarksProveLowDegree(t *testing.T) {

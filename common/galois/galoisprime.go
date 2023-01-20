@@ -29,7 +29,7 @@ func NewGFP() *GFP {
 	size := p.BitLen()
 	// p.Set(big.NewInt(17))
 
-	log.Printf("Prime : %x", p)
+	// log.Printf("Prime : %x", p)
 	prime, _ := uint256.FromBig(p)
 
 	gf := GFP{uint(size), prime}
@@ -64,6 +64,13 @@ func (gf *GFP) Sub(x, y *uint256.Int) *uint256.Int {
 func (gf *GFP) Mul(x, y *uint256.Int) *uint256.Int {
 	s := new(uint256.Int)
 	return s.MulMod(x, y, gf.Prime)
+}
+func (gf *GFP) Mul2(x, y *uint256.Int) *uint256.Int {
+	s := x.ToBig()
+	s.Mul(s, y.ToBig())
+	s.Mod(s, gf.Prime.ToBig())
+	o, _ := uint256.FromBig(s)
+	return o
 }
 
 func (gf *GFP) Div(x, y *uint256.Int) *uint256.Int {

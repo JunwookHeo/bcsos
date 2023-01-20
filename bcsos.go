@@ -244,20 +244,23 @@ func test_starks_prime() {
 		// Start Encryption
 		vis := poscipher.CalculateXorWithAddress(addr, x)
 		_, y := poscipher.EncryptPoSWithPrimeField(key, vis)
-		start := time.Now().UnixNano()
-		f.GenerateStarksProof(vis, y, key)
-		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Generating Proof Time : %v", tenc)
-		log.Printf("Enc y %v :%v", len(y), y[len(y)-80:])
-		// Start Decryption
-		start = time.Now().UnixNano()
-		x_t := poscipher.DecryptPoSWithPrimeField(key, y)
-		x_t = poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
-		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Decryption Time : %v", tdec)
 
-		log.Printf("Org x %v :%v", len(x), x[len(x)-80:])
-		log.Printf("New x %v :%v", len(x_t), x_t[len(x_t)-80:])
+		// Start generating proof
+		start := time.Now().UnixNano()
+		proof := f.GenerateStarksProof(vis, y, key)
+		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Generating Proof Time : %v, length : %v", tenc, len(proof))
+
+		// Start verification
+		start = time.Now().UnixNano()
+		f.VerifytarksProof(vis, key, proof)
+		// x_t := poscipher.DecryptPoSWithPrimeField(key, y)
+		// x_t = poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
+		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Verifying Proof Time : %v", tdec)
+
+		// log.Printf("Org x %v :%v", len(x), x[len(x)-80:])
+		// log.Printf("New x %v :%v", len(x_t), x_t[len(x_t)-80:])
 		key = y
 		return
 	}

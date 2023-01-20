@@ -2,6 +2,7 @@ package starks
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"log"
 
 	"github.com/holiman/uint256"
@@ -49,7 +50,7 @@ func (f *starks) makeMerkleBranch(tree [][]byte, index int) [][]byte {
 	o := tree[index]
 	output = append(output, o)
 	for index > 1 {
-		o := tree[index^0x1]
+		o = tree[index^0x1]
 		output = append(output, o)
 		index = index >> 1
 	}
@@ -92,7 +93,7 @@ func (f *starks) VerifyMultiBranch(root []byte, indices []uint32, proof [][][]by
 	return output
 }
 
-func (f *starks) GetPseudorandomIndices(seed []byte, modulus uint32, count int) []uint32 {
+func (f *starks) GetPseudorandomIndices(seed []byte, modulus uint32, count int, exclude uint32) []uint32 {
 	data := make([]byte, 4*count)
 	r := seed
 	size := 0
@@ -108,10 +109,21 @@ func (f *starks) GetPseudorandomIndices(seed []byte, modulus uint32, count int) 
 		}
 	}
 	indices := make([]uint32, count)
+	real_modulus := modulus
+	if exclude > 1 {
+		real_modulus = modulus * (exclude - 1) / exclude
+	}
 	for i := 0; i < count; i++ {
-		indices[i] = binary.BigEndian.Uint32(data[i*4:i*4+4]) % modulus
+		indices[i] = binary.BigEndian.Uint32(data[i*4:i*4+4]) % real_modulus
+		indices[i] = indices[i] + 1 + indices[i]/(exclude-1)
 	}
 
+	// for i := 0; i < count; i++ {
+	// 	if indices[i]%exclude == 0 {
+	// 		log.Panicf("Wrong number : %v", indices[i])
+	// 	}
+
+	// }
 	return indices
 }
 
@@ -153,7 +165,7 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []inter
 	}
 
 	m2 := f.Merklize(colums)
-	yys := f.GetPseudorandomIndices(m2[1], uint32(len(colums)), f.numIdx)
+	yys := f.GetPseudorandomIndices(m2[1], uint32(len(colums)), f.numIdx, uint32(f.extFactor))
 
 	poly_positions := make([]uint32, len(yys)*4)
 	for i := 0; i < len(yys); i++ {
@@ -198,7 +210,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uin
 		cbranch, _ := p[1].([][][]byte)
 		pbranch, _ := p[2].([][][]byte)
 
-		ys := f.GetPseudorandomIndices(root2, uint32(roudeg), f.numIdx)
+		ys := f.GetPseudorandomIndices(root2, uint32(roudeg), f.numIdx, uint32(f.extFactor))
 		poly_positions := make([]uint32, len(ys)*4)
 		for j := 0; j < len(ys); j++ {
 			for k := 0; k < 4; k++ {
@@ -246,7 +258,7 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	vosu := f.GFP.LoadUint256FromStream32(vos)
 	ks := f.GFP.LoadUint256FromKey(key)
-	log.Printf("%v, %v, %v", len(ks), len(visu), len(vosu))
+	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(ks), len(visu), len(vosu))
 
 	precision := f.steps * f.extFactor
 	skips := precision / f.steps
@@ -256,14 +268,14 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	g = g.Sub(g, uint256.NewInt(1))
 	g = f.GFP.Div(g, uint256.NewInt(uint64(precision)))
 	G2 := f.GFP.Exp(uint256.NewInt(7), g)
-	log.Printf("G2 : %v", G2)
+	// log.Printf("G2 : %v", G2)
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
-	log.Printf("G1 : %v", G1)
+	// log.Printf("G1 : %v", G1)
 
 	// Vi(x)
 	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
 	eval_visu := f.GFP.DFT(poly_visu, G2)
-	log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
+	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
 	// for i := 0; i < 10; i++ {
 	// 	log.Printf("eval_visu : %v, %v", visu[i], eval_visu[i*f.extFactor])
 	// }
@@ -271,18 +283,18 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	// Vo(x)
 	poly_vosu := f.GFP.IDFT(vosu[0:f.steps], G1)
 	eval_vosu := f.GFP.DFT(poly_vosu, G2)
-	log.Printf("vosu : %v, %v", len(poly_vosu), len(eval_vosu))
+	// log.Printf("vosu : %v, %v", len(poly_vosu), len(eval_vosu))
 	// for i := 0; i < 10; i++ {
 	// 	log.Printf("eval_vosu : %v, %v", vosu[i], eval_vosu[i*f.extFactor])
 	// }
 
 	skip2 := f.steps / len(ks)
-	log.Printf("skip for key : %v", skip2)
+	// log.Printf("skip for key : %v", skip2)
 
 	// K(x)
 	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G1, uint256.NewInt(uint64(skip2))))
 	eval_key := f.GFP.DFT(poly_key, f.GFP.Exp(G2, uint256.NewInt(uint64(skip2))))
-	log.Printf("skip for key : %v", len(eval_key))
+	// log.Printf("skip for key : %v", len(eval_key))
 
 	// C(x) = C(Vi(x), Vo(x), K(x))
 	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
@@ -307,7 +319,7 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
 	size -= 1
 	xs = xs[0:size]
-	log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
+	// log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
 
 	// Z(x)
 	eval_inv_z := make([]*uint256.Int, precision)
@@ -390,26 +402,189 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	// Compute Merkle root of L(x)
 	tree_l := f.Merklize(eval_l)
 
-	log.Printf("mtree : %v", m_root)
-	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80)
-	augmented_positions := make([]uint32, len(positions)*4)
+	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
+	augmented_positions := make([]uint32, len(positions)*2)
 	for i := 0; i < len(positions); i++ {
-		for j := 0; j < 4; j++ {
-			augmented_positions[i*4+j] = positions[i] + uint32(skips*j)
+		// In this case, we need previous Vo(x) for encryption/decryption
+		augmented_positions[i*2] = positions[i]
+		if positions[i] >= uint32(skips) {
+			augmented_positions[i*2+1] = positions[i] - uint32(skips)
+		} else {
+			augmented_positions[i*2+1] = uint32(precision) + positions[i] - uint32(skips)
 		}
 	}
 	// log.Printf("positions : %v", positions)
 	// log.Printf("augmented_positions : %v", augmented_positions)
 	// log.Printf("tree_l : %v", tree_l[1])
 
-	proof := make([]interface{}, 7)
+	proof := make([]interface{}, 8)
 	proof[0] = m_root
-	proof[1] = tree_l[1]
+	proof[1] = [][]byte{tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
 	proof[2] = f.MakeMultiBranch(tree_vosu, augmented_positions)
 	proof[3] = f.MakeMultiBranch(tree_d, augmented_positions)
 	proof[4] = f.MakeMultiBranch(tree_b, augmented_positions)
 	proof[5] = f.MakeMultiBranch(tree_l, positions)
-	proof[6] = f.ProveLowDegree(eval_l, G2)
+	proof[6] = []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	proof[7] = f.ProveLowDegree(eval_l, G2)
 
 	return proof
+}
+
+func (f *starks) VerifytarksProof(vis []byte, key []byte, proof []interface{}) bool {
+	visu := f.GFP.LoadUint256FromStream31(vis)
+	ks := f.GFP.LoadUint256FromKey(key)
+	log.Printf("Length of Inputs : ks(%v), vi(%v)", len(ks), len(visu))
+
+	precision := f.steps * f.extFactor
+	skips := precision / f.steps
+	log.Printf("precision : %v, skips : %v", precision, skips)
+
+	g := f.GFP.Prime.Clone()
+	g = g.Sub(g, uint256.NewInt(1))
+	g = f.GFP.Div(g, uint256.NewInt(uint64(precision)))
+	G2 := f.GFP.Exp(uint256.NewInt(7), g)
+	// log.Printf("G2 : %v", G2)
+	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
+	// log.Printf("G1 : %v", G1)
+
+	skip2 := f.steps / len(ks)
+	// log.Printf("skip for key : %v", skip2)
+
+	// Vi(x)
+	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
+	eval_visu := f.GFP.DFT(poly_visu, G2)
+	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
+
+	// K(x)
+	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G2, f.GFP.Mul(uint256.NewInt(uint64(f.extFactor)), uint256.NewInt(uint64(skip2)))))
+	// log.Printf("poly_key %v", len(poly_key))
+
+	m_root, _ := proof[0].([]byte)
+	tree_roots, _ := proof[1].([][]byte)
+	tree_vosu, _ := proof[2].([][][]byte)
+	tree_d, _ := proof[3].([][][]byte)
+	tree_b, _ := proof[4].([][][]byte)
+	tree_l, _ := proof[5].([][][]byte)
+	vosu_fl, _ := proof[6].([]*uint256.Int)
+	fri_proof, _ := proof[7].([]interface{})
+
+	// Verify root of trees
+	// tree_roots = {tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
+	mr := tree_roots[0]
+	mr = append(mr, tree_roots[1]...)
+	mr = append(mr, tree_roots[2]...)
+	h1 := hex.EncodeToString(f.GetHashBytes(mr))
+	h2 := hex.EncodeToString(m_root)
+	if h1 != h2 {
+		log.Printf("Verifying m_root hash : %v != %v", h1, h2)
+		return false
+	}
+
+	if !f.VerifyLowDegreeProof(tree_roots[3], fri_proof, G2) {
+		log.Printf("Low Degree Testing Fail")
+		return false
+	}
+
+	// L(x) : Linear combination
+	k1 := uint256.NewInt(0)
+	k1.SetBytes8(m_root[0:])
+	k2 := uint256.NewInt(0)
+	k2.SetBytes8(m_root[8:])
+	k3 := uint256.NewInt(0)
+	k3.SetBytes8(m_root[16:])
+	k4 := uint256.NewInt(0)
+	k4.SetBytes8(m_root[24:])
+
+	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
+	augmented_positions := make([]uint32, len(positions)*2)
+
+	for i := 0; i < len(positions); i++ {
+		// In this case, we need previous Vo(x) for encryption/decryption
+		augmented_positions[i*2] = positions[i]
+		if positions[i] >= uint32(skips) {
+			augmented_positions[i*2+1] = positions[i] - uint32(skips)
+		} else {
+			augmented_positions[i*2+1] = uint32(precision) + positions[i] - uint32(skips)
+		}
+	}
+
+	// Compute Io(x)
+	lp := uint256.NewInt(uint64((f.steps - 1) * f.extFactor))
+	last_step_position := f.GFP.Exp(G2, lp)
+
+	// Io(x)
+	xos := []*uint256.Int{uint256.NewInt(1), last_step_position}
+	yos := []*uint256.Int{vosu_fl[0], vosu_fl[1]}
+	poly_io := f.GFP.LagrangeInterp(xos, yos)
+
+	// Zo(x)
+	f1 := []*uint256.Int{f.GFP.Sub(f.GFP.Prime, uint256.NewInt(1)), uint256.NewInt(1)}  // (x - 1)
+	f2 := []*uint256.Int{f.GFP.Sub(f.GFP.Prime, last_step_position), uint256.NewInt(1)} // (x - lastpoint)
+	poly_zo := f.GFP.MulPolys(f1, f2)
+
+	// log.Printf("io : %v, zo : %v", poly_io, poly_zo)
+
+	leaves_vosu := f.VerifyMultiBranch(tree_roots[0], augmented_positions, tree_vosu)
+	leaves_d := f.VerifyMultiBranch(tree_roots[1], augmented_positions, tree_d)
+	leaves_b := f.VerifyMultiBranch(tree_roots[2], augmented_positions, tree_b)
+	leaves_l := f.VerifyMultiBranch(tree_roots[3], positions, tree_l)
+
+	// log.Printf("leaves %v, %v, %v, %v", len(leaves_vosu), len(leaves_d), len(leaves_b), len(leaves_l))
+
+	for i := 0; i < len(positions); i++ {
+		power := uint256.NewInt(uint64(positions[i]))
+		x := f.GFP.Exp(G2, power)
+		x_to_steps := f.GFP.Exp(x, uint256.NewInt(uint64(f.steps)))
+
+		vi_x := eval_visu[positions[i]]
+		vo_x := f.GFP.IntFromBytes(leaves_vosu[i*2])
+		vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
+		d_x := f.GFP.IntFromBytes(leaves_d[i*2])
+		b_x := f.GFP.IntFromBytes(leaves_b[i*2])
+		l_x := f.GFP.IntFromBytes(leaves_l[i])
+
+		z := f.GFP.Exp(x, uint256.NewInt(uint64(f.steps)))
+		z = f.GFP.Sub(z, uint256.NewInt(1))
+		k_x := f.GFP.EvalPolyAt(poly_key, f.GFP.Exp(x, uint256.NewInt(uint64(skip2))))
+
+		// log.Printf("vi : %v, vo : %v, vo_pre : %v, kx : %v", vi_x, vo_x, vo_xpre, k_x)
+
+		// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+		// C(x) = Z(x)*D(x)
+		c := f.GFP.Exp(vo_x, uint256.NewInt(3))
+		if !vo_xpre.IsZero() {
+			c = f.GFP.Mul(c, vo_xpre)
+		}
+		c = f.GFP.Sub(c, k_x)
+		c = f.GFP.Sub(vi_x, c)
+		q := f.GFP.Mul(d_x, z)
+
+		if c.Cmp(q) != 0 {
+			log.Printf("Verification fail : C(x) != Z(x)*D(x), %v != %v", c, q)
+			return false
+		}
+
+		// Check boundary constraints  B(x) = (Vo(x) - Io(x)) / Zo(x)
+		// B(x) * Zo(x) + Io(x) = Vo(x)
+		io := f.GFP.EvalPolyAt(poly_io, x)
+		zo := f.GFP.EvalPolyAt(poly_zo, x)
+		vb := f.GFP.Add(f.GFP.Mul(b_x, zo), io)
+		if vb.Cmp(vo_x) != 0 {
+			log.Printf("Verification fail : B(x) * Zo(x) + Io(x) != Vo(x), %v, %v", vb, vo_x)
+			return false
+		}
+
+		// Check correctness of the linear combination
+		p := f.GFP.Add(f.GFP.Mul(vo_x, k1), f.GFP.Mul(vo_x, f.GFP.Mul(k2, x_to_steps)))
+		b := f.GFP.Add(f.GFP.Mul(b_x, k3), f.GFP.Mul(b_x, f.GFP.Mul(k4, x_to_steps)))
+		vl := f.GFP.Add(d_x, p)
+		vl = f.GFP.Add(vl, b)
+		if vl.Cmp(l_x) != 0 {
+			log.Printf("Verification fail : Linear combination, %v, %v, %v", positions[i], vl, l_x)
+			return false
+		}
+	}
+
+	log.Println("Verification Success!!!")
+	return true
 }
