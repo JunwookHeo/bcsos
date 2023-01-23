@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"log"
+	"time"
 
 	"github.com/holiman/uint256"
 	"github.com/junwookheo/bcsos/common/blockchain"
@@ -150,6 +151,9 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []inter
 	special_x := f.GFP.IntFromBytes(m1[1])
 	quarter_len := len(xxs) >> 2
 
+	start := time.Now().UnixNano()
+	log.Printf("ProveLowDegree 1: %v", time.Now().UnixNano()-start)
+
 	x_polys := make([][]*uint256.Int, quarter_len)
 	dxs := make([][]*uint256.Int, quarter_len)
 	dys := make([][]*uint256.Int, quarter_len)
@@ -157,13 +161,14 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []inter
 	for i := 0; i < quarter_len; i++ {
 		xs := []*uint256.Int{xxs[i], xxs[i+quarter_len], xxs[i+2*quarter_len], xxs[i+3*quarter_len]}
 		ys := []*uint256.Int{values[i], values[i+quarter_len], values[i+2*quarter_len], values[i+3*quarter_len]}
-		x_poly := f.GFP.LagrangeInterp(xs[:], ys[:])
+		// x_poly := f.GFP.LagrangeInterp(xs[:], ys[:])
+		x_poly := f.GFP.LagrangeInterp_4(xs[:], ys[:])
 		colums[i] = f.GFP.EvalPolyAt(x_poly, special_x)
 		x_polys[i] = x_poly
 		dxs[i] = xs
 		dys[i] = ys
 	}
-
+	log.Printf("ProveLowDegree 2: %v", time.Now().UnixNano()-start)
 	m2 := f.Merklize(colums)
 	yys := f.GetPseudorandomIndices(m2[1], uint32(len(colums)), f.numIdx, uint32(f.extFactor))
 
@@ -178,9 +183,7 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []inter
 	current[0] = m2[1]
 	current[1] = f.MakeMultiBranch(m2, yys)
 	current[2] = f.MakeMultiBranch(m1, poly_positions)
-
 	next := f.ProveLowDegree(colums, f.GFP.Exp(rou, uint256.NewInt(4)))
-
 	proof := make([]interface{}, 1)
 	proof[0] = current
 	proof = append(proof, next...)
@@ -234,7 +237,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uin
 
 		special_x := f.GFP.IntFromBytes(root)
 		for j := 0; j < len(ys); j++ {
-			poly := f.GFP.LagrangeInterp(xs[j], rows[j])
+			poly := f.GFP.LagrangeInterp_4(xs[j], rows[j])
 			eval := f.GFP.EvalPolyAt(poly, special_x)
 			if f.GFP.Cmp(eval, columnvals[j]) != 0 {
 				log.Printf("Evaluation fail : %v-%v", eval, columnvals[j])
@@ -358,12 +361,20 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	f1 := []*uint256.Int{f.GFP.Sub(f.GFP.Prime, uint256.NewInt(1)), uint256.NewInt(1)}           // (x - 1)
 	f2 := []*uint256.Int{f.GFP.Sub(f.GFP.Prime, xs[(f.steps-1)*f.extFactor]), uint256.NewInt(1)} // (x - lastpoint)
 
+	start := time.Now().UnixNano()
+	log.Printf("GenerateStarksProof 1: %v", time.Now().UnixNano()-start)
 	// Zo(x)
 	poly_zo := f.GFP.MulPolys(f1, f2)
-	eval_inv_zo := make([]*uint256.Int, precision)
+	// eval_inv_zo := make([]*uint256.Int, precision)
+	// for i := 0; i < precision; i++ {
+	// 	eval_inv_zo[i] = f.GFP.Inv(f.GFP.EvalPolyAt(poly_zo, xs[i]))
+	// }
+	eval_zo := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
-		eval_inv_zo[i] = f.GFP.Inv(f.GFP.EvalPolyAt(poly_zo, xs[i]))
+		eval_zo[i] = f.GFP.EvalPolyAt(poly_zo, xs[i])
 	}
+	eval_inv_zo := f.GFP.MultInv(eval_zo)
+	log.Printf("GenerateStarksProof 2: %v", time.Now().UnixNano()-start)
 
 	// B(x) = (Vo(x) - Io(x)) / Zo(x)
 	eval_b := make([]*uint256.Int, precision)

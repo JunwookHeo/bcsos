@@ -116,6 +116,32 @@ func (gf *GFP) Inv(x *uint256.Int) *uint256.Int {
 	return gf.Exp(x, inv)
 }
 
+func (gf *GFP) MultInv(xs []*uint256.Int) []*uint256.Int {
+	output := make([]*uint256.Int, len(xs)+1)
+	output[0] = uint256.NewInt(1)
+
+	for i := 1; i < len(output); i++ {
+		if xs[i-1].IsZero() {
+			output[i] = output[i-1]
+		} else {
+			output[i] = gf.Mul(output[i-1], xs[i-1])
+		}
+	}
+
+	inv := gf.Inv(output[len(output)-1])
+	for i := len(xs); 0 < i; i-- {
+		if xs[i-1].IsZero() {
+			output[i-1] = uint256.NewInt(0)
+		} else {
+			output[i-1] = gf.Mul(output[i-1], inv)
+		}
+		if !xs[i-1].IsZero() {
+			inv = gf.Mul(inv, xs[i-1])
+		}
+	}
+	return output[:len(xs)]
+}
+
 // Evaluate Polynomial at a point x
 func (gf *GFP) EvalPolyAt(cs []*uint256.Int, x *uint256.Int) *uint256.Int {
 	y := uint256.NewInt(0)
@@ -218,6 +244,57 @@ func (gf *GFP) LagrangeInterp(xs, ys []*uint256.Int) []*uint256.Int {
 		for j := range ys {
 			lp[j] = gf.Add(lp[j], gf.Mul(dp[j], yk))
 		}
+	}
+
+	return lp
+}
+
+func (gf *GFP) LagrangeInterp_4(xs, ys []*uint256.Int) []*uint256.Int {
+	x01 := gf.Mul(xs[0], xs[1])
+	x02 := gf.Mul(xs[0], xs[2])
+	x03 := gf.Mul(xs[0], xs[3])
+	x12 := gf.Mul(xs[1], xs[2])
+	x13 := gf.Mul(xs[1], xs[3])
+	x23 := gf.Mul(xs[2], xs[3])
+	m := gf.Prime
+
+	add3 := func(a, b, c *uint256.Int) *uint256.Int {
+		return gf.Add(gf.Add(a, b), c)
+	}
+
+	eq0 := []*uint256.Int{gf.Mul(gf.Sub(m, x12), xs[3]), add3(x12, x13, x23), gf.Sub(m, add3(xs[1], xs[2], xs[3])), uint256.NewInt(1)}
+	eq1 := []*uint256.Int{gf.Mul(gf.Sub(m, x02), xs[3]), add3(x02, x03, x23), gf.Sub(m, add3(xs[0], xs[2], xs[3])), uint256.NewInt(1)}
+	eq2 := []*uint256.Int{gf.Mul(gf.Sub(m, x01), xs[3]), add3(x01, x03, x13), gf.Sub(m, add3(xs[0], xs[1], xs[3])), uint256.NewInt(1)}
+	eq3 := []*uint256.Int{gf.Mul(gf.Sub(m, x01), xs[2]), add3(x01, x02, x12), gf.Sub(m, add3(xs[0], xs[1], xs[2])), uint256.NewInt(1)}
+
+	eval_deg4 := func(p []*uint256.Int, x *uint256.Int) *uint256.Int {
+		x2 := gf.Mul(x, x)
+		x3 := gf.Mul(x2, x)
+
+		o := gf.Add(p[0], gf.Mul(p[1], x))
+		o = gf.Add(o, gf.Mul(p[2], x2))
+		o = gf.Add(o, gf.Mul(p[3], x3))
+		return o
+	}
+
+	e0 := eval_deg4(eq0, xs[0])
+	e1 := eval_deg4(eq1, xs[1])
+	e2 := eval_deg4(eq2, xs[2])
+	e3 := eval_deg4(eq3, xs[3])
+	e01 := gf.Mul(e0, e1)
+	e23 := gf.Mul(e2, e3)
+	invall := gf.Inv(gf.Mul(e01, e23))
+	inv_y0 := gf.Mul(gf.Mul(gf.Mul(ys[0], invall), e1), e23)
+	inv_y1 := gf.Mul(gf.Mul(gf.Mul(ys[1], invall), e0), e23)
+	inv_y2 := gf.Mul(gf.Mul(gf.Mul(ys[2], invall), e01), e3)
+	inv_y3 := gf.Mul(gf.Mul(gf.Mul(ys[3], invall), e01), e2)
+
+	lp := make([]*uint256.Int, len(ys))
+	for i := 0; i < len(ys); i++ {
+		lp[i] = gf.Mul(eq0[i], inv_y0)
+		lp[i] = gf.Add(lp[i], gf.Mul(eq1[i], inv_y1))
+		lp[i] = gf.Add(lp[i], gf.Mul(eq2[i], inv_y2))
+		lp[i] = gf.Add(lp[i], gf.Mul(eq3[i], inv_y3))
 	}
 
 	return lp
