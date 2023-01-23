@@ -260,6 +260,13 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	ks := f.GFP.LoadUint256FromKey(key)
 	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(ks), len(visu), len(vosu))
 
+	for i := len(visu); i < f.steps; i++ {
+		visu = append(visu, uint256.NewInt(0))
+	}
+	for i := len(vosu); i < f.steps; i++ {
+		vosu = append(vosu, uint256.NewInt(0))
+	}
+
 	precision := f.steps * f.extFactor
 	skips := precision / f.steps
 	log.Printf("precision : %v, skips : %v", precision, skips)
@@ -434,6 +441,10 @@ func (f *starks) VerifytarksProof(vis []byte, key []byte, proof []interface{}) b
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	ks := f.GFP.LoadUint256FromKey(key)
 	log.Printf("Length of Inputs : ks(%v), vi(%v)", len(ks), len(visu))
+
+	for i := len(visu); i < f.steps; i++ {
+		visu = append(visu, uint256.NewInt(0))
+	}
 
 	precision := f.steps * f.extFactor
 	skips := precision / f.steps

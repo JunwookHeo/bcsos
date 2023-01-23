@@ -261,7 +261,7 @@ func test_starks_prime() {
 
 		// log.Printf("Org x %v :%v", len(x), x[len(x)-80:])
 		// log.Printf("New x %v :%v", len(x_t), x_t[len(x_t)-80:])
-		key = y
+		// key = y
 		return
 	}
 	close(msg)

@@ -387,7 +387,7 @@ func (gf *GFP) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 func (gf *GFP) IDFT(ys []*uint256.Int, root *uint256.Int) []*uint256.Int {
 	size, xs := gf.ExtRootUnity(root, true)
 	if size != len(ys)+1 {
-		log.Println("The length of xs and ys should be the same")
+		log.Printf("The length of xs and ys should be the same : %v, %v", size, len(ys))
 		return nil
 	}
 
