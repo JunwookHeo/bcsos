@@ -299,6 +299,25 @@ func TestGF256ExtRootUnity(t *testing.T) {
 	log.Printf("lp : %v", tm1/1000000)
 }
 
+func TestGF256ExtRootUnity2(t *testing.T) {
+	gf := GF256(4)
+	tm1 := int64(0)
+
+	log.Printf("P-1 : %v", gf.GMask)
+
+	start := time.Now().UnixNano()
+	for i := uint64(1); i <= gf.GMask.Uint64(); i++ {
+		a := uint256.NewInt(uint64(i))
+		size, rus := gf.ExtRootUnity(a, false)
+		log.Printf("%v : (%v) %v", i, size, rus)
+	}
+
+	end := time.Now().UnixNano()
+	tm1 += (end - start)
+
+	log.Printf("lp : %v", tm1/1000000)
+}
+
 func TestGF256ExtFindRootUnity(t *testing.T) {
 	gf := GF256(16)
 
@@ -407,14 +426,14 @@ func TestGF256FFT(t *testing.T) {
 	}
 
 	log.Printf("==>xs:%v, ys:%v", xs, ys)
-	start := time.Now().Nanosecond()
+	start := time.Now().UnixNano()
 	os1 := gf.LagrangeInterp(xs, ys)
-	end := time.Now().Nanosecond()
+	end := time.Now().UnixNano()
 	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
 
-	start = time.Now().Nanosecond()
+	start = time.Now().UnixNano()
 	os2 := gf.IDFT(ys, g1)
-	end = time.Now().Nanosecond()
+	end = time.Now().UnixNano()
 	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
 
 	os3 := gf.DFT(os1, g1)
@@ -442,9 +461,9 @@ func TestGF256FFTPerf(t *testing.T) {
 
 	log.Printf("ys(%v) :  %v", size, ys[:10])
 
-	start := time.Now().Nanosecond()
+	start := time.Now().UnixNano()
 	os2 := gf.IDFT(ys, g1)
-	end := time.Now().Nanosecond()
+	end := time.Now().UnixNano()
 	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2[:10])
 
 	os3 := gf.DFT(os2, g1)

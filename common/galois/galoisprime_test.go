@@ -1,6 +1,7 @@
 package galois
 
 import (
+	"fmt"
 	"log"
 	"math/big"
 	"math/rand"
@@ -428,6 +429,16 @@ func TestGFPExtRootUnity2_2(t *testing.T) {
 
 	log.Printf("lp : %v", tm1/1000000)
 }
+
+func TestGFPExtRootUnity3(t *testing.T) {
+	gf := NewGFP()
+	g := int(gf.Prime.Uint64())
+	for i := 1; i < g; i++ {
+		_, ru := gf.ExtRootUnity(uint256.NewInt(uint64(i)), false)
+		fmt.Printf("%v : %v\n", i, ru)
+	}
+}
+
 func TestGFPDTF(t *testing.T) {
 	gf := NewGFP()
 
@@ -445,17 +456,17 @@ func TestGFPDTF(t *testing.T) {
 
 	log.Printf("xs : %v, ys : %v", xs, ys)
 	os1 := make([]*uint256.Int, len(xs))
-	start := time.Now().Nanosecond()
+	start := time.Now().UnixNano()
 	for i, x := range xs {
 		os1[i] = gf.EvalPolyAt(ys, x)
 
 	}
-	end := time.Now().Nanosecond()
+	end := time.Now().UnixNano()
 	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
 
-	start = time.Now().Nanosecond()
+	start = time.Now().UnixNano()
 	os2 := gf.DFT(ys, g1)
-	end = time.Now().Nanosecond()
+	end = time.Now().UnixNano()
 	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
 
 }
@@ -477,14 +488,14 @@ func TestGFPFFT(t *testing.T) {
 	}
 
 	log.Printf("==>xs:%v, ys:%v", xs, ys)
-	start := time.Now().Nanosecond()
+	start := time.Now().UnixNano()
 	os1 := gf.LagrangeInterp(xs, ys)
-	end := time.Now().Nanosecond()
+	end := time.Now().UnixNano()
 	log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1)
 
-	start = time.Now().Nanosecond()
+	start = time.Now().UnixNano()
 	os2 := gf.IDFT(ys, g1)
-	end = time.Now().Nanosecond()
+	end = time.Now().UnixNano()
 	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, os2)
 
 	os3 := gf.DFT(os1, g1)
@@ -509,9 +520,9 @@ func TestGFPFFTPerf(t *testing.T) {
 		return
 	}
 
-	tm1 := int(0)
+	tm1 := int64(0)
 
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		ys := make([]*uint256.Int, size)
 		for j := 0; j < size; j++ {
 			r := rand.Uint64() % gf.Prime.Uint64()
@@ -519,14 +530,14 @@ func TestGFPFFTPerf(t *testing.T) {
 			ys[j] = a
 		}
 
-		start := time.Now().Nanosecond()
+		start := time.Now().UnixNano()
 		os1 := gf.IDFT(ys, g1)
-		end := time.Now().Nanosecond()
+		end := time.Now().UnixNano()
 		tm1 += end - start
 		log.Printf("Running : %v", i)
-		start = time.Now().Nanosecond()
+		start = time.Now().UnixNano()
 		os2 := gf.DFT(os1, g1)
-		end = time.Now().Nanosecond()
+		end = time.Now().UnixNano()
 		tm1 += end - start
 
 		assert.Equal(t, ys[10], os2[10])

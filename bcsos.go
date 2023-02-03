@@ -303,6 +303,49 @@ func test_prime_field() {
 	log.Printf("Mul : %v", tm2/1000)
 }
 
+func test_fft() {
+	gf := galois.NewGFP()
+
+	length := 65536
+	g := gf.Prime.Clone()
+	g.Sub(g, uint256.NewInt(1))
+	g.Div(g, uint256.NewInt(uint64(length)))
+	g1 := gf.Exp(uint256.NewInt(7), g)
+
+	size, xs := gf.ExtRootUnity(g1, false)
+	xs = xs[:size-1]
+	size -= 1
+	ys := make([]*uint256.Int, 0, size)
+
+	for j := 0; j < size; j++ {
+		r := rand.Uint64() % gf.Prime.Uint64()
+		a := uint256.NewInt(r)
+		ys = append(ys, a)
+	}
+	log.Printf("==>xs:%v", xs[:10])
+	log.Printf("==>ys:%v", ys[:10])
+
+	lag := false
+	if lag {
+		start := time.Now().UnixNano()
+		os1 := gf.LagrangeInterp(xs, ys)
+		end := time.Now().UnixNano()
+		log.Printf("LagrangeInterp(%v) : f(x)=%v", (end-start)/1000, os1[:10])
+	}
+
+	start := time.Now().UnixNano()
+	os2 := gf.IDFT(ys, g1)
+	end := time.Now().UnixNano()
+	log.Printf("IDFT(%v) : f(x)=%v", (end-start)/1000, len(os2))
+	log.Printf("IDFT : %v", os2[:10])
+
+	start = time.Now().UnixNano()
+	os3 := gf.DFT(os2, g1)
+	end = time.Now().UnixNano()
+	log.Printf("DFT(%v) : %v", (end-start)/1000, len(os3))
+	log.Printf("DFT : %v", os3[:10])
+}
+
 // running with cpu profiling
 // eg) go run bcsos.go -cpuprofile=cpu.prof
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -322,6 +365,7 @@ func main() {
 	// test_encypt_decrypt()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
-	test_starks_prime()
+	// test_starks_prime()
 	// test_prime_field()
+	test_fft()
 }
