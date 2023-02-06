@@ -21,7 +21,7 @@ type starks struct {
 const PSIZE = 31
 
 func NewStarks() *starks {
-	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: 8192, extFactor: 8}
+	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: 8192 / 4, extFactor: 8}
 
 	return &f
 }
@@ -314,8 +314,12 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	for i := 0; i < precision; i++ {
 		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
 		c = f.GFP.Mul(c, pre)
-		c = f.GFP.Sub(c, eval_key[i%len(eval_key)])
+		// c = f.GFP.Sub(c, eval_key[i%len(eval_key)])
+		if !eval_key[i%len(eval_key)].IsZero() {
+			c = f.GFP.Mul(c, eval_key[i%len(eval_key)])
+		}
 		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
+
 		if i+1-f.extFactor < 0 {
 			pre = eval_vosu[(i+1-f.extFactor)+precision]
 		} else {
@@ -577,7 +581,10 @@ func (f *starks) VerifytarksProof(vis []byte, key []byte, proof []interface{}) b
 		if !vo_xpre.IsZero() {
 			c = f.GFP.Mul(c, vo_xpre)
 		}
-		c = f.GFP.Sub(c, k_x)
+		// c = f.GFP.Sub(c, k_x)
+		if !k_x.IsZero() {
+			c = f.GFP.Mul(c, k_x)
+		}
 		c = f.GFP.Sub(vi_x, c)
 		q := f.GFP.Mul(d_x, z)
 

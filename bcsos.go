@@ -214,16 +214,19 @@ func test_fri_prove_low_degree() {
 }
 
 func test_starks_prime() {
-	const PATH_TEST = "blocks_360.json"
+	const PATH_TEST = "./blocks_360.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	key := w.PublicKey
-	addr := w.PublicKey
+	// addr := w.PublicKey
 
 	msg := make(chan bitcoin.BlockPkt)
 	go simulation.LoadBtcData(PATH_TEST, msg)
 
 	tenc := int64(0)
 	tdec := int64(0)
+	tpro := int64(0)
+	tver := int64(0)
+
 	f := starks.NewStarks()
 
 	for {
@@ -242,27 +245,42 @@ func test_starks_prime() {
 		// log.Printf("Block : %v", x[:80])
 
 		// Start Encryption
-		vis := poscipher.CalculateXorWithAddress(addr, x)
-		_, y := poscipher.EncryptPoSWithPrimeField(key, vis)
+		start := time.Now().UnixNano()
+		// vis := poscipher.CalculateXorWithAddress(addr, x)
+		_, y := poscipher.EncryptPoSWithPrimeField(key, x)
+		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Encryption Time : %v", tenc)
 
 		// Start generating proof
-		start := time.Now().UnixNano()
-		proof := f.GenerateStarksProof(vis, y, key)
-		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Generating Proof Time : %v, length : %v", tenc, len(proof))
+		start = time.Now().UnixNano()
+		proof := f.GenerateStarksProof(x, y, key)
+		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Generating Proof Time : %v, length : %v", tpro, len(proof))
 
 		// Start verification
 		start = time.Now().UnixNano()
-		f.VerifytarksProof(vis, key, proof)
-		// x_t := poscipher.DecryptPoSWithPrimeField(key, y)
+		ret := f.VerifytarksProof(x, key, proof)
+		tver += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Verifying Proof Time : %v, %v", tver, ret)
+		if !ret {
+			log.Panicf("Verification Fail : %v", ret)
+		}
+
+		start = time.Now().UnixNano()
+		x_t := poscipher.DecryptPoSWithPrimeField(key, y)
 		// x_t = poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Verifying Proof Time : %v", tdec)
+		log.Printf("Decryption Time : %v", tdec)
 
-		// log.Printf("Org x %v :%v", len(x), x[len(x)-80:])
-		// log.Printf("New x %v :%v", len(x_t), x_t[len(x_t)-80:])
+		for i := 0; i < 10; i++ {
+			r := rand.Int() % len(x)
+			if x_t[r] != x[r] {
+				log.Panicf("Decryption Fail : %v", x_t[r])
+			}
+		}
+
 		// key = y
-		return
+		// return
 	}
 	close(msg)
 }

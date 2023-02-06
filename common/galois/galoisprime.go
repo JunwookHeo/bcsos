@@ -347,7 +347,7 @@ func (gf *GFP) ExtRootUnity2(x *uint256.Int, inv bool) (int, []*uint256.Int) {
 }
 
 func (gf *GFP) ExtRootUnity(root *uint256.Int, inv bool) (int, []*uint256.Int) {
-	maxc := 65537
+	maxc := 65536*1 + 1
 	if gf.Size < 16 {
 		maxc = int(1<<gf.Size) + 1
 	}
