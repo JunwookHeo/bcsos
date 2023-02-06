@@ -448,9 +448,10 @@ func (gf *GFP) DFT(cs []*uint256.Int, root *uint256.Int) []*uint256.Int {
 	}
 	w := uint256.NewInt(1) // No inverse
 	vs := make([]*uint256.Int, size-1)
-	for i := 0; i < len(cs); i++ {
-		vs[i] = cs[i]
-	}
+	// for i := 0; i < len(cs); i++ {
+	// 	vs[i] = cs[i]
+	// }
+	copy(vs, cs)
 	for i := len(cs); i < len(vs); i++ {
 		vs[i] = uint256.NewInt(0)
 	}

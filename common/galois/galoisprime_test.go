@@ -545,5 +545,4 @@ func TestGFPFFTPerf(t *testing.T) {
 	}
 
 	log.Printf("DFT/IDFT : %v", tm1/1000000)
-
 }

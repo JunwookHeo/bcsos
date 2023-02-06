@@ -180,37 +180,40 @@ func test_encypt_decrypt_prime() {
 func test_fri_prove_low_degree() {
 	f := starks.NewStarks()
 	length := 65536
-	ys := make([]*uint256.Int, length)
-	for i := 0; i < len(ys); i++ {
-		r := rand.Int63()
-		ys[i] = uint256.NewInt(uint64(r))
-	}
-
-	g := f.GFP.Prime.Clone()
-	g.Sub(g, uint256.NewInt(1))
-	g.Div(g, uint256.NewInt(uint64(length)))
-	g1 := f.GFP.Exp(uint256.NewInt(7), g)
 
 	tm1 := int64(0)
-	start := time.Now().UnixNano()
-	proof := f.ProveLowDegree(ys, g1)
-	end := time.Now().UnixNano()
-	tm1 = end - start
-	log.Printf("size of Proof : %v, %v", len(proof), tm1/1000000)
-
-	m1 := f.Merklize(ys)
 	tm2 := int64(0)
-	start = time.Now().UnixNano()
-	eval := f.VerifyLowDegreeProof(m1[1], proof, g1)
-	end = time.Now().UnixNano()
-	tm2 = end - start
-	log.Printf("Eval : %v", eval)
-	log.Printf("Verify: %v", tm2/1000000)
-	// for i:=0; i<len(proof); i++{
-	// 	log.Printf("Proof ======= %v", i)
-	// 	log.Printf("Proof : %v", proof[i])
-	// }
 
+	N := 100
+	for i := 0; i < N; i++ {
+		ys := make([]*uint256.Int, length)
+		for j := 0; j < len(ys); j++ {
+			r := rand.Int63()
+			ys[j] = uint256.NewInt(uint64(r))
+		}
+
+		g := f.GFP.Prime.Clone()
+		g.Sub(g, uint256.NewInt(1))
+		g.Div(g, uint256.NewInt(uint64(length)))
+		g1 := f.GFP.Exp(uint256.NewInt(7), g)
+
+		start := time.Now().UnixNano()
+		proof := f.ProveLowDegree(ys, g1)
+		end := time.Now().UnixNano()
+		tm1 += end - start
+		log.Printf("size of Proof : %v, %v", len(proof), tm1/1000000)
+
+		m1 := f.Merklize(ys)
+
+		start = time.Now().UnixNano()
+		eval := f.VerifyLowDegreeProof(m1[1], proof, g1)
+		end = time.Now().UnixNano()
+		tm2 += end - start
+		log.Printf("Eval : %v", eval)
+		log.Printf("Verify: %v", tm2/1000000)
+	}
+
+	log.Printf("Avg Proof : %v, Verify : %v", tm1/int64(N)/1000000, tm2/int64(N)/1000000)
 }
 
 func test_starks_prime() {
@@ -381,9 +384,9 @@ func main() {
 
 	// test_encypt_2()
 	// test_encypt_decrypt()
-	// test_fri_prove_low_degree()
+	test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
 	// test_prime_field()
-	test_fft()
+	// test_fft()
 }
