@@ -178,8 +178,9 @@ func test_encypt_decrypt_prime() {
 }
 
 func test_fri_prove_low_degree() {
-	f := starks.NewStarks()
 	length := 65536
+
+	f := starks.NewStarks(length / 8)
 
 	tm1 := int64(0)
 	tm2 := int64(0)
@@ -230,7 +231,7 @@ func test_starks_prime() {
 	tpro := int64(0)
 	tver := int64(0)
 
-	f := starks.NewStarks()
+	f := starks.NewStarks(65536 / 8)
 
 	for {
 		d, ok := <-msg

@@ -11,7 +11,7 @@ import (
 )
 
 func TestStarksMerklize(t *testing.T) {
-	f := NewStarks()
+	f := NewStarks(65536 / 8)
 
 	xs := make([]*uint256.Int, 65536)
 	for i := 0; i < len(xs); i++ {
@@ -30,7 +30,7 @@ func TestStarksDivid(t *testing.T) {
 }
 
 func TestStarksGetPseudorandomIndices(t *testing.T) {
-	f := NewStarks()
+	f := NewStarks(65536 / 8)
 	r := make([]byte, 32)
 
 	for i := 0; i < 1000; i++ {
@@ -47,8 +47,9 @@ func TestStarksGetPseudorandomIndices(t *testing.T) {
 }
 
 func TestStarksProveLowDegree(t *testing.T) {
-	f := NewStarks()
 	length := 16384
+	f := NewStarks(16384 / 8)
+
 	ys := make([]*uint256.Int, length)
 	for i := 0; i < len(ys); i++ {
 		r := rand.Int63()
@@ -73,6 +74,6 @@ func TestStarksProveLowDegree(t *testing.T) {
 }
 
 func TestStarksGenerateStarksProof(t *testing.T) {
-	f := NewStarks()
+	f := NewStarks(65536 / 8)
 	f.GenerateStarksProof(nil, nil, nil)
 }

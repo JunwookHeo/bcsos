@@ -20,8 +20,11 @@ type starks struct {
 
 const PSIZE = 31
 
-func NewStarks() *starks {
-	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: 8192 / 4, extFactor: 8}
+func NewStarks(steps int) *starks {
+	if steps == 0 {
+		steps = 2048 // 8192 / 4
+	}
+	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: steps, extFactor: 8}
 
 	return &f
 }
