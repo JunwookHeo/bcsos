@@ -93,6 +93,9 @@ func (f *starks) VerifyMultiBranch(root []byte, indices []uint32, proof [][][]by
 	output := make([][]byte, len(proof))
 	for i := 0; i < len(proof); i++ {
 		output[i] = f.verifyMerkleBranch(root, int(indices[i]), proof[i])
+		if output[i] == nil {
+			return nil
+		}
 	}
 	return output
 }
@@ -226,6 +229,10 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uin
 
 		column_values := f.VerifyMultiBranch(root2, ys, cbranch)
 		poly_values := f.VerifyMultiBranch(root, poly_positions, pbranch)
+		if column_values == nil || poly_values == nil {
+			log.Printf("Evaluation fail : %v-%v", column_values, poly_values)
+			return false
+		}
 
 		xs := make([][]*uint256.Int, len(ys))
 		rows := make([][]*uint256.Int, len(ys))

@@ -178,14 +178,14 @@ func test_encypt_decrypt_prime() {
 }
 
 func test_fri_prove_low_degree() {
-	length := 65536
+	length := 65536 / 4
 
 	f := starks.NewStarks(length / 8)
 
 	tm1 := int64(0)
 	tm2 := int64(0)
 
-	N := 100
+	N := 1
 	for i := 0; i < N; i++ {
 		ys := make([]*uint256.Int, length)
 		for j := 0; j < len(ys); j++ {
@@ -212,6 +212,21 @@ func test_fri_prove_low_degree() {
 		tm2 += end - start
 		log.Printf("Eval : %v", eval)
 		log.Printf("Verify: %v", tm2/1000000)
+
+		// Test Fake Data
+		tfake := false
+		if tfake == true {
+			findx := rand.Int() % len(ys)
+			ys[findx] = f.GFP.Add(ys[findx], uint256.NewInt(1))
+
+			m2 := f.Merklize(ys)
+			eval = f.VerifyLowDegreeProof(m2[1], proof, g1)
+			log.Printf("Eval Fake : %v", eval)
+
+			proof = f.ProveLowDegree(ys, g1)
+			eval = f.VerifyLowDegreeProof(m1[1], proof, g1)
+			log.Printf("Eval Fake : %v", eval)
+		}
 	}
 
 	log.Printf("Avg Proof : %v, Verify : %v", tm1/int64(N)/1000000, tm2/int64(N)/1000000)
@@ -284,7 +299,7 @@ func test_starks_prime() {
 		}
 
 		// key = y
-		// return
+		return
 	}
 	close(msg)
 }
@@ -385,9 +400,9 @@ func main() {
 
 	// test_encypt_2()
 	// test_encypt_decrypt()
-	test_fri_prove_low_degree()
+	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
-	// test_starks_prime()
+	test_starks_prime()
 	// test_prime_field()
 	// test_fft()
 }
