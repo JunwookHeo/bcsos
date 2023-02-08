@@ -11,6 +11,7 @@ import (
 )
 
 const ALIGN = 4
+const Ix2 = 2147483648 // P is Even so P/2 = (2^32) / 2
 
 var GF = galois.GFN(32)
 
@@ -57,21 +58,21 @@ func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 		for i := 0; i < ls; i++ {
 			// y[i] = k[i%lk] ^ x[i]
 			d := (x[i] ^ k[i%lk]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
 	} else if lk > ls {
 		for i := 0; i < ls; i++ {
 			// y[i] = k[i] ^ x[i]
 			d := (x[i] ^ k[i]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
 			// y[i] = k[i] ^ x[i]
 			d := (x[i] ^ k[i]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), 6442450943))
+			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
 	}
