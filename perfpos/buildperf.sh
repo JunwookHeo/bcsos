@@ -41,6 +41,7 @@ env GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED CC=$CC go build -o $DIR/$
 
 if [ -d "$DIR" ] 
 then
+    rm -rf "../out/perf/"
     mv "$DIR" ../out/perf
-    echo "mv dir"
+    echo "mv $DIR"
 fi

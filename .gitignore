@@ -32,3 +32,5 @@ blocks_360.json
 blocks_720.json
 ppos.*.csv
 python_utils/*.png
+*.csv
+doc/

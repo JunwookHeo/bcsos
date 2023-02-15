@@ -53,25 +53,25 @@ func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 
 	y := make([]uint32, ls)
 
-	pre := uint32(0)
+	// pre := uint32(0)
+	pre := uint32(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			// y[i] = k[i%lk] ^ x[i]
-			d := (x[i] ^ k[i%lk]) ^ pre
-			y[i] = uint32(GF.Exp(uint64(d), Ix2))
-			pre = y[i]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			// y[i] = k[i] ^ x[i]
-			d := (x[i] ^ k[i]) ^ pre
+			// d := (x[i] ^ k[i%lk]) ^ pre
+			d := (x[i] ^ k[i%lk])
+			if pre != 0 {
+				d = uint32(GF.Div(uint64(d), uint64(pre)))
+			}
 			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			// y[i] = k[i] ^ x[i]
-			d := (x[i] ^ k[i]) ^ pre
+			// d := (x[i] ^ k[i]) ^ pre
+			d := (x[i] ^ k[i])
+			if pre != 0 {
+				d = uint32(GF.Div(uint64(d), uint64(pre)))
+			}
 			y[i] = uint32(GF.Exp(uint64(d), Ix2))
 			pre = y[i]
 		}
@@ -117,26 +117,26 @@ func DecryptPoSWithVariableLength(key, s []byte) []byte {
 	}
 
 	y := make([]uint32, ls)
-	pre := uint32(0)
+	// pre := uint32(0)
+	pre := uint32(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			// ui_d[i] = ui_key[i%lk] ^ ui_s[i]
 			d := uint32(GF.Exp(uint64(x[i]), 2))
-			y[i] = (d ^ pre) ^ k[i%lk]
-			pre = x[i]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			// y[i] = k[i] ^ x[i]
-			d := uint32(GF.Exp(uint64(x[i]), 2))
-			y[i] = (d ^ pre) ^ k[i]
+			// y[i] = (d ^ pre) ^ k[i%lk]
+			if pre != 0 {
+				y[i] = uint32(GF.Mul(uint64(d), uint64(pre)))
+			}
+			y[i] = y[i] ^ k[i%lk]
 			pre = x[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			// y[i] = k[i] ^ x[i]
 			d := uint32(GF.Exp(uint64(x[i]), 2))
-			y[i] = (d ^ pre) ^ k[i]
+			// y[i] = (d ^ pre) ^ k[i]
+			if pre != 0 {
+				y[i] = uint32(GF.Mul(uint64(d), uint64(pre)))
+			}
+			y[i] = y[i] ^ k[i]
 			pre = x[i]
 		}
 	}
@@ -158,10 +158,6 @@ func GetHashforPoSKey(key []byte, ls int) string {
 	if lk < ls {
 		for i := 0; i < ls; i++ {
 			d[i] = key[i%lk]
-		}
-	} else if lk > ls {
-		for i := 0; i < ls; i++ {
-			d[i] = key[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
