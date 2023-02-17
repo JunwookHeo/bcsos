@@ -278,7 +278,7 @@ func test_starks_prime() {
 
 		// Start verification
 		start = time.Now().UnixNano()
-		ret := f.VerifytarksProof(x, key, proof)
+		ret := f.VerifyStarksProof(x, key, proof)
 		tver += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Verifying Proof Time : %v, %v", tver, ret)
 		if !ret {
@@ -299,6 +299,85 @@ func test_starks_prime() {
 		}
 
 		// key = y
+		return
+	}
+	close(msg)
+}
+
+func test_starks_prime_prekey() {
+	const PATH_TEST = "./blocks_360.json"
+	w := wallet.NewWallet("blocks.json.wallet")
+	addr := w.PublicKey
+	key := make([]byte, 0, len(addr)*32)
+	for i := 0; i < len(addr); i++ {
+		t := uint256.NewInt(uint64(addr[i])).Bytes32()
+		key = append(key, t[:]...)
+	}
+
+	msg := make(chan bitcoin.BlockPkt)
+	go simulation.LoadBtcData(PATH_TEST, msg)
+
+	tenc := int64(0)
+	tdec := int64(0)
+	tpro := int64(0)
+	tver := int64(0)
+
+	f := starks.NewStarks(65536 / 8)
+
+	for loop := 0; ; loop++ {
+		d, ok := <-msg
+		if !ok {
+			log.Println("Channle closed")
+			break
+		}
+
+		if d.Block == config.END_TEST {
+			break
+		}
+
+		rb := bitcoin.NewRawBlock(d.Block)
+		x := rb.GetBlockBytes()
+		// log.Printf("Block : %v", x[:80])
+
+		// Start Encryption
+		start := time.Now().UnixNano()
+		vis := poscipher.CalculateXorWithAddress(addr, x)
+		_, y := poscipher.EncryptPoSWithPrimeFieldPreKey(key, vis)
+		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Encryption Time : %v", tenc)
+
+		// Start generating proof
+		start = time.Now().UnixNano()
+		proof := f.GenerateStarksProofPreKey(vis, y, key)
+		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Generating Proof Time : %v, length : %v", tpro, len(proof))
+
+		// Start verification
+		start = time.Now().UnixNano()
+		ret := f.VerifyStarksProofPreKey(vis, proof)
+		tver += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Verifying Proof Time : %v, %v", tver, ret)
+		if !ret {
+			log.Panicf("Verification Fail : %v", ret)
+		}
+
+		proof_size := f.GetStarksProofPreKey(proof)
+		log.Printf("Proof Size : %v", proof_size)
+
+		start = time.Now().UnixNano()
+		x_t := poscipher.DecryptPoSWithPrimeFieldPreKey(key, y)
+		x_o := poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
+		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
+		log.Printf("Decryption Time : %v", tdec)
+
+		for i := 0; i < 10; i++ {
+			r := rand.Int() % len(x)
+			if x_o[r] != x[r] {
+				log.Panicf("Decryption Fail : %v", x_o[r])
+			}
+		}
+
+		key = y
 		return
 	}
 	close(msg)
@@ -402,7 +481,8 @@ func main() {
 	// test_encypt_decrypt()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
-	test_starks_prime()
+	// test_starks_prime()
+	test_starks_prime_prekey()
 	// test_prime_field()
 	// test_fft()
 }
