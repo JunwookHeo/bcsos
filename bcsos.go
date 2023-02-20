@@ -322,7 +322,7 @@ func test_starks_prime_prekey() {
 	tpro := int64(0)
 	tver := int64(0)
 
-	f := starks.NewStarks(65536 / 8)
+	f := starks.NewStarks(65536 / 8 / 4)
 
 	for loop := 0; ; loop++ {
 		d, ok := <-msg
@@ -378,7 +378,7 @@ func test_starks_prime_prekey() {
 		}
 
 		key = y
-		return
+		// return
 	}
 	close(msg)
 }

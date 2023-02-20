@@ -48,37 +48,70 @@ func (f *starks) Merklize(values []*uint256.Int) [][]byte {
 	return ms
 }
 
-func (f *starks) makeMerkleBranch(tree [][]byte, index int) [][]byte {
+func (f *starks) makeMerkleBranch(tree [][]byte, tree_cache map[int][]byte, index int) [][]byte {
 	output := make([][]byte, 0)
+
+	addCache := func(idx int, d []byte) {
+		_, ok := tree_cache[idx]
+		if ok {
+			output = append(output, nil)
+		} else {
+			tree_cache[idx] = d
+			output = append(output, d)
+		}
+	}
 
 	index += len(tree) >> 1
 	o := tree[index]
-	output = append(output, o)
+	addCache(index, o)
+
 	for index > 1 {
 		o = tree[index^0x1]
-		output = append(output, o)
+		addCache(index^0x1, o)
 		index = index >> 1
 	}
 	return output
 }
 
 func (f *starks) MakeMultiBranch(tree [][]byte, indices []uint32) [][][]byte {
+	tree_cache := make(map[int][]byte)
 	output := make([][][]byte, len(indices))
+
 	for i := 0; i < len(indices); i++ {
-		branch := f.makeMerkleBranch(tree, int(indices[i]))
+		branch := f.makeMerkleBranch(tree, tree_cache, int(indices[i]))
 		output[i] = branch
 	}
 	return output
 }
 
-func (f *starks) verifyMerkleBranch(root []byte, index int, proof [][]byte) []byte {
-	index += 1 << len(proof)
-	v := proof[0]
-	for i := 1; i < len(proof); i++ {
-		if index%2 == 0 {
-			v = blockchain.CalMerkleNodeHash(v, proof[i])
+func (f *starks) verifyMerkleBranch(root []byte, tree_cache map[int][]byte, index int, proof [][]byte) []byte {
+	cacheCache := func(idx int, d []byte) []byte {
+		val, ok := tree_cache[idx]
+		if ok {
+			return val
 		} else {
-			v = blockchain.CalMerkleNodeHash(proof[i], v)
+			if d == nil {
+				log.Panicf("Failed %v", idx)
+			}
+			tree_cache[idx] = d
+		}
+
+		return d
+	}
+
+	index += 1 << len(proof)
+	// v := proof[0]
+	p0 := cacheCache(index, proof[0])
+	v := p0
+
+	for i := 1; i < len(proof); i++ {
+		// val := proof[i]
+		val := cacheCache(index^0x1, proof[i])
+
+		if index%2 == 0 {
+			v = blockchain.CalMerkleNodeHash(v, val)
+		} else {
+			v = blockchain.CalMerkleNodeHash(val, v)
 		}
 		index = index >> 1
 	}
@@ -87,14 +120,16 @@ func (f *starks) verifyMerkleBranch(root []byte, index int, proof [][]byte) []by
 		log.Printf("Faile to verify : %v-%v", v, root)
 		return nil
 	}
-	return proof[0]
+	return p0
 }
 
 func (f *starks) VerifyMultiBranch(root []byte, indices []uint32, proof [][][]byte) [][]byte {
+	tree_cache := make(map[int][]byte)
 	output := make([][]byte, len(proof))
 	for i := 0; i < len(proof); i++ {
-		output[i] = f.verifyMerkleBranch(root, int(indices[i]), proof[i])
+		output[i] = f.verifyMerkleBranch(root, tree_cache, int(indices[i]), proof[i])
 		if output[i] == nil {
+			log.Printf("Faile to verify : index %v", int(indices[i]))
 			return nil
 		}
 	}
