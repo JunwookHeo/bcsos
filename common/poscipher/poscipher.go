@@ -380,6 +380,8 @@ func DecryptPoSWithPrimeFieldPreKey(key, s []byte) []byte {
 			}
 			if !ks[i%lk].IsZero() {
 				y[i] = GFP.Mul(d, ks[i%lk])
+			} else {
+				y[i] = d
 			}
 
 			pre = xs[i]
@@ -392,6 +394,8 @@ func DecryptPoSWithPrimeFieldPreKey(key, s []byte) []byte {
 			}
 			if !ks[i].IsZero() {
 				y[i] = GFP.Mul(d, ks[i])
+			} else {
+				y[i] = d
 			}
 
 			pre = xs[i]
