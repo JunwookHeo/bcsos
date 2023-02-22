@@ -25,8 +25,9 @@ type DBAgent interface {
 	DeleteNoAccedObjects()
 	UpdateDBNetworkQuery(fromqc int, toqc int, totalqc int)
 	UpdateDBNetworkDelay(addtime int, hop int)
-	GetNonInteractiveProof(hash string) *dtype.PoSProof
-	VerifyProofStorage(proof *dtype.PoSProof) bool
+	GetNonInteractiveStarksProof(hash string) *dtype.NonInteractiveProof
+	VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool
+	VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiveProof) bool
 	GetInteractiveProof(height int) *dtype.PoSProof
 	GetRandomHeightForNConsecutiveBlocks(hash string) int
 	GetLastBlockTime() int64

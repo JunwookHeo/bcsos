@@ -1,5 +1,7 @@
 package dtype
 
+import "github.com/holiman/uint256"
+
 type NodeInfo struct {
 	Mode string `json:"mode"`
 	SC   int    `json:"storage_class"`
@@ -51,4 +53,28 @@ type PoSProof struct {
 	Selected  int
 	Hash      string
 	EncBlock  []byte
+}
+type FriProofElement struct {
+	Root2   [][]byte
+	CBranch [][][]byte
+	PBranch [][][]byte
+}
+
+type StarksProof struct {
+	MerkleRoot []byte
+	TreeRoots  [][]byte
+	TreeVosu   [][][]byte
+	TreeKey    [][][]byte
+	TreeD      [][][]byte
+	TreeB      [][][]byte
+	TreeL      [][][]byte
+	VosuFl     []*uint256.Int
+	FriProof   []*FriProofElement
+}
+
+type NonInteractiveProof struct {
+	Address []byte
+	Hash    string
+
+	Starks *StarksProof
 }

@@ -3,6 +3,7 @@ package dbagent
 import (
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/config"
+	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/wallet"
 	"github.com/stretchr/testify/assert"
@@ -229,11 +231,28 @@ func newTestDBBtcSqlite(path string) DBAgent {
 }
 
 func TestBtcDBAgentPoS(t *testing.T) {
-	path := "../../blockchainnode/db_nodes/7001.db"
-	config.WALLET_PATH = "../../blockchainnode/db_nodes/7001.wallet"
+	path := "../../blockchainnode/db_nodes/7031.db"
+	config.WALLET_PATH = "../../blockchainnode/db_nodes/7031.wallet"
 	ag := newTestDBBtcSqlite(path)
-	hash := "05500000000000000000f9e395753e490f29a3213fdfbe8931a691a0d268c1d1"
-	proof := ag.GetNonInteractiveProof(hash)
-	// log.Printf("Proof : %v", proof.Hash)
-	ag.VerifyProofStorage(proof)
+	hash := "00000000000000000003728ce7b6b715726f4ecb87162b942670a1c3649c2aea"
+	proof := ag.GetNonInteractiveStarksProof(hash)
+
+	m_proof, _ := json.Marshal(proof)
+
+	var um_proof dtype.NonInteractiveProof
+	json.Unmarshal(m_proof, &um_proof)
+
+	log.Printf("%v, %v", proof.Address, um_proof.Address)
+
+	// for i := 0; i < len(fri_proof)-1; i++ {
+	// 	p := fri_proof[i].([]interface{})
+	// 	root2, _ := p[0].([]byte)
+	// 	cbranch, _ := p[1].([][][]byte)
+	// 	pbranch, _ := p[2].([][][]byte)
+	// }
+
+	// rest := fri_proof[len(fri_proof)-1].([][]byte)
+
+	// log.Printf("Proof : %v", rp)
+	ag.VerifyNonInterActiveProofStorage(proof)
 }

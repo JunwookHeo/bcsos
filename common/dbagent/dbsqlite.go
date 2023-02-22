@@ -639,7 +639,7 @@ func (a *dbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 	return -1
 }
 
-func (a *dbagent) GetNonInteractiveProof(hash string) *dtype.PoSProof {
+func (a *dbagent) GetNonInteractiveStarksProof(hash string) *dtype.NonInteractiveProof {
 	return nil
 }
 
@@ -647,7 +647,11 @@ func (a *dbagent) GetInteractiveProof(height int) *dtype.PoSProof {
 	return nil
 }
 
-func (a *dbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
+func (a *dbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
+	return false
+}
+
+func (a *dbagent) VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiveProof) bool {
 	return false
 }
 

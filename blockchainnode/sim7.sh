@@ -6,7 +6,7 @@ then
 
     if compgen -G "./db_nodes/*.*" > /dev/null; then
         echo "pattern exists!"
-        rm ./db_nodes/*.*
+        rm  -rf ./db_nodes/*.*
     fi
 
     tmux new-session -s MLDC -n "SC0" -d

@@ -19,6 +19,7 @@ import (
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/serial"
+	"github.com/junwookheo/bcsos/common/starks"
 	"github.com/junwookheo/bcsos/common/wallet"
 )
 
@@ -145,11 +146,13 @@ func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
 }
 
 func (a *btcdbagent) encryptPoSWithVariableLength(key, s []byte) (string, []byte) {
-	return poscipher.EncryptPoSWithVariableLength(key, s)
+	// return poscipher.EncryptPoSWithVariableLength(key, s)
+	return poscipher.EncryptPoSWithPrimeFieldPreKey(key, s)
 }
 
 func (a *btcdbagent) decryptPoSWithVariableLength(key, s []byte) []byte {
-	return poscipher.DecryptPoSWithVariableLength(key, s)
+	// return poscipher.DecryptPoSWithVariableLength(key, s)
+	return poscipher.DecryptPoSWithPrimeFieldPreKey(key, s)
 }
 
 func (a *btcdbagent) getHashforPoSKey(key []byte, ls int) string {
@@ -347,6 +350,58 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	return &proof
 }
 
+// height : the start height of n-consecutive encrypted blocks
+func (a *btcdbagent) generateStarksProof(height int) *dtype.NonInteractiveProof {
+	start := time.Now().UnixNano()
+
+	bi := a.getEncryptInfoWithHeight(height)
+	if bi == nil {
+		log.Printf("Get Encrypt block info error : %v", height)
+		return nil
+	}
+
+	cb, err := ioutil.ReadFile(filepath.Join(a.dirpath, bi.hash))
+	if err != nil {
+		log.Panicf("Reading encryped block err : %v", err)
+		return nil
+	}
+
+	key, err := ioutil.ReadFile(filepath.Join(a.dirpath, bi.hashprev))
+	if err != nil {
+		log.Panicf("Reading encryped block key err : %v", err)
+		return nil
+	}
+
+	vis := a.decryptPoSWithVariableLength(key, cb)
+
+	f := starks.NewStarks(65536 / 8 / 4)
+	starks_proof := f.GenerateStarksProofPreKey(vis, cb, key)
+	proof_size := f.GetSizeStarksProofPreKey(starks_proof)
+	gap := int(time.Now().UnixNano() - start)
+	{
+		a.mutex.Lock()
+		status := &a.dbstatus
+		status.TimeGenProof += gap
+		status.SizeProof += proof_size
+		a.mutex.Unlock()
+	}
+	dbproof := btcDBProof{}
+	dbproof.ProofHeight = bi.height
+	dbproof.ProofBlock = bi.hash
+	dbproof.SizeGenProof = proof_size
+	dbproof.TimeGenProof = gap
+
+	a.updateDBProof(&dbproof)
+	log.Printf("Proof stats : %v", a.dbstatus)
+	var proof dtype.NonInteractiveProof
+	// proof := make([]interface{}, 3)
+	proof.Address = a.getEncryptKeyforGenesis()
+	proof.Hash = bi.hash
+	proof.Starks = starks_proof
+
+	return &proof
+}
+
 // hash : new block's hash for randomization
 func (a *btcdbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
@@ -364,14 +419,32 @@ func (a *btcdbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 }
 
 // hash : new block's hash for randomization
-func (a *btcdbagent) GetNonInteractiveProof(hash string) *dtype.PoSProof {
+func (a *btcdbagent) getRandomHeightForProofBlocks(hash string) int {
+	// Perform PoS when block height is larger than 6
+	LEASTBLOCKS := 2
+	if a.lastblock.height <= LEASTBLOCKS {
+		log.Printf("Block selector Max Height short: %v", a.lastblock.height)
+		return -1
+	}
+	// Select block
+	tmp, _ := hex.DecodeString(hash)
+	hb := sha256.Sum256(tmp)
+	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-1) // margin 10 blocks
+	ri += 1                                                  // Exclude genesys block
+	log.Printf("Block selector : %v - max : %v", ri, a.lastblock.height)
+
+	return int(ri)
+}
+
+// hash : new block's hash for randomization
+func (a *btcdbagent) GetNonInteractiveStarksProof(hash string) *dtype.NonInteractiveProof {
 	// Perform PoS when block height is larger than NUM_CONSECUTIVE_HASHES*3
-	ri := a.GetRandomHeightForNConsecutiveBlocks(hash)
+	ri := a.getRandomHeightForProofBlocks(hash)
 	if ri == -1 {
 		return nil
 	}
 
-	return a.generateProof(int(ri))
+	return a.generateStarksProof(int(ri))
 }
 
 func (a *btcdbagent) GetInteractiveProof(height int) *dtype.PoSProof {
@@ -395,7 +468,7 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	return poscipher.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
 }
 
-func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
+func (a *btcdbagent) verifyInterActiveProofStorage_Fwd(proof *dtype.PoSProof) bool {
 	bi := a.getEncryptInfoWithPreviousHash(proof.Hash)
 	if bi == nil {
 		log.Printf("Get Encrypt block info error : %v", proof.Hash)
@@ -436,7 +509,7 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 	return false
 }
 
-func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
+func (a *btcdbagent) verifyInterActiveProofStorage_Rev(proof *dtype.PoSProof) bool {
 	bi := a.getEncryptInfoWithHash(proof.Hash)
 	if bi == nil {
 		log.Printf("Get Encrypt block info error : %v", proof.Hash)
@@ -479,14 +552,14 @@ func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
 	return false
 }
 
-func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
+func (a *btcdbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 	bi := a.getEncryptInfoWithHash(proof.Hash)
 	dbverif := btcDBVerif{}
 	dbverif.VerifBlock = bi.hash
 	dbverif.VerifHeight = bi.height
 
 	start := time.Now().UnixNano()
-	ret1 := a.verifyProofStorage_Rev(proof)
+	ret1 := a.verifyInterActiveProofStorage_Rev(proof)
 	gap := int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -497,7 +570,7 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 
 	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
-	ret2 := a.verifyProofStorage_Fwd(proof)
+	ret2 := a.verifyInterActiveProofStorage_Fwd(proof)
 	gap = int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -509,6 +582,46 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 	dbverif.TimeVerifFwd = gap
 	a.updateDBVerif(&dbverif)
 	return ret1 && ret2
+}
+
+func (a *btcdbagent) VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiveProof) bool {
+	addr := proof.Address
+	hash := proof.Hash
+	starks_proof := proof.Starks
+
+	start := time.Now().UnixNano()
+	bi := a.getEncryptInfoWithHash(hash)
+	if bi == nil {
+		log.Printf("Get Encrypt block info error : %v", hash)
+		return false
+	}
+
+	dbverif := btcDBVerif{}
+	dbverif.VerifBlock = bi.hash
+	dbverif.VerifHeight = bi.height
+
+	b := a.getDecryptBlock(bi)
+	if b == nil {
+		log.Printf("Get Decrypt block error : %v", bi.hash)
+		return false
+	}
+	vis := poscipher.CalculateXorWithAddress(addr, b)
+
+	f := starks.NewStarks(65536 / 8 / 4)
+	ret := f.VerifyStarksProofPreKey(vis, starks_proof)
+
+	gap := int(time.Now().UnixNano() - start)
+	{
+		a.mutex.Lock()
+		status := &a.dbstatus
+		status.TimeVerifyRev += gap
+		a.mutex.Unlock()
+	}
+
+	dbverif.TimeVerifFwd = gap
+	a.updateDBVerif(&dbverif)
+
+	return ret
 }
 
 func (a *btcdbagent) initLastBlock() {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/galois"
 )
 
@@ -170,7 +171,7 @@ func (f *starks) GetPseudorandomIndices(seed []byte, modulus uint32, count int, 
 	return indices
 }
 
-func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []interface{} {
+func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []*dtype.FriProofElement {
 	L := len(values)
 	if (L >> 2) <= 16 {
 		log.Println("Produced FRI proof")
@@ -179,7 +180,11 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []inter
 			ms[i] = values[i].Bytes() //   blockchain.CalHashSha256(values[i].Bytes())
 			// ms[i] = t[:]
 		}
-		return []interface{}{ms}
+		proof := make([]*dtype.FriProofElement, 1)
+		var current dtype.FriProofElement
+		current.Root2 = ms
+		proof[0] = &current
+		return proof
 	}
 
 	log.Printf("Prove values with length : %v", L)
@@ -221,18 +226,20 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []inter
 		}
 	}
 
-	current := make([]interface{}, 3)
-	current[0] = m2[1]
-	current[1] = f.MakeMultiBranch(m2, yys)
-	current[2] = f.MakeMultiBranch(m1, poly_positions)
+	proof := make([]*dtype.FriProofElement, 1)
+	var current dtype.FriProofElement
+	current.Root2 = make([][]byte, 1)
+	current.Root2[0] = m2[1]
+	current.CBranch = f.MakeMultiBranch(m2, yys)
+	current.PBranch = f.MakeMultiBranch(m1, poly_positions)
 	next := f.ProveLowDegree(colums, f.GFP.Exp(rou, uint256.NewInt(4)))
-	proof := make([]interface{}, 1)
-	proof[0] = current
+	proof[0] = &current
 	proof = append(proof, next...)
+
 	return proof
 }
 
-func (f *starks) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uint256.Int) bool {
+func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElement, rou *uint256.Int) bool {
 	testval := rou.Clone()
 	roudeg := uint64(1)
 
@@ -250,10 +257,10 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []interface{}, rou *uin
 	for i := 0; i < len(proof)-1; i++ {
 		roudeg = roudeg / 4
 		log.Printf("Verify values with length : %v", roudeg)
-		p := proof[i].([]interface{})
-		root2, _ := p[0].([]byte)
-		cbranch, _ := p[1].([][][]byte)
-		pbranch, _ := p[2].([][][]byte)
+		// p := proof[i].([]interface{})
+		root2 := proof[i].Root2[0]
+		cbranch := proof[i].CBranch
+		pbranch := proof[i].PBranch
 
 		ys := f.GetPseudorandomIndices(root2, uint32(roudeg), f.numIdx, uint32(f.extFactor))
 		poly_positions := make([]uint32, len(ys)*4)
@@ -538,7 +545,7 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof []interface{}) 
 	tree_b, _ := proof[4].([][][]byte)
 	tree_l, _ := proof[5].([][][]byte)
 	vosu_fl, _ := proof[6].([]*uint256.Int)
-	fri_proof, _ := proof[7].([]interface{})
+	// fri_proof, _ := proof[7].([]interface{})
 
 	// Verify root of trees
 	// tree_roots = {tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
@@ -552,10 +559,10 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof []interface{}) 
 		return false
 	}
 
-	if !f.VerifyLowDegreeProof(tree_roots[3], fri_proof, G2) {
-		log.Printf("Low Degree Testing Fail")
-		return false
-	}
+	// if !f.VerifyLowDegreeProof(tree_roots[3], fri_proof, G2) {
+	// 	log.Printf("Low Degree Testing Fail")
+	// 	return false
+	// }
 
 	// L(x) : Linear combination
 	k1 := uint256.NewInt(0)
@@ -667,7 +674,7 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof []interface{}) 
 // Vis : Input values
 // Vos : Output values
 // key : Adress of Prover
-func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) []interface{} {
+func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *dtype.StarksProof {
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	vosu := f.GFP.LoadUint256FromStream32(vos)
 	ks := f.GFP.LoadUint256FromStream32(key)
@@ -859,21 +866,22 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) [
 	// log.Printf("augmented_positions : %v", augmented_positions)
 	// log.Printf("tree_l : %v", tree_l[1])
 
-	proof := make([]interface{}, 9)
-	proof[0] = m_root
-	proof[1] = [][]byte{tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}
-	proof[2] = f.MakeMultiBranch(tree_vosu, augmented_positions)
-	proof[3] = f.MakeMultiBranch(tree_key, augmented_positions)
-	proof[4] = f.MakeMultiBranch(tree_d, augmented_positions)
-	proof[5] = f.MakeMultiBranch(tree_b, augmented_positions)
-	proof[6] = f.MakeMultiBranch(tree_l, positions)
-	proof[7] = []*uint256.Int{vosu[0], vosu[f.steps-1]}
-	proof[8] = f.ProveLowDegree(eval_l, G2)
+	// proof := make([]interface{}, 9)
+	var proof dtype.StarksProof
+	proof.MerkleRoot = m_root
+	proof.TreeRoots = [][]byte{tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}
+	proof.TreeVosu = f.MakeMultiBranch(tree_vosu, augmented_positions)
+	proof.TreeKey = f.MakeMultiBranch(tree_key, augmented_positions)
+	proof.TreeD = f.MakeMultiBranch(tree_d, augmented_positions)
+	proof.TreeB = f.MakeMultiBranch(tree_b, augmented_positions)
+	proof.TreeL = f.MakeMultiBranch(tree_l, positions)
+	proof.VosuFl = []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	proof.FriProof = f.ProveLowDegree(eval_l, G2)
 
-	return proof
+	return &proof
 }
 
-func (f *starks) VerifyStarksProofPreKey(vis []byte, proof []interface{}) bool {
+func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) bool {
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	log.Printf("Length of Inputs : vi(%v)", len(visu))
 
@@ -898,45 +906,45 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof []interface{}) bool {
 	eval_visu := f.GFP.DFT(poly_visu, G2)
 	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
 
-	m_root, _ := proof[0].([]byte)
-	tree_roots, _ := proof[1].([][]byte)
-	tree_vosu, _ := proof[2].([][][]byte)
-	tree_key, _ := proof[3].([][][]byte)
-	tree_d, _ := proof[4].([][][]byte)
-	tree_b, _ := proof[5].([][][]byte)
-	tree_l, _ := proof[6].([][][]byte)
-	vosu_fl, _ := proof[7].([]*uint256.Int)
-	fri_proof, _ := proof[8].([]interface{})
+	// m_root, _ := proof.MerkleRoot
+	// tree_roots, _ := proof[1].([][]byte)
+	// tree_vosu, _ := proof[2].([][][]byte)
+	// tree_key, _ := proof[3].([][][]byte)
+	// tree_d, _ := proof[4].([][][]byte)
+	// tree_b, _ := proof[5].([][][]byte)
+	// tree_l, _ := proof[6].([][][]byte)
+	// vosu_fl, _ := proof[7].([]*uint256.Int)
+	// fri_proof, _ := proof[8].([]interface{})
 
 	// Verify root of trees
 	// tree_roots = {tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}
-	mr := tree_roots[0]
-	mr = append(mr, tree_roots[1]...)
-	mr = append(mr, tree_roots[2]...)
-	mr = append(mr, tree_roots[3]...)
+	mr := proof.TreeRoots[0]
+	mr = append(mr, proof.TreeRoots[1]...)
+	mr = append(mr, proof.TreeRoots[2]...)
+	mr = append(mr, proof.TreeRoots[3]...)
 	h1 := hex.EncodeToString(f.GetHashBytes(mr))
-	h2 := hex.EncodeToString(m_root)
+	h2 := hex.EncodeToString(proof.MerkleRoot)
 	if h1 != h2 {
 		log.Printf("Verifying m_root hash : %v != %v", h1, h2)
 		return false
 	}
 
-	if !f.VerifyLowDegreeProof(tree_roots[4], fri_proof, G2) {
+	if !f.VerifyLowDegreeProof(proof.TreeRoots[4], proof.FriProof, G2) {
 		log.Printf("Low Degree Testing Fail")
 		return false
 	}
 
 	// L(x) : Linear combination
 	k1 := uint256.NewInt(0)
-	k1.SetBytes8(m_root[0:])
+	k1.SetBytes8(proof.MerkleRoot[0:])
 	k2 := uint256.NewInt(0)
-	k2.SetBytes8(m_root[8:])
+	k2.SetBytes8(proof.MerkleRoot[8:])
 	k3 := uint256.NewInt(0)
-	k3.SetBytes8(m_root[16:])
+	k3.SetBytes8(proof.MerkleRoot[16:])
 	k4 := uint256.NewInt(0)
-	k4.SetBytes8(m_root[24:])
+	k4.SetBytes8(proof.MerkleRoot[24:])
 
-	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
+	positions := f.GetPseudorandomIndices(proof.MerkleRoot, uint32(precision), 80, uint32(f.extFactor))
 	augmented_positions := make([]uint32, len(positions)*2)
 
 	for i := 0; i < len(positions); i++ {
@@ -955,7 +963,7 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof []interface{}) bool {
 
 	// Io(x)
 	xos := []*uint256.Int{uint256.NewInt(1), last_step_position}
-	yos := []*uint256.Int{vosu_fl[0], vosu_fl[1]}
+	yos := []*uint256.Int{proof.VosuFl[0], proof.VosuFl[1]}
 	poly_io := f.GFP.LagrangeInterp(xos, yos)
 
 	// Zo(x)
@@ -965,11 +973,11 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof []interface{}) bool {
 
 	// log.Printf("io : %v, zo : %v", poly_io, poly_zo)
 
-	leaves_vosu := f.VerifyMultiBranch(tree_roots[0], augmented_positions, tree_vosu)
-	leaves_key := f.VerifyMultiBranch(tree_roots[1], augmented_positions, tree_key)
-	leaves_d := f.VerifyMultiBranch(tree_roots[2], augmented_positions, tree_d)
-	leaves_b := f.VerifyMultiBranch(tree_roots[3], augmented_positions, tree_b)
-	leaves_l := f.VerifyMultiBranch(tree_roots[4], positions, tree_l)
+	leaves_vosu := f.VerifyMultiBranch(proof.TreeRoots[0], augmented_positions, proof.TreeVosu)
+	leaves_key := f.VerifyMultiBranch(proof.TreeRoots[1], augmented_positions, proof.TreeKey)
+	leaves_d := f.VerifyMultiBranch(proof.TreeRoots[2], augmented_positions, proof.TreeD)
+	leaves_b := f.VerifyMultiBranch(proof.TreeRoots[3], augmented_positions, proof.TreeB)
+	leaves_l := f.VerifyMultiBranch(proof.TreeRoots[4], positions, proof.TreeL)
 
 	// log.Printf("leaves %v, %v, %v, %v", len(leaves_vosu), len(leaves_d), len(leaves_b), len(leaves_l))
 
@@ -1035,76 +1043,67 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof []interface{}) bool {
 	return true
 }
 
-func (f *starks) GetStarksProofPreKey(proof []interface{}) int {
+func (f *starks) GetSizeStarksProofPreKey(proof *dtype.StarksProof) int {
 	size := 0
 
-	m_root, _ := proof[0].([]byte)
-	size += len(m_root)
+	size += len(proof.MerkleRoot)
 
-	tree_roots, _ := proof[1].([][]byte)
-	for i := 0; i < len(tree_roots); i++ {
-		size += len(tree_roots[i])
+	for i := 0; i < len(proof.TreeRoots); i++ {
+		size += len(proof.TreeRoots[i])
 	}
 	log.Printf("sizof buf : %v", size)
 
-	tree_vosu, _ := proof[2].([][][]byte)
-	for i := 0; i < len(tree_vosu); i++ {
-		for j := 0; j < len(tree_vosu[i]); j++ {
-			size += len(tree_vosu[i][j])
+	for i := 0; i < len(proof.TreeVosu); i++ {
+		for j := 0; j < len(proof.TreeVosu[i]); j++ {
+			size += len(proof.TreeVosu[i][j])
 		}
 	}
 
 	log.Printf("sizof buf : %v", size)
-	tree_key, _ := proof[3].([][][]byte)
-	for i := 0; i < len(tree_key); i++ {
-		for j := 0; j < len(tree_key[i]); j++ {
-			size += len(tree_key[i][j])
+	for i := 0; i < len(proof.TreeKey); i++ {
+		for j := 0; j < len(proof.TreeKey[i]); j++ {
+			size += len(proof.TreeKey[i][j])
 		}
 	}
 
 	log.Printf("sizof buf : %v", size)
-	tree_d, _ := proof[4].([][][]byte)
-	for i := 0; i < len(tree_d); i++ {
-		for j := 0; j < len(tree_d[i]); j++ {
-			size += len(tree_d[i][j])
+	for i := 0; i < len(proof.TreeD); i++ {
+		for j := 0; j < len(proof.TreeD[i]); j++ {
+			size += len(proof.TreeD[i][j])
 		}
 	}
 
 	log.Printf("sizof buf : %v", size)
-	tree_b, _ := proof[5].([][][]byte)
-	for i := 0; i < len(tree_b); i++ {
-		for j := 0; j < len(tree_b[i]); j++ {
-			size += len(tree_b[i][j])
+	for i := 0; i < len(proof.TreeB); i++ {
+		for j := 0; j < len(proof.TreeB[i]); j++ {
+			size += len(proof.TreeB[i][j])
 		}
 	}
 
 	log.Printf("sizof buf : %v", size)
-	tree_l, _ := proof[6].([][][]byte)
-	for i := 0; i < len(tree_l); i++ {
-		for j := 0; j < len(tree_l[i]); j++ {
-			size += len(tree_l[i][j])
+	for i := 0; i < len(proof.TreeL); i++ {
+		for j := 0; j < len(proof.TreeL[i]); j++ {
+			size += len(proof.TreeL[i][j])
 		}
 	}
 
 	log.Printf("sizof buf : %v", size)
-	vosu_fl, _ := proof[7].([]*uint256.Int)
-	size += len(vosu_fl) * 4 * 8
+	size += len(proof.VosuFl) * 4 * 8
 
 	log.Printf("sizof buf : %v", size)
-	fri_proof, _ := proof[8].([]interface{})
-	for i := 0; i < len(fri_proof)-1; i++ {
-		p := fri_proof[i].([]interface{})
-		root2, _ := p[0].([]byte)
+	for i := 0; i < len(proof.FriProof)-1; i++ {
+		p := proof.FriProof[i]
+		root2 := p.Root2[0]
 		size += len(root2)
 
-		cbranch, _ := p[1].([][][]byte)
+		cbranch := p.CBranch
 		for i := 0; i < len(cbranch); i++ {
 			for j := 0; j < len(cbranch[i]); j++ {
 				size += len(cbranch[i][j])
 			}
 		}
 
-		pbranch, _ := p[2].([][][]byte)
+		pbranch := p.PBranch
 		for i := 0; i < len(pbranch); i++ {
 			for j := 0; j < len(pbranch[i]); j++ {
 				size += len(pbranch[i][j])
@@ -1113,7 +1112,7 @@ func (f *starks) GetStarksProofPreKey(proof []interface{}) int {
 	}
 
 	log.Printf("sizof buf : %v", size)
-	rootl, _ := fri_proof[len(fri_proof)-1].([][]byte)
+	rootl := proof.FriProof[len(proof.FriProof)-1].Root2
 	for i := 0; i < len(rootl); i++ {
 		size += len(rootl[i])
 	}

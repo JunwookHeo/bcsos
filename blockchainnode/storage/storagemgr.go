@@ -25,6 +25,7 @@ type StorageMgr struct {
 	db   dbagent.DBAgent
 	om   *ObjectMgr
 	cand *datalib.CandidateBlocks
+	ltb  int64 // Latest Time receiving a new block
 }
 
 var upgrader = websocket.Upgrader{
@@ -321,18 +322,23 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 	}
 	defer ws.Close()
 
-	var proof dtype.PoSProof
+	// var proof dtype.PoSProof
+	var proof dtype.NonInteractiveProof
 	if err := ws.ReadJSON(&proof); err != nil {
 		log.Printf("Read json error : %v", err)
 		return
 	}
 
-	start := h.db.GetLastBlockTime()
-	if (proof.Timestamp-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
-		log.Printf("Verify Proof : Time Exceed %v", (proof.Timestamp-start)/1000000)
+	start := h.ltb //h.db.GetLastBlockTime()
+	now := time.Now().UnixNano()
+	if (now-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+		log.Printf("Verify Proof : Time Exceed %v", (now-start)/1000000)
 		return
+	} else {
+		log.Printf("Receive Verify Proof : Time %v", (now-start)/1000000)
 	}
-	h.VerifyProofStorage(&proof)
+
+	h.VerifyNonInteractiveProofStorage(&proof)
 
 }
 
@@ -340,16 +346,20 @@ func (h *StorageMgr) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 	return h.db.GetRandomHeightForNConsecutiveBlocks(hash)
 }
 
-func (h *StorageMgr) GetNonInteractiveProof(hash string) *dtype.PoSProof {
-	return h.db.GetNonInteractiveProof(hash)
+func (h *StorageMgr) GetNonInteractiveStarksProof(hash string) *dtype.NonInteractiveProof {
+	return h.db.GetNonInteractiveStarksProof(hash)
 }
 
 func (h *StorageMgr) GetInteractiveProof(height int) *dtype.PoSProof {
 	return h.db.GetInteractiveProof(height)
 }
 
-func (h *StorageMgr) VerifyProofStorage(proof *dtype.PoSProof) bool {
-	return h.db.VerifyProofStorage(proof)
+func (h *StorageMgr) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
+	return h.db.VerifyInterActiveProofStorage(proof)
+}
+
+func (h *StorageMgr) VerifyNonInteractiveProofStorage(proof *dtype.NonInteractiveProof) bool {
+	return h.db.VerifyNonInterActiveProofStorage(proof)
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {
@@ -401,6 +411,9 @@ func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 }
 
 func (h *StorageMgr) AddNewBtcBlock(b *bitcoin.BlockPkt, hash string) {
+	h.ltb = time.Now().UnixNano()
+	log.Printf("Received Time new block : %v", h.ltb)
+	// Update time first and then add block
 	h.db.AddNewBlock(b)
 }
 
@@ -429,6 +442,7 @@ func StorageMgrInst(db_path string) *StorageMgr {
 			db:   dbagent.NewDBAgent(db_path),
 			om:   nil,
 			cand: datalib.NewCandidateBlocks(),
+			ltb:  time.Now().UnixNano(),
 		}
 		sm.om = NewObjMgr(sm.db)
 	})

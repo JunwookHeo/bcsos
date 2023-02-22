@@ -354,48 +354,13 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received New BTC Block : %v", hash)
 	go mi.BroadcastNewBtcBlock(&buf)
 
-	if config.PROOFSTORAGE_METHOD == "INTERACTIVE" {
-		go mi.requestInteractiveProof(hash)
-	} else {
-		go mi.nonInteractiveProofStorage(hash)
-	}
+	mi.requestProof(hash)
 
 	sm := storage.StorageMgrInst("")
 	sm.AddNewBtcBlock(&buf, hash)
 }
 
-// Non-interactive Proof of Storage
-func (mi *Mining) nonInteractiveProofStorage(hash string) {
-	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
-	nm := network.NodeMgrInst()
-	nm.GetSCNNodeListAll(&nodes)
-
-	ni := network.NodeInfoInst()
-	local := ni.GetLocalddr()
-
-	tmp, _ := hex.DecodeString(hash)
-	h1 := sha256.Sum256(tmp)
-	h2, _ := hex.DecodeString(local.Hash)
-
-	// Check address and hash
-	mask := byte(config.MASK_SELECT_POS_NODE) // compare 4-bit, so pos is performed avg. 16*T(block generation time)
-	log.Printf("check hash for Pos : %v-%v", h1[len(h1)-1]&mask, h2[len(h2)-1]&mask)
-	if h1[len(h1)-1]&mask != h2[len(h2)-1]&mask {
-		return
-	}
-
-	// Create a Proof
-	sm := storage.StorageMgrInst("")
-	proof := sm.GetNonInteractiveProof(hash)
-
-	// Broadcast the Proof
-	log.Printf("Non-interactive ProofStorage : %v", proof)
-	if proof != nil {
-		mi.broadcastNonInteractiveProof(proof)
-	}
-}
-
-func (mi *Mining) broadcastNonInteractiveProof(p *dtype.PoSProof) {
+func (mi *Mining) broadcastNonInteractiveProof(p *dtype.NonInteractiveProof) {
 	sendTransaction := func(node *dtype.NodeInfo) {
 		url := fmt.Sprintf("ws://%v:%v/noninteractiveproof", node.IP, node.Port)
 		//log.Printf("BroadcasTransaction to : %v", url)
@@ -426,20 +391,13 @@ func (mi *Mining) broadcastNonInteractiveProof(p *dtype.PoSProof) {
 }
 
 // Request Proof of Storage
-func (mi *Mining) requestInteractiveProof(hash string) {
-
-	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
-	nm := network.NodeMgrInst()
-	nm.GetSCNNodeListAll(&nodes)
-
+func (mi *Mining) requestProof(hash string) {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	ht, _ := hex.DecodeString(hash)
-	h1 := sha256.Sum256(ht)
-
-	ht, _ = hex.DecodeString(local.Hash)
-	h2 := sha256.Sum256(ht)
+	tmp, _ := hex.DecodeString(hash)
+	h1 := sha256.Sum256(tmp)
+	h2, _ := hex.DecodeString(local.Hash)
 
 	h2[len(h2)-1] = byte(local.Port & 0xFF)
 
@@ -450,19 +408,37 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 		return
 	}
 
+	if config.PROOFSTORAGE_METHOD == "INTERACTIVE" {
+		mi.requestInteractiveProof(hash)
+	} else {
+		mi.nonInteractiveProofStorage(hash)
+	}
+}
+
+// Non-interactive Proof of Storage
+func (mi *Mining) nonInteractiveProofStorage(hash string) {
+	// Create a Proof
+	sm := storage.StorageMgrInst("")
+	proof := sm.GetNonInteractiveStarksProof(hash)
+
+	// Broadcast the Proof
+	if proof != nil {
+		log.Printf("Non-interactive ProofStorage hash : %v", proof.Hash)
+		mi.broadcastNonInteractiveProof(proof)
+	}
+}
+
+func (mi *Mining) requestInteractiveProof(hash string) {
+	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
+	nm := network.NodeMgrInst()
+	nm.GetSCNNodeListAll(&nodes)
+
 	// Get target node for Proof of Storage
 	node := mi.GetTargetNodePoS(nodes)
 	if node == nil {
 		return
 	}
 	log.Printf("check node for Pos : %v-%v", node.IP, node.Port)
-
-	sm := storage.StorageMgrInst("")
-	height := sm.GetRandomHeightForNConsecutiveBlocks(hash)
-
-	if height == -1 {
-		return
-	}
 
 	url := fmt.Sprintf("ws://%v:%v/interactiveproof", node.IP, node.Port)
 	// log.Printf("Send ping with local info : %v", url)
@@ -473,6 +449,13 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 		return
 	}
 	defer ws.Close()
+
+	sm := storage.StorageMgrInst("")
+	height := sm.GetRandomHeightForNConsecutiveBlocks(hash)
+
+	if height == -1 {
+		return
+	}
 
 	req := dtype.ReqConsecutiveHashes{Height: height, Count: config.NUM_CONSECUTIVE_HASHES}
 	if err := ws.WriteJSON(req); err != nil {
@@ -497,7 +480,7 @@ func (mi *Mining) requestInteractiveProof(hash string) {
 		return
 	}
 
-	sm.VerifyProofStorage(&proof)
+	sm.VerifyInterActiveProofStorage(&proof)
 }
 
 func (mi *Mining) GetTargetNodePoS(nodes [config.MAX_SC * config.MAX_SC_PEER]dtype.NodeInfo) *dtype.NodeInfo {

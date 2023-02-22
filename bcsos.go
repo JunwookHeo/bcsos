@@ -350,7 +350,7 @@ func test_starks_prime_prekey() {
 		start = time.Now().UnixNano()
 		proof := f.GenerateStarksProofPreKey(vis, y, key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Generating Proof Time : %v, length : %v", tpro, len(proof))
+		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, proof.MerkleRoot)
 
 		// Start verification
 		start = time.Now().UnixNano()
@@ -361,7 +361,7 @@ func test_starks_prime_prekey() {
 			log.Panicf("Verification Fail : %v", ret)
 		}
 
-		proof_size := f.GetStarksProofPreKey(proof)
+		proof_size := f.GetSizeStarksProofPreKey(proof)
 		log.Printf("Proof Size : %v", proof_size)
 
 		start = time.Now().UnixNano()
