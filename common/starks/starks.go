@@ -310,7 +310,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 // Vis : Input values
 // Vos : Output values
 // key : Adress of Prover
-func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []interface{} {
+func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.StarksProof {
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	vosu := f.GFP.LoadUint256FromStream32(vos)
 	ks := f.GFP.LoadUint256FromKey(key)
@@ -492,20 +492,21 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) []inter
 	// log.Printf("augmented_positions : %v", augmented_positions)
 	// log.Printf("tree_l : %v", tree_l[1])
 
-	proof := make([]interface{}, 8)
-	proof[0] = m_root
-	proof[1] = [][]byte{tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
-	proof[2] = f.MakeMultiBranch(tree_vosu, augmented_positions)
-	proof[3] = f.MakeMultiBranch(tree_d, augmented_positions)
-	proof[4] = f.MakeMultiBranch(tree_b, augmented_positions)
-	proof[5] = f.MakeMultiBranch(tree_l, positions)
-	proof[6] = []*uint256.Int{vosu[0], vosu[f.steps-1]}
-	proof[7] = f.ProveLowDegree(eval_l, G2)
+	var proof dtype.StarksProof
+	// proof := make([]interface{}, 8)
+	proof.MerkleRoot = m_root
+	proof.TreeRoots = [][]byte{tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
+	proof.TreeVosu = f.MakeMultiBranch(tree_vosu, augmented_positions)
+	proof.TreeD = f.MakeMultiBranch(tree_d, augmented_positions)
+	proof.TreeB = f.MakeMultiBranch(tree_b, augmented_positions)
+	proof.TreeL = f.MakeMultiBranch(tree_l, positions)
+	proof.VosuFl = []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	proof.FriProof = f.ProveLowDegree(eval_l, G2)
 
-	return proof
+	return &proof
 }
 
-func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof []interface{}) bool {
+func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksProof) bool {
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	ks := f.GFP.LoadUint256FromKey(key)
 	log.Printf("Length of Inputs : ks(%v), vi(%v)", len(ks), len(visu))
@@ -538,14 +539,14 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof []interface{}) 
 	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G2, f.GFP.Mul(uint256.NewInt(uint64(f.extFactor)), uint256.NewInt(uint64(skip2)))))
 	// log.Printf("poly_key %v", len(poly_key))
 
-	m_root, _ := proof[0].([]byte)
-	tree_roots, _ := proof[1].([][]byte)
-	tree_vosu, _ := proof[2].([][][]byte)
-	tree_d, _ := proof[3].([][][]byte)
-	tree_b, _ := proof[4].([][][]byte)
-	tree_l, _ := proof[5].([][][]byte)
-	vosu_fl, _ := proof[6].([]*uint256.Int)
-	// fri_proof, _ := proof[7].([]interface{})
+	m_root := proof.MerkleRoot
+	tree_roots := proof.TreeRoots
+	tree_vosu := proof.TreeVosu
+	tree_d := proof.TreeD
+	tree_b := proof.TreeB
+	tree_l := proof.TreeL
+	vosu_fl := proof.VosuFl
+	fri_proof := proof.FriProof
 
 	// Verify root of trees
 	// tree_roots = {tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
@@ -559,10 +560,10 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof []interface{}) 
 		return false
 	}
 
-	// if !f.VerifyLowDegreeProof(tree_roots[3], fri_proof, G2) {
-	// 	log.Printf("Low Degree Testing Fail")
-	// 	return false
-	// }
+	if !f.VerifyLowDegreeProof(tree_roots[3], fri_proof, G2) {
+		log.Printf("Low Degree Testing Fail")
+		return false
+	}
 
 	// L(x) : Linear combination
 	k1 := uint256.NewInt(0)

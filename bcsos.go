@@ -274,7 +274,7 @@ func test_starks_prime() {
 		start = time.Now().UnixNano()
 		proof := f.GenerateStarksProof(x, y, key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Generating Proof Time : %v, length : %v", tpro, len(proof))
+		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, proof.MerkleRoot)
 
 		// Start verification
 		start = time.Now().UnixNano()
@@ -299,7 +299,7 @@ func test_starks_prime() {
 		}
 
 		// key = y
-		return
+		// return
 	}
 	close(msg)
 }
