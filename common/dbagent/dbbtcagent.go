@@ -614,7 +614,7 @@ func (a *btcdbagent) VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiv
 	{
 		a.mutex.Lock()
 		status := &a.dbstatus
-		status.TimeVerifyRev += gap
+		status.TimeVerifyFwd += gap
 		a.mutex.Unlock()
 	}
 
