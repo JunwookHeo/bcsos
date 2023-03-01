@@ -378,7 +378,7 @@ func test_starks_prime_prekey() {
 		}
 
 		key = y
-		// return
+		return
 	}
 	close(msg)
 }

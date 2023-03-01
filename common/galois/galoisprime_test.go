@@ -346,6 +346,45 @@ func TestGFPLagrangeInterp(t *testing.T) {
 	log.Printf("lp : %v", tm1/1000000)
 }
 
+// Set prime with 257
+func TestGFPExtRootUnityGF257(t *testing.T) {
+	gf := NewGFP()
+	g := gf.Prime.Clone()
+	g.Sub(g, uint256.NewInt(1))
+	g.Div(g, uint256.NewInt(32))
+	G2 := gf.Exp(uint256.NewInt(7), g)
+
+	tm1 := int64(0)
+
+	log.Printf("g2 : %v", G2)
+	start := time.Now().UnixNano()
+	_, xs1 := gf.ExtRootUnity(G2, false)
+	end := time.Now().UnixNano()
+	log.Printf("G2 : %v", xs1)
+	tm1 = end - start
+
+	G1 := gf.Exp(G2, uint256.NewInt(4))
+	log.Printf("g1 : %v", G1)
+	start = time.Now().UnixNano()
+	size1, xs2 := gf.ExtRootUnity(G1, false)
+	end = time.Now().UnixNano()
+	log.Printf("G1 : %v", xs2)
+	tm1 += end - start
+
+	rand.Seed(time.Now().UnixMilli())
+	ys := make([]*uint256.Int, size1-1)
+	for j := 0; j < size1-1; j++ {
+		r := rand.Uint64() % gf.Prime.Uint64()
+		ys[j] = uint256.NewInt(r)
+	}
+	log.Printf("Ys : %v", ys)
+	poly := gf.IDFT(ys, G1)
+	eval_y := gf.DFT(poly, G2)
+	log.Printf("Evaluation : %v", eval_y)
+
+	log.Printf("lp : %v", tm1/1000000)
+}
+
 func TestGFPExtRootUnity(t *testing.T) {
 	gf := NewGFP()
 	g := gf.Prime.Clone()

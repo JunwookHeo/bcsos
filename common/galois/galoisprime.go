@@ -27,7 +27,7 @@ func NewGFP() *GFP {
 	p.Sub(p, p1)
 	p.Add(p, big.NewInt(1))
 	size := p.BitLen()
-	// p.Set(big.NewInt(17))
+	// p.Set(big.NewInt(257))
 
 	// log.Printf("Prime : %x", p)
 	prime, _ := uint256.FromBig(p)
