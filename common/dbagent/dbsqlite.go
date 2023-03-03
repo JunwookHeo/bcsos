@@ -651,7 +651,7 @@ func (a *dbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 	return false
 }
 
-func (a *dbagent) VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiveProof) bool {
+func (a *dbagent) VerifyNonInterActiveProofStorage(tlb int64, trb int64, trp int64, proof *dtype.NonInteractiveProof) bool {
 	return false
 }
 

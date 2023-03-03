@@ -27,7 +27,7 @@ type DBAgent interface {
 	UpdateDBNetworkDelay(addtime int, hop int)
 	GetNonInteractiveStarksProof(hash string) *dtype.NonInteractiveProof
 	VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool
-	VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiveProof) bool
+	VerifyNonInterActiveProofStorage(tlb int64, trb int64, trp int64, proof *dtype.NonInteractiveProof) bool
 	GetInteractiveProof(height int) *dtype.PoSProof
 	GetRandomHeightForNConsecutiveBlocks(hash string) int
 	GetLastBlockTime() int64

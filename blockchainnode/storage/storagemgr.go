@@ -338,7 +338,7 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 		log.Printf("Receive Verify Proof : Time %v", (now-start)/1000000)
 	}
 
-	h.VerifyNonInteractiveProofStorage(&proof)
+	h.VerifyNonInteractiveProofStorage(h.db.GetLastBlockTime(), start, now, &proof)
 
 }
 
@@ -358,8 +358,8 @@ func (h *StorageMgr) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 	return h.db.VerifyInterActiveProofStorage(proof)
 }
 
-func (h *StorageMgr) VerifyNonInteractiveProofStorage(proof *dtype.NonInteractiveProof) bool {
-	return h.db.VerifyNonInterActiveProofStorage(proof)
+func (h *StorageMgr) VerifyNonInteractiveProofStorage(tlb, trb, trp int64, proof *dtype.NonInteractiveProof) bool {
+	return h.db.VerifyNonInterActiveProofStorage(tlb, trb, trp, proof)
 }
 
 func (h *StorageMgr) ObjectbyAccessPatternProc() {

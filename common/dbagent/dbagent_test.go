@@ -254,5 +254,5 @@ func TestBtcDBAgentPoS(t *testing.T) {
 	// rest := fri_proof[len(fri_proof)-1].([][]byte)
 
 	// log.Printf("Proof : %v", rp)
-	ag.VerifyNonInterActiveProofStorage(proof)
+	ag.VerifyNonInterActiveProofStorage(0, 0, 0, proof)
 }

@@ -61,6 +61,7 @@ type FriProofElement struct {
 }
 
 type StarksProof struct {
+	RandomHash string
 	MerkleRoot []byte
 	TreeRoots  [][]byte
 	TreeVosu   [][][]byte

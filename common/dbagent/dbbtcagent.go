@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"hash/fnv"
 	"io/ioutil"
 	"log"
 	"os"
@@ -54,11 +53,14 @@ type btcDBProof struct {
 }
 
 type btcDBVerif struct {
-	Timestamp    time.Time
-	VerifHeight  int
-	VerifBlock   string
-	TimeVerifFwd int
-	TimeVerifRev int
+	Timestamp        time.Time
+	VerifHeight      int
+	VerifBlock       string
+	TimeVerifFwd     int
+	TimeVerifRev     int
+	TimeLastBlock    int64
+	TimeRcvLastBlock int64
+	TimeRcvPoS       int64
 }
 
 type btcdbagent struct {
@@ -286,12 +288,6 @@ func (a *btcdbagent) getEncryptInfoWithHash(hash string) *btcBlock {
 // 	return x
 // }
 
-func hashToUint32(b []byte) uint32 {
-	h := fnv.New32a()
-	h.Write(b)
-	return h.Sum32()
-}
-
 // height : the start height of n-consecutive encrypted blocks
 func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	// List up the encrypted block hash and key hash of encrypted blocks
@@ -316,7 +312,7 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	// select a block using the merkle root
 	proof.Root = blockchain.CalMerkleRootHash(hashroots)
 	// randomize block selection. exclude the last block for forward verification
-	proof.Selected = int(hashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES-1))
+	proof.Selected = int(poscipher.HashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES-1))
 	proof.Hash = bis[proof.Selected].hash
 	log.Printf("Proof selected : %v - %v", proof.Selected, proof.Hash)
 
@@ -351,7 +347,7 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 }
 
 // height : the start height of n-consecutive encrypted blocks
-func (a *btcdbagent) generateStarksProof(height int) *dtype.NonInteractiveProof {
+func (a *btcdbagent) generateStarksProof(height int, hash string) *dtype.NonInteractiveProof {
 	start := time.Now().UnixNano()
 
 	bi := a.getEncryptInfoWithHeight(height)
@@ -375,7 +371,7 @@ func (a *btcdbagent) generateStarksProof(height int) *dtype.NonInteractiveProof 
 	vis := a.decryptPoSWithVariableLength(key, cb)
 
 	f := starks.NewStarks(65536 / 8 / 4)
-	starks_proof := f.GenerateStarksProofPreKey(vis, cb, key)
+	starks_proof := f.GenerateStarksProofPreKey(hash, vis, cb, key)
 	proof_size := f.GetSizeStarksProofPreKey(starks_proof)
 	gap := int(time.Now().UnixNano() - start)
 	{
@@ -411,8 +407,8 @@ func (a *btcdbagent) GetRandomHeightForNConsecutiveBlocks(hash string) int {
 	// Select block
 	tmp, _ := hex.DecodeString(hash)
 	hb := sha256.Sum256(tmp)
-	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-(config.NUM_CONSECUTIVE_HASHES+1)) // margin 10 blocks
-	ri += 1                                                                                  // Exclude genesys block
+	ri := poscipher.HashToUint32(hb[:]) % uint32(a.lastblock.height-(config.NUM_CONSECUTIVE_HASHES+1)) // margin 10 blocks
+	ri += 1                                                                                            // Exclude genesys block
 	log.Printf("Block selector : %v", ri)
 
 	return int(ri)
@@ -427,10 +423,9 @@ func (a *btcdbagent) getRandomHeightForProofBlocks(hash string) int {
 		return -1
 	}
 	// Select block
-	tmp, _ := hex.DecodeString(hash)
-	hb := sha256.Sum256(tmp)
-	ri := hashToUint32(hb[:]) % uint32(a.lastblock.height-1) // margin 10 blocks
-	ri += 1                                                  // Exclude genesys block
+	ri := poscipher.GetRandIntFromHash(hash) % int(a.lastblock.height-1) // margin 10 blocks
+
+	ri += 1 // Exclude genesys block
 	log.Printf("Block selector : %v - max : %v", ri, a.lastblock.height)
 
 	return int(ri)
@@ -444,7 +439,7 @@ func (a *btcdbagent) GetNonInteractiveStarksProof(hash string) *dtype.NonInterac
 		return nil
 	}
 
-	return a.generateStarksProof(int(ri))
+	return a.generateStarksProof(int(ri), hash)
 }
 
 func (a *btcdbagent) GetInteractiveProof(height int) *dtype.PoSProof {
@@ -568,6 +563,7 @@ func (a *btcdbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 		a.mutex.Unlock()
 	}
 
+	dbverif.TimeRcvPoS = start
 	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
 	ret2 := a.verifyInterActiveProofStorage_Fwd(proof)
@@ -584,7 +580,7 @@ func (a *btcdbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 	return ret1 && ret2
 }
 
-func (a *btcdbagent) VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiveProof) bool {
+func (a *btcdbagent) VerifyNonInterActiveProofStorage(tlb int64, trb int64, trp int64, proof *dtype.NonInteractiveProof) bool {
 	addr := proof.Address
 	hash := proof.Hash
 	starks_proof := proof.Starks
@@ -599,6 +595,9 @@ func (a *btcdbagent) VerifyNonInterActiveProofStorage(proof *dtype.NonInteractiv
 	dbverif := btcDBVerif{}
 	dbverif.VerifBlock = bi.hash
 	dbverif.VerifHeight = bi.height
+	dbverif.TimeLastBlock = tlb
+	dbverif.TimeRcvLastBlock = trb
+	dbverif.TimeRcvPoS = trp
 
 	b := a.getDecryptBlock(bi)
 	if b == nil {
@@ -770,19 +769,19 @@ func (a *btcdbagent) updateDBProof(dbproof *btcDBProof) {
 func (a *btcdbagent) updateDBVerif(dbverif *btcDBVerif) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev) VALUES ( datetime('now'), ?, ?, ?, ?)`)
+	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev, timelastblock, timercvlastblock, timercvpos) VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		log.Printf("Prepare adding veriftbl error : %v", err)
 		return
 	}
 	defer st.Close()
 
-	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
+	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeLastBlock, dbverif.TimeRcvLastBlock, dbverif.TimeRcvPoS)
 	if err != nil {
 		log.Panicf("Exec adding veriftbl error : %v", err)
 		return
 	}
-	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
+	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeLastBlock, dbverif.TimeRcvLastBlock, dbverif.TimeRcvPoS)
 }
 
 func newDBBtcSqlite(path string) DBAgent {
@@ -855,7 +854,10 @@ func newDBBtcSqlite(path string) DBAgent {
 		verifheight			INTEGER,
 		verifblock			TEXT,
 		timeveriffwd		INTEGER,
-		timeverifrev		INTEGER
+		timeverifrev		INTEGER,
+		timelastblock		INTEGER,
+		timercvlastblock	INTEGER,
+		timercvpos			INTEGER
 	);`
 
 	st, err = db.Prepare(create_veriftbl)

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"hash/fnv"
 	"log"
 	"math/big"
 
@@ -413,4 +414,16 @@ func DecryptPoSWithPrimeFieldPreKey(key, s []byte) []byte {
 	}
 
 	return buf.Bytes()
+}
+
+func HashToUint32(b []byte) uint32 {
+	h := fnv.New32a()
+	h.Write(b)
+	return h.Sum32()
+}
+
+func GetRandIntFromHash(hash string) int {
+	tmp, _ := hex.DecodeString(hash)
+	hb := sha256.Sum256(tmp)
+	return int(HashToUint32(hb[:]))
 }

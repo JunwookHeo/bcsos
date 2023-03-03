@@ -11,6 +11,7 @@ import (
 	"github.com/junwookheo/bcsos/common/blockchain"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/galois"
+	"github.com/junwookheo/bcsos/common/poscipher"
 )
 
 type starks struct {
@@ -672,10 +673,13 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 	return true
 }
 
+// hash : random seed to calculate starting point
 // Vis : Input values
 // Vos : Output values
 // key : Adress of Prover
-func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *dtype.StarksProof {
+func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, key []byte) *dtype.StarksProof {
+	si := poscipher.GetRandIntFromHash(hash)
+
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	vosu := f.GFP.LoadUint256FromStream32(vos)
 	ks := f.GFP.LoadUint256FromStream32(key)
@@ -699,6 +703,13 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 		ks = append(ks, uint256.NewInt(0))
 	}
 
+	if len(visu) > f.steps {
+		si = si % (len(visu) - f.steps)
+	} else {
+		si = 0
+	}
+	log.Printf("Starting position : %v", si)
+
 	precision := f.steps * f.extFactor
 	skips := precision / f.steps
 	log.Printf("precision : %v, skips : %v", precision, skips)
@@ -712,7 +723,7 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 	// log.Printf("G1 : %v", G1)
 
 	// Vi(x)
-	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
+	poly_visu := f.GFP.IDFT(visu[si:f.steps+si], G1)
 	eval_visu := f.GFP.DFT(poly_visu, G2)
 	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
 	// for i := 0; i < 10; i++ {
@@ -720,7 +731,7 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 	// }
 
 	// Vo(x)
-	poly_vosu := f.GFP.IDFT(vosu[0:f.steps], G1)
+	poly_vosu := f.GFP.IDFT(vosu[si:f.steps+si], G1)
 	eval_vosu := f.GFP.DFT(poly_vosu, G2)
 	// log.Printf("vosu : %v, %v", len(poly_vosu), len(eval_vosu))
 	// for i := 0; i < 10; i++ {
@@ -728,7 +739,7 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 	// }
 
 	// K(x)
-	poly_key := f.GFP.IDFT(ks[0:f.steps], G1)
+	poly_key := f.GFP.IDFT(ks[si:f.steps+si], G1)
 	eval_key := f.GFP.DFT(poly_key, G2)
 	// log.Printf("skip for key : %v", len(eval_key))
 
@@ -737,6 +748,9 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 	eval_cp := make([]*uint256.Int, precision)
 	pre := uint256.NewInt(1)
+	if si > 0 {
+		pre = vosu[si-1]
+	}
 	for i := 0; i < precision; i++ {
 		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
 		c = f.GFP.Mul(c, pre)
@@ -779,7 +793,7 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 	// Compute polynomial for Vos
 	// Compute interpolant of ((1, input), (x_atlast_step, output))
 	xos := []*uint256.Int{xs[0], xs[(f.steps-1)*f.extFactor]}
-	yos := []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	yos := []*uint256.Int{vosu[si], vosu[si+f.steps-1]}
 
 	// Io(x)
 	poly_io := f.GFP.LagrangeInterp(xos, yos)
@@ -869,6 +883,7 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 
 	// proof := make([]interface{}, 9)
 	var proof dtype.StarksProof
+	proof.RandomHash = hash
 	proof.MerkleRoot = m_root
 	proof.TreeRoots = [][]byte{tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}
 	proof.TreeVosu = f.MakeMultiBranch(tree_vosu, augmented_positions)
@@ -876,7 +891,7 @@ func (f *starks) GenerateStarksProofPreKey(vis []byte, vos []byte, key []byte) *
 	proof.TreeD = f.MakeMultiBranch(tree_d, augmented_positions)
 	proof.TreeB = f.MakeMultiBranch(tree_b, augmented_positions)
 	proof.TreeL = f.MakeMultiBranch(tree_l, positions)
-	proof.VosuFl = []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	proof.VosuFl = []*uint256.Int{vosu[si], vosu[si+f.steps-1]}
 	proof.FriProof = f.ProveLowDegree(eval_l, G2)
 
 	return &proof
@@ -902,20 +917,19 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	// log.Printf("G1 : %v", G1)
 
+	si := poscipher.GetRandIntFromHash(proof.RandomHash)
+	if len(visu) > f.steps {
+		si = si % (len(visu) - f.steps)
+	} else {
+		si = 0
+	}
+
+	log.Printf("Starting position : %v", si)
+
 	// Vi(x)
-	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
+	poly_visu := f.GFP.IDFT(visu[si:si+f.steps], G1)
 	eval_visu := f.GFP.DFT(poly_visu, G2)
 	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
-
-	// m_root, _ := proof.MerkleRoot
-	// tree_roots, _ := proof[1].([][]byte)
-	// tree_vosu, _ := proof[2].([][][]byte)
-	// tree_key, _ := proof[3].([][][]byte)
-	// tree_d, _ := proof[4].([][][]byte)
-	// tree_b, _ := proof[5].([][][]byte)
-	// tree_l, _ := proof[6].([][][]byte)
-	// vosu_fl, _ := proof[7].([]*uint256.Int)
-	// fri_proof, _ := proof[8].([]interface{})
 
 	// Verify root of trees
 	// tree_roots = {tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}

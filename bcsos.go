@@ -337,6 +337,11 @@ func test_starks_prime_prekey() {
 
 		rb := bitcoin.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
+
+		block := bitcoin.NewBlock()
+		block.SetHash(rb.GetRawBytes(0, 80))
+		hash := block.GetHashString()
+
 		// log.Printf("Block : %v", x[:80])
 
 		// Start Encryption
@@ -348,7 +353,7 @@ func test_starks_prime_prekey() {
 
 		// Start generating proof
 		start = time.Now().UnixNano()
-		proof := f.GenerateStarksProofPreKey(vis, y, key)
+		proof := f.GenerateStarksProofPreKey(hash, vis, y, key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, proof.MerkleRoot)
 
@@ -378,7 +383,7 @@ func test_starks_prime_prekey() {
 		}
 
 		key = y
-		return
+		// return
 	}
 	close(msg)
 }

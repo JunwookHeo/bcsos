@@ -33,3 +33,5 @@ blocks_720.json
 python_utils/*.png
 ppos*.csv
 doc/
+MLDC_*/
+PoS_*/
