@@ -354,22 +354,14 @@ func TestGFPExtRootUnityGF257(t *testing.T) {
 	g.Div(g, uint256.NewInt(32))
 	G2 := gf.Exp(uint256.NewInt(7), g)
 
-	tm1 := int64(0)
-
 	log.Printf("g2 : %v", G2)
-	start := time.Now().UnixNano()
 	_, xs1 := gf.ExtRootUnity(G2, false)
-	end := time.Now().UnixNano()
 	log.Printf("G2 : %v", xs1)
-	tm1 = end - start
 
 	G1 := gf.Exp(G2, uint256.NewInt(4))
 	log.Printf("g1 : %v", G1)
-	start = time.Now().UnixNano()
 	size1, xs2 := gf.ExtRootUnity(G1, false)
-	end = time.Now().UnixNano()
 	log.Printf("G1 : %v", xs2)
-	tm1 += end - start
 
 	rand.Seed(time.Now().UnixMilli())
 	ys := make([]*uint256.Int, size1-1)
@@ -382,7 +374,12 @@ func TestGFPExtRootUnityGF257(t *testing.T) {
 	eval_y := gf.DFT(poly, G2)
 	log.Printf("Evaluation : %v", eval_y)
 
-	log.Printf("lp : %v", tm1/1000000)
+	ys[7] = gf.Add(ys[7], uint256.NewInt(1))
+	log.Printf("Ys : %v", ys)
+	poly2 := gf.IDFT(ys, G1)
+	eval_y2 := gf.DFT(poly2, G2)
+	log.Printf("Evaluation : %v", eval_y2)
+
 }
 
 func TestGFPExtRootUnity(t *testing.T) {

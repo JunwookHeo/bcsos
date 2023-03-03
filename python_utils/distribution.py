@@ -57,6 +57,22 @@ def exponential_distribution():
     plt.tick_params(labelsize=14)    
     plt.savefig("AccessPatterns.png") 
     plt.show()
+
+def probability_detecting(p):
     
+    c = []
+    t = 1
+    for i in range(100):
+        t = t*p
+        c.append(t)
+        print(i+1, t)
+
+    print("P=", p)
+    plt.plot(c)
+    plt.show()
+
+
 # exponential_select()
-exponential_distribution()
+# exponential_distribution()
+p = 1. - (31*2048/1000000.)*3
+probability_detecting(p)
