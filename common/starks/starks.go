@@ -257,7 +257,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 
 	for i := 0; i < len(proof)-1; i++ {
 		roudeg = roudeg / 4
-		log.Printf("Verify values with length : %v", roudeg)
+		// log.Printf("Verify values with length : %v", roudeg)
 		// p := proof[i].([]interface{})
 		root2 := proof[i].Root2[0]
 		cbranch := proof[i].CBranch

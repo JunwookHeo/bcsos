@@ -22,6 +22,7 @@ import (
 )
 
 type RcvBlockTime struct {
+	GenTime int64
 	RcvTime int64
 	Hash    string
 }
@@ -335,17 +336,17 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 	}
 
 	if proof.Starks.RandomHash == h.ltb.Hash {
-
 		start := h.ltb.RcvTime //h.db.GetLastBlockTime()
-		now := time.Now().UnixNano()
-		if (now-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
-			log.Printf("Verify Proof : Time Exceed %v", (now-start)/1000000)
+		current := time.Now().UnixNano()
+		log.Printf("Event Proof Time : T1:%v, T2:%v, T3:%v", (h.ltb.RcvTime-h.ltb.GenTime)/1000000, (current-h.ltb.GenTime)/1000000, (current-h.ltb.RcvTime)/1000000)
+		if (current-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+			log.Printf("Verify Proof : Time Exceed %v", (current-start)/1000000)
 			return
 		} else {
-			log.Printf("Receive Verify Proof : Time %v", (now-start)/1000000)
+			log.Printf("Receive Verify Proof : Time %v", (current-start)/1000000)
 		}
 
-		h.VerifyNonInteractiveProofStorage(h.db.GetLastBlockTime(), start, now, &proof)
+		h.VerifyNonInteractiveProofStorage(h.ltb.GenTime, start, current, &proof)
 	} else {
 		log.Panicf("hash mismatching, %v, %v", proof.Starks.RandomHash, h.ltb.Hash)
 	}
@@ -422,8 +423,10 @@ func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 
 func (h *StorageMgr) AddNewBtcBlock(b *bitcoin.BlockPkt, hash string) {
 	h.ltb.RcvTime = time.Now().UnixNano()
+	h.ltb.GenTime = b.Timestamp
 	h.ltb.Hash = hash
-	log.Printf("Received Time new block : %v", h.ltb)
+
+	log.Printf("Received Time new block : %v ms", (h.ltb.RcvTime-b.Timestamp)/1000000)
 
 	// Update time first and then add block
 	h.db.AddNewBlock(b)
