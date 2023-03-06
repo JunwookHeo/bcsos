@@ -21,11 +21,16 @@ import (
 	"github.com/junwookheo/bcsos/common/listener"
 )
 
+type RcvBlockTime struct {
+	RcvTime int64
+	Hash    string
+}
+
 type StorageMgr struct {
 	db   dbagent.DBAgent
 	om   *ObjectMgr
 	cand *datalib.CandidateBlocks
-	ltb  int64 // Latest Time receiving a new block
+	ltb  RcvBlockTime // Latest Time receiving a new block
 }
 
 var upgrader = websocket.Upgrader{
@@ -329,16 +334,21 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	start := h.ltb //h.db.GetLastBlockTime()
-	now := time.Now().UnixNano()
-	if (now-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
-		log.Printf("Verify Proof : Time Exceed %v", (now-start)/1000000)
-		return
-	} else {
-		log.Printf("Receive Verify Proof : Time %v", (now-start)/1000000)
-	}
+	if proof.Starks.RandomHash == h.ltb.Hash {
 
-	h.VerifyNonInteractiveProofStorage(h.db.GetLastBlockTime(), start, now, &proof)
+		start := h.ltb.RcvTime //h.db.GetLastBlockTime()
+		now := time.Now().UnixNano()
+		if (now-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+			log.Printf("Verify Proof : Time Exceed %v", (now-start)/1000000)
+			return
+		} else {
+			log.Printf("Receive Verify Proof : Time %v", (now-start)/1000000)
+		}
+
+		h.VerifyNonInteractiveProofStorage(h.db.GetLastBlockTime(), start, now, &proof)
+	} else {
+		log.Panicf("hash mismatching, %v, %v", proof.Starks.RandomHash, h.ltb.Hash)
+	}
 
 }
 
@@ -411,8 +421,10 @@ func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 }
 
 func (h *StorageMgr) AddNewBtcBlock(b *bitcoin.BlockPkt, hash string) {
-	h.ltb = time.Now().UnixNano()
+	h.ltb.RcvTime = time.Now().UnixNano()
+	h.ltb.Hash = hash
 	log.Printf("Received Time new block : %v", h.ltb)
+
 	// Update time first and then add block
 	h.db.AddNewBlock(b)
 }
@@ -437,12 +449,14 @@ func StorageMgrInst(db_path string) *StorageMgr {
 		return sm
 	}
 
+	ltb := RcvBlockTime{time.Now().UnixNano(), ""}
+
 	once.Do(func() {
 		sm = &StorageMgr{
 			db:   dbagent.NewDBAgent(db_path),
 			om:   nil,
 			cand: datalib.NewCandidateBlocks(),
-			ltb:  time.Now().UnixNano(),
+			ltb:  ltb,
 		}
 		sm.om = NewObjMgr(sm.db)
 	})
