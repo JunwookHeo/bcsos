@@ -452,7 +452,7 @@ func StorageMgrInst(db_path string) *StorageMgr {
 		return sm
 	}
 
-	ltb := RcvBlockTime{time.Now().UnixNano(), ""}
+	ltb := RcvBlockTime{0, time.Now().UnixNano(), ""}
 
 	once.Do(func() {
 		sm = &StorageMgr{
