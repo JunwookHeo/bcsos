@@ -178,28 +178,41 @@ func test_encypt_decrypt_prime() {
 }
 
 func test_fri_prove_low_degree() {
-	length := 65536 / 4
+	length := 65536 /// 4
 
 	f := starks.NewStarks(length / 8)
 
 	tm1 := int64(0)
 	tm2 := int64(0)
 
+	rand.Seed(time.Now().UnixNano())
 	N := 1
 	for i := 0; i < N; i++ {
-		ys := make([]*uint256.Int, length)
-		for j := 0; j < len(ys); j++ {
-			r := rand.Int63()
-			ys[j] = uint256.NewInt(uint64(r))
-		}
-
 		g := f.GFP.Prime.Clone()
 		g.Sub(g, uint256.NewInt(1))
 		g.Div(g, uint256.NewInt(uint64(length)))
-		g1 := f.GFP.Exp(uint256.NewInt(7), g)
+		g2 := f.GFP.Exp(uint256.NewInt(7), g)
+		log.Printf("g1 : %v", g2)
+
+		yss := make([]*uint256.Int, length/8)
+		yss2 := make([]*uint256.Int, length/8)
+		for j := 0; j < len(yss); j++ {
+			r := rand.Int63()
+			yss[j] = uint256.NewInt(uint64(r))
+			r = rand.Int63()
+			yss2[j] = uint256.NewInt(uint64(r))
+		}
+
+		ys := f.GFP.DFT(yss, g2)
+		ys2 := f.GFP.DFT(yss2, g2)
+		for j := 0; j < len(ys); j++ {
+			// r := rand.Int63()
+			ys[j] = f.GFP.Div(ys[j], ys2[j])
+			// ys[j] = f.GFP.Sub(ys[j], uint256.NewInt(uint64(600)))
+		}
 
 		start := time.Now().UnixNano()
-		proof := f.ProveLowDegree(ys, g1)
+		proof := f.ProveLowDegree(ys, g2)
 		end := time.Now().UnixNano()
 		tm1 += end - start
 		log.Printf("size of Proof : %v, %v", len(proof), tm1/1000000)
@@ -207,7 +220,7 @@ func test_fri_prove_low_degree() {
 		m1 := f.Merklize(ys)
 
 		start = time.Now().UnixNano()
-		eval := f.VerifyLowDegreeProof(m1[1], proof, g1)
+		eval := f.VerifyLowDegreeProof(m1[1], proof, g2)
 		end = time.Now().UnixNano()
 		tm2 += end - start
 		log.Printf("Eval : %v", eval)
@@ -220,11 +233,11 @@ func test_fri_prove_low_degree() {
 			ys[findx] = f.GFP.Add(ys[findx], uint256.NewInt(1))
 
 			m2 := f.Merklize(ys)
-			eval = f.VerifyLowDegreeProof(m2[1], proof, g1)
+			eval = f.VerifyLowDegreeProof(m2[1], proof, g2)
 			log.Printf("Eval Fake : %v", eval)
 
-			proof = f.ProveLowDegree(ys, g1)
-			eval = f.VerifyLowDegreeProof(m1[1], proof, g1)
+			proof = f.ProveLowDegree(ys, g2)
+			eval = f.VerifyLowDegreeProof(m1[1], proof, g2)
 			log.Printf("Eval Fake : %v", eval)
 		}
 	}
@@ -246,7 +259,7 @@ func test_starks_prime() {
 	tpro := int64(0)
 	tver := int64(0)
 
-	f := starks.NewStarks(65536 / 8)
+	f := starks.NewStarks(65536 / 8 / 4)
 
 	for {
 		d, ok := <-msg
@@ -261,7 +274,10 @@ func test_starks_prime() {
 
 		rb := bitcoin.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
-		// log.Printf("Block : %v", x[:80])
+		log.Printf("Block len : %v", len(x))
+		if len(x) < 64000 {
+			continue
+		}
 
 		// Start Encryption
 		start := time.Now().UnixNano()
@@ -269,6 +285,8 @@ func test_starks_prime() {
 		_, y := poscipher.EncryptPoSWithPrimeField(key, x)
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
+		// y[100] += 100
+		// y[9] += 100
 
 		// Start generating proof
 		start = time.Now().UnixNano()
@@ -322,7 +340,7 @@ func test_starks_prime_prekey() {
 	tpro := int64(0)
 	tver := int64(0)
 
-	f := starks.NewStarks(65536 / 8 / 4)
+	f := starks.NewStarks(65536 / 8)
 
 	for loop := 0; ; loop++ {
 		d, ok := <-msg
@@ -388,6 +406,114 @@ func test_starks_prime_prekey() {
 	close(msg)
 }
 
+func test_error_1byte_detect_starks() {
+	const PATH_TEST = "./blocks_720.json"
+	w := wallet.NewWallet("blocks.json.wallet")
+	addr := w.PublicKey
+	key := make([]byte, 0, len(addr)*32)
+	for i := 0; i < len(addr); i++ {
+		t := uint256.NewInt(uint64(addr[i])).Bytes32()
+		key = append(key, t[:]...)
+	}
+
+	rand.Seed(time.Now().Local().UnixNano())
+
+	msg := make(chan bitcoin.BlockPkt)
+	go simulation.LoadBtcData(PATH_TEST, msg)
+
+	step := 65536 / 8 / 4
+	f := starks.NewStarks(step)
+
+	det := 0
+	inc := 0
+	sizex := 0
+	sizey := 0
+	loop := 0
+
+	for {
+		d, ok := <-msg
+		if !ok {
+			log.Println("Channle closed")
+			break
+		}
+
+		if d.Block == config.END_TEST {
+			break
+		}
+
+		rb := bitcoin.NewRawBlock(d.Block)
+		x := rb.GetBlockBytes()
+
+		block := bitcoin.NewBlock()
+		block.SetHash(rb.GetRawBytes(0, 80))
+		hash := block.GetHashString()
+
+		// log.Printf("Block : %v", x[:80])
+		sizex += len(x)
+
+		// Start Encryption
+		vis := poscipher.CalculateXorWithAddress(addr, x)
+		_, y := poscipher.EncryptPoSWithPrimeFieldPreKey(key, vis)
+
+		sizey += len(y)
+
+		// Start generating proof
+		pos := rand.Intn(len(y))
+		y[pos] += 1
+		proof := f.GenerateStarksProofPreKey(hash, vis, y, key)
+
+		// Start verification
+		ret := f.VerifyStarksProofPreKey(vis, proof)
+		if !ret {
+			log.Printf("Verification Fail : %v", ret)
+		}
+
+		proof_size := f.GetSizeStarksProofPreKey(proof)
+		log.Printf("Proof Size : %v", proof_size)
+
+		// x_t := poscipher.DecryptPoSWithPrimeFieldPreKey(key, y)
+		// x_o := poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
+		// log.Printf("Decryption Time : %v", tdec)
+
+		log.Printf("Block # %v", loop)
+		log.Printf("Error position : %v-%v", pos, len(y))
+		si := poscipher.GetRandIntFromHash(hash)
+		visu := f.GFP.LoadUint256FromStream31(vis)
+		// vosu := f.GFP.LoadUint256FromStream32(y)
+		if len(visu) > f.GetSteps() {
+			si = si % (len(visu) - f.GetSteps())
+		} else {
+			si = 0
+		}
+
+		log.Printf("Starks position : %v", si)
+		included := false
+		if pos >= si*32 && pos < (si+step)*32 {
+			included = true
+			inc += 1
+		}
+		if !ret {
+			det += 1
+		}
+		log.Printf("Verification : %v-%v", included, ret)
+
+		log.Printf("Verification(%v) : det %v- inc %v", loop+1, det, inc)
+		key = y
+		loop++
+		// break
+	}
+
+	log.Printf("Verification : det %v- inc %v", float64(det)/float64(loop), float64(inc)/float64(loop))
+	log.Printf("Avg. Size X %v, Probability X %v,", float64(sizex)/float64(loop), float64((31*2048))/float64(sizex)*float64(loop))
+	log.Printf("Avg. Size Y %v, Probability Y %v,", float64(sizey)/float64(loop), float64((32*2048))/float64(sizey)*float64(loop))
+
+	close(msg)
+}
+
+func float(det int) {
+	panic("unimplemented")
+}
+
 func test_prime_field() {
 	g := galois.NewGFP()
 
@@ -435,7 +561,7 @@ func test_fft() {
 
 	size, xs := gf.ExtRootUnity(g1, false)
 	xs = xs[:size-1]
-	size -= 1
+	// size -= 1
 	ys := make([]*uint256.Int, 0, size)
 
 	for j := 0; j < size; j++ {
@@ -487,7 +613,8 @@ func main() {
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
-	test_starks_prime_prekey()
+	// test_starks_prime_prekey()
+	test_error_1byte_detect_starks()
 	// test_prime_field()
 	// test_fft()
 }

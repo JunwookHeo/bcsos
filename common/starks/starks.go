@@ -22,6 +22,7 @@ type starks struct {
 }
 
 const PSIZE = 31
+const MAXDEG = 16
 
 func NewStarks(steps int) *starks {
 	if steps == 0 {
@@ -32,6 +33,9 @@ func NewStarks(steps int) *starks {
 	return &f
 }
 
+func (f *starks) GetSteps() int {
+	return f.steps
+}
 func (f *starks) GetHashBytes(b []byte) []byte {
 	return blockchain.CalHashSha256(b)
 }
@@ -174,7 +178,9 @@ func (f *starks) GetPseudorandomIndices(seed []byte, modulus uint32, count int, 
 
 func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []*dtype.FriProofElement {
 	L := len(values)
-	if (L >> 2) <= 16 {
+	log.Printf("Prove values with length : %v", L)
+
+	if (L >> 2) <= MAXDEG {
 		log.Println("Produced FRI proof")
 		ms := make([][]byte, L)
 		for i := 0; i < L; i++ {
@@ -188,7 +194,6 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []*dtyp
 		return proof
 	}
 
-	log.Printf("Prove values with length : %v", L)
 	size, xxs := f.GFP.ExtRootUnity(rou, false)
 	if L != size-1 {
 		log.Panicf("Mismatch the size of values and xs : %v, %v", L, len(xxs)-1)
@@ -202,19 +207,19 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []*dtyp
 	start := time.Now().UnixNano()
 	log.Printf("ProveLowDegree 1: %v", time.Now().UnixNano()-start)
 
-	x_polys := make([][]*uint256.Int, quarter_len)
-	dxs := make([][]*uint256.Int, quarter_len)
-	dys := make([][]*uint256.Int, quarter_len)
+	// x_polys := make([][]*uint256.Int, quarter_len)
+	// dxs := make([][]*uint256.Int, quarter_len)
+	// dys := make([][]*uint256.Int, quarter_len)
 	colums := make([]*uint256.Int, quarter_len)
 	for i := 0; i < quarter_len; i++ {
 		xs := []*uint256.Int{xxs[i], xxs[i+quarter_len], xxs[i+2*quarter_len], xxs[i+3*quarter_len]}
 		ys := []*uint256.Int{values[i], values[i+quarter_len], values[i+2*quarter_len], values[i+3*quarter_len]}
-		// x_poly := f.GFP.LagrangeInterp(xs[:], ys[:])
+
 		x_poly := f.GFP.LagrangeInterp_4(xs[:], ys[:])
 		colums[i] = f.GFP.EvalPolyAt(x_poly, special_x)
-		x_polys[i] = x_poly
-		dxs[i] = xs
-		dys[i] = ys
+		// x_polys[i] = x_poly
+		// dxs[i] = xs
+		// dys[i] = ys
 	}
 	log.Printf("ProveLowDegree 2: %v", time.Now().UnixNano()-start)
 	m2 := f.Merklize(colums)
@@ -304,6 +309,52 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 
 	}
 
+	roudeg = roudeg / 2
+
+	data := proof[len(proof)-1]
+	mdata := make([]*uint256.Int, len(data.Root2))
+	for i := 0; i < len(data.Root2); i++ {
+		mdata[i] = f.GFP.IntFromBytes(data.Root2[i])
+	}
+
+	roudeg = uint64(len(mdata)/8) * 3
+	log.Printf("rou deg-data deg : %v-%v", roudeg, len(mdata))
+
+	mtree := f.Merklize(mdata)
+	if f.GFP.Cmp(f.GFP.IntFromBytes(mtree[1]), f.GFP.IntFromBytes(root)) != 0 {
+		log.Printf("Evaluation fail : %v-%v", mtree[1], root)
+		return false
+	}
+
+	pts := make([]int, 0)
+	for i := 0; i < len(mdata); i++ {
+		if i%f.extFactor != 0 {
+			pts = append(pts, i)
+		}
+	}
+
+	_, powers := f.GFP.ExtRootUnity(rou, false)
+
+	txs := make([]*uint256.Int, 0)
+	for _, v := range pts[:roudeg] {
+		txs = append(txs, powers[v])
+	}
+
+	tys := make([]*uint256.Int, 0)
+	for _, v := range pts[:roudeg] {
+		tys = append(tys, mdata[v])
+	}
+
+	poly_t := f.GFP.LagrangeInterp(txs, tys)
+	for _, v := range pts[roudeg:] {
+		e := f.GFP.EvalPolyAt(poly_t, powers[v])
+		// log.Printf("%v, %v", v, e)
+		if e.Cmp(mdata[v]) != 0 {
+			// log.Printf("Evaluation failed %v, %v", e, mdata[v])
+			return false
+		}
+	}
+
 	log.Println("Evaluation success")
 	return true
 }
@@ -315,6 +366,7 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	visu := f.GFP.LoadUint256FromStream31(vis)
 	vosu := f.GFP.LoadUint256FromStream32(vos)
 	ks := f.GFP.LoadUint256FromKey(key)
+
 	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(ks), len(visu), len(vosu))
 
 	for i := len(visu); i < f.steps; i++ {
@@ -364,24 +416,21 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
 	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 	eval_cp := make([]*uint256.Int, precision)
-	pre := uint256.NewInt(1)
+	// pre := uint256.NewInt(1)
 	for i := 0; i < precision; i++ {
 		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
-		c = f.GFP.Mul(c, pre)
-		// c = f.GFP.Sub(c, eval_key[i%len(eval_key)])
 		if !eval_key[i%len(eval_key)].IsZero() {
 			c = f.GFP.Mul(c, eval_key[i%len(eval_key)])
 		}
+
 		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
 
-		if i+1-f.extFactor < 0 {
-			pre = eval_vosu[(i+1-f.extFactor)+precision]
-		} else {
-			pre = eval_vosu[i+1-f.extFactor]
-		}
-		if pre.IsZero() {
-			pre = uint256.NewInt(1)
-		}
+		// if i+1-f.extFactor < 0 {
+		// 	pre = eval_vosu[(i+1-f.extFactor)+precision]
+		// } else {
+		// 	pre = eval_vosu[i+1-f.extFactor]
+		// }
+
 	}
 
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
@@ -452,13 +501,17 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 
 	// L(x) : Linear combination
 	k1 := uint256.NewInt(0)
-	k1.SetBytes8(m_root[0:])
+	kt := f.GetHashBytes(m_root)
+	k1.SetBytes8(kt)
 	k2 := uint256.NewInt(0)
-	k2.SetBytes8(m_root[8:])
+	kt = f.GetHashBytes(k1.Bytes())
+	k2.SetBytes8(kt)
 	k3 := uint256.NewInt(0)
-	k3.SetBytes8(m_root[16:])
+	kt = f.GetHashBytes(k2.Bytes())
+	k3.SetBytes8(kt)
 	k4 := uint256.NewInt(0)
-	k4.SetBytes8(m_root[24:])
+	kt = f.GetHashBytes(k3.Bytes())
+	k4.SetBytes8(kt)
 
 	G2_steps := f.GFP.Exp(G2, uint256.NewInt(uint64(f.steps)))
 	powers := make([]*uint256.Int, f.extFactor)
@@ -469,9 +522,11 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 
 	eval_l := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
+		eval_l[i] = uint256.NewInt(0)
 		p := f.GFP.Add(f.GFP.Mul(eval_vosu[i], k1), f.GFP.Mul(eval_vosu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
 		b := f.GFP.Add(f.GFP.Mul(eval_b[i], k3), f.GFP.Mul(eval_b[i], f.GFP.Mul(k4, powers[i%f.extFactor])))
-		eval_l[i] = f.GFP.Add(eval_d[i], p)
+		eval_l[i] = f.GFP.Add(eval_l[i], p)
+		eval_l[i] = f.GFP.Add(eval_l[i], eval_d[i])
 		eval_l[i] = f.GFP.Add(eval_l[i], b)
 	}
 
@@ -568,13 +623,17 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 
 	// L(x) : Linear combination
 	k1 := uint256.NewInt(0)
-	k1.SetBytes8(m_root[0:])
+	kt := f.GetHashBytes(m_root)
+	k1.SetBytes8(kt)
 	k2 := uint256.NewInt(0)
-	k2.SetBytes8(m_root[8:])
+	kt = f.GetHashBytes(k1.Bytes())
+	k2.SetBytes8(kt)
 	k3 := uint256.NewInt(0)
-	k3.SetBytes8(m_root[16:])
+	kt = f.GetHashBytes(k2.Bytes())
+	k3.SetBytes8(kt)
 	k4 := uint256.NewInt(0)
-	k4.SetBytes8(m_root[24:])
+	kt = f.GetHashBytes(k3.Bytes())
+	k4.SetBytes8(kt)
 
 	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
 	augmented_positions := make([]uint32, len(positions)*2)
@@ -619,7 +678,7 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 
 		vi_x := eval_visu[positions[i]]
 		vo_x := f.GFP.IntFromBytes(leaves_vosu[i*2])
-		vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
+		// vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
 		d_x := f.GFP.IntFromBytes(leaves_d[i*2])
 		b_x := f.GFP.IntFromBytes(leaves_b[i*2])
 		l_x := f.GFP.IntFromBytes(leaves_l[i])
@@ -633,13 +692,10 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 		// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 		// C(x) = Z(x)*D(x)
 		c := f.GFP.Exp(vo_x, uint256.NewInt(3))
-		if !vo_xpre.IsZero() {
-			c = f.GFP.Mul(c, vo_xpre)
-		}
-		// c = f.GFP.Sub(c, k_x)
 		if !k_x.IsZero() {
 			c = f.GFP.Mul(c, k_x)
 		}
+
 		c = f.GFP.Sub(vi_x, c)
 		q := f.GFP.Mul(d_x, z)
 
@@ -708,6 +764,7 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	} else {
 		si = 0
 	}
+
 	log.Printf("Starting position : %v", si)
 
 	precision := f.steps * f.extFactor
@@ -747,32 +804,31 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
 	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 	eval_cp := make([]*uint256.Int, precision)
-	pre := uint256.NewInt(1)
-	if si > 0 {
-		pre = vosu[si-1]
-	}
+	// pre := uint256.NewInt(1)
+	// if si > 0 {
+	// 	pre = vosu[si-1]
+	// }
 	for i := 0; i < precision; i++ {
 		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
-		c = f.GFP.Mul(c, pre)
-		// c = f.GFP.Sub(c, eval_key[i])
+
 		if !eval_key[i].IsZero() {
 			c = f.GFP.Mul(c, eval_key[i])
 		}
+
 		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
 
-		if i+1-f.extFactor < 0 {
-			pre = eval_vosu[(i+1-f.extFactor)+precision]
-		} else {
-			pre = eval_vosu[i+1-f.extFactor]
-		}
-		if pre.IsZero() {
-			pre = uint256.NewInt(1)
-		}
+		// if i+1-f.extFactor < 0 {
+		// 	pre = eval_vosu[(i+1-f.extFactor)+precision]
+		// } else {
+		// 	pre = eval_vosu[i+1-f.extFactor]
+		// }
+		// if pre.IsZero() {
+		// 	pre = uint256.NewInt(1)
+		// }
 	}
 
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
-	size -= 1
-	xs = xs[0:size]
+	xs = xs[:size-1]
 	// log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
 
 	// Z(x)
@@ -857,10 +913,12 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 
 	eval_l := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
+		eval_l[i] = uint256.NewInt(0)
 		p := f.GFP.Add(f.GFP.Mul(eval_vosu[i], k1), f.GFP.Mul(eval_vosu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
 		b := f.GFP.Add(f.GFP.Mul(eval_b[i], k3), f.GFP.Mul(eval_b[i], f.GFP.Mul(k4, powers[i%f.extFactor])))
-		eval_l[i] = f.GFP.Add(eval_d[i], p)
+		eval_l[i] = f.GFP.Add(eval_l[i], p)
 		eval_l[i] = f.GFP.Add(eval_l[i], b)
+		eval_l[i] = f.GFP.Add(eval_l[i], eval_d[i])
 	}
 
 	// Compute Merkle root of L(x)
@@ -1003,7 +1061,7 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 
 		vi_x := eval_visu[positions[i]]
 		vo_x := f.GFP.IntFromBytes(leaves_vosu[i*2])
-		vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
+		// vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
 		k_x := f.GFP.IntFromBytes(leaves_key[i*2])
 		d_x := f.GFP.IntFromBytes(leaves_d[i*2])
 		b_x := f.GFP.IntFromBytes(leaves_b[i*2])
@@ -1018,10 +1076,9 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 		// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 		// C(x) = Z(x)*D(x)
 		c := f.GFP.Exp(vo_x, uint256.NewInt(3))
-		if !vo_xpre.IsZero() {
-			c = f.GFP.Mul(c, vo_xpre)
-		}
-		// c = f.GFP.Sub(c, k_x)
+		// if !vo_xpre.IsZero() {
+		// 	c = f.GFP.Mul(c, vo_xpre)
+		// }
 		if !k_x.IsZero() {
 			c = f.GFP.Mul(c, k_x)
 		}
@@ -1046,7 +1103,9 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 		// Check correctness of the linear combination
 		p := f.GFP.Add(f.GFP.Mul(vo_x, k1), f.GFP.Mul(vo_x, f.GFP.Mul(k2, x_to_steps)))
 		b := f.GFP.Add(f.GFP.Mul(b_x, k3), f.GFP.Mul(b_x, f.GFP.Mul(k4, x_to_steps)))
-		vl := f.GFP.Add(d_x, p)
+		vl := uint256.NewInt(0)
+		vl = f.GFP.Add(vl, d_x)
+		vl = f.GFP.Add(vl, p)
 		vl = f.GFP.Add(vl, b)
 		if vl.Cmp(l_x) != 0 {
 			log.Printf("Verification fail : Linear combination, %v, %v, %v", positions[i], vl, l_x)

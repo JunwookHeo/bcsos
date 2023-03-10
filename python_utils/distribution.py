@@ -63,9 +63,9 @@ def probability_detecting(p):
     c = []
     t = 1
     for i in range(100):
-        t = t*p
-        c.append(t)
-        print(i+1, t)
+        t = t*p        
+        c.append(1-t)
+        print("%d : %0.2f"%(i+1, (1-t)*100))
 
     print("P=", p)
     plt.plot(c)
@@ -74,5 +74,5 @@ def probability_detecting(p):
 
 # exponential_select()
 # exponential_distribution()
-p = 1. - (31*2048/1000000.)*3
+p = 1. - 0.0621*2
 probability_detecting(p)
