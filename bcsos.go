@@ -339,10 +339,11 @@ func test_starks_prime_prekey() {
 	tdec := int64(0)
 	tpro := int64(0)
 	tver := int64(0)
+	loop := 0
 
-	f := starks.NewStarks(65536 / 8)
+	f := starks.NewStarks(65536 / 8 / 4)
 
-	for loop := 0; ; loop++ {
+	for {
 		d, ok := <-msg
 		if !ok {
 			log.Println("Channle closed")
@@ -401,6 +402,7 @@ func test_starks_prime_prekey() {
 		}
 
 		key = y
+		loop++
 		// return
 	}
 	close(msg)
@@ -429,7 +431,7 @@ func test_error_1byte_detect_starks() {
 	sizex := 0
 	sizey := 0
 	loop := 0
-
+	bsizes := make([]int, 0)
 	for {
 		d, ok := <-msg
 		if !ok {
@@ -450,6 +452,7 @@ func test_error_1byte_detect_starks() {
 
 		// log.Printf("Block : %v", x[:80])
 		sizex += len(x)
+		bsizes = append(bsizes, len(x))
 
 		// Start Encryption
 		vis := poscipher.CalculateXorWithAddress(addr, x)
@@ -506,7 +509,7 @@ func test_error_1byte_detect_starks() {
 	log.Printf("Verification : det %v- inc %v", float64(det)/float64(loop), float64(inc)/float64(loop))
 	log.Printf("Avg. Size X %v, Probability X %v,", float64(sizex)/float64(loop), float64((31*2048))/float64(sizex)*float64(loop))
 	log.Printf("Avg. Size Y %v, Probability Y %v,", float64(sizey)/float64(loop), float64((32*2048))/float64(sizey)*float64(loop))
-
+	log.Printf("Block Size : %v", bsizes)
 	close(msg)
 }
 

@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import random
 
 def random_select():
     df = pd.read_csv('rs.csv')
@@ -58,21 +59,54 @@ def exponential_distribution():
     plt.savefig("AccessPatterns.png") 
     plt.show()
 
-def probability_detecting(p):
-    
-    c = []
-    t = 1
-    for i in range(100):
-        t = t*p        
-        c.append(1-t)
-        print("%d : %0.2f"%(i+1, (1-t)*100))
+def probability_detecting():
+    p1 = 1. - 0.0621
+    p2 = 1. - 0.14
 
-    print("P=", p)
-    plt.plot(c)
+    c1, c2 = [], []
+    t1, t2 = 1, 1
+
+    for i in range(100):
+        t1, t2 = t1*p1, t2*p2   
+        c1.append(1-t1)
+        c2.append(1-t2)
+        print("%d : %0.2f, %0.2f"%(i+1, (1-t1)*100, (1-t2)*100))
+
+    print("P", (p1, p2))
+    plt.plot(c1)
+    plt.plot(c2)
+    plt.legend(['6.21%', '14%'])
     plt.show()
 
+def probability_detecting_sim():
+    b_size = ""
+    with open('./block_size.txt', 'r') as f:
+        b_size = f.read()
 
+    block_size = [eval(s) for s in b_size.split(' ')]
+    # print(block_size)
+
+    random.seed()
+    K = 31*2048
+    d = 0
+    p = 0.
+    for i, s in enumerate(block_size):
+        t = random.randint(0, s)
+        if s <= K:
+            k = 0
+            p += 1.
+        else:
+            k = random.randint(0, s-K)
+            p += float(K/s)
+        if t >=k and t < k+K :
+            d += 1
+            print("Detected %d : %0.4f"%(d, d/(i+1)*100.))
+    print('Expected Probability : %0.4f'%(p/len(block_size)*100.))
+    plt.boxplot(block_size)
+    plt.show()
+
+    
 # exponential_select()
 # exponential_distribution()
-p = 1. - 0.0621*2
-probability_detecting(p)
+probability_detecting()
+# probability_detecting_sim()

@@ -317,7 +317,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 		mdata[i] = f.GFP.IntFromBytes(data.Root2[i])
 	}
 
-	roudeg = uint64(len(mdata)/8) * 3
+	roudeg = uint64(len(mdata)/8) * 6
 	log.Printf("rou deg-data deg : %v-%v", roudeg, len(mdata))
 
 	mtree := f.Merklize(mdata)
@@ -804,27 +804,17 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
 	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 	eval_cp := make([]*uint256.Int, precision)
-	// pre := uint256.NewInt(1)
-	// if si > 0 {
-	// 	pre = vosu[si-1]
-	// }
 	for i := 0; i < precision; i++ {
-		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
-
+		c := eval_vosu[i]
+		if !eval_key[i].IsZero() {
+			c = f.GFP.Mul(c, eval_key[i])
+		}
+		c = f.GFP.Exp(c, uint256.NewInt(3))
 		if !eval_key[i].IsZero() {
 			c = f.GFP.Mul(c, eval_key[i])
 		}
 
 		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
-
-		// if i+1-f.extFactor < 0 {
-		// 	pre = eval_vosu[(i+1-f.extFactor)+precision]
-		// } else {
-		// 	pre = eval_vosu[i+1-f.extFactor]
-		// }
-		// if pre.IsZero() {
-		// 	pre = uint256.NewInt(1)
-		// }
 	}
 
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
@@ -1075,10 +1065,11 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 
 		// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
 		// C(x) = Z(x)*D(x)
-		c := f.GFP.Exp(vo_x, uint256.NewInt(3))
-		// if !vo_xpre.IsZero() {
-		// 	c = f.GFP.Mul(c, vo_xpre)
-		// }
+		c := vo_x.Clone()
+		if !k_x.IsZero() {
+			c = f.GFP.Mul(c, k_x)
+		}
+		c = f.GFP.Exp(c, uint256.NewInt(3))
 		if !k_x.IsZero() {
 			c = f.GFP.Mul(c, k_x)
 		}
