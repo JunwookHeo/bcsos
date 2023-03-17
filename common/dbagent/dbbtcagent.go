@@ -61,6 +61,12 @@ type btcDBVerif struct {
 	TimeLastBlock    int64
 	TimeRcvLastBlock int64
 	TimeRcvPoS       int64
+	IsSuccess        int
+}
+
+type latency struct {
+	NumMeasure int64
+	TotalDealy int64
 }
 
 type btcdbagent struct {
@@ -69,10 +75,19 @@ type btcdbagent struct {
 	dbstatus  btcDBStatus
 	dirpath   string
 	lastblock btcBlock
+	avgdelay  latency
 	mutex     sync.Mutex
 }
 
 const SIZE_PROOF = 8 + 32 + 32*config.NUM_CONSECUTIVE_HASHES + 32*config.NUM_CONSECUTIVE_HASHES
+
+const (
+	V_SUCCESS         int = 0
+	V_FAIL_TIME           = 1
+	V_FAIL_VERIFY         = 1 << 1
+	V_FAIL_VERIFY_FWD     = 1 << 2
+	V_FAIL_VERIFY_BAC     = 1 << 3
+)
 
 func (a *btcdbagent) Close() {
 	a.db.Close()
@@ -552,9 +567,13 @@ func (a *btcdbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 	dbverif := btcDBVerif{}
 	dbverif.VerifBlock = bi.hash
 	dbverif.VerifHeight = bi.height
+	dbverif.IsSuccess = V_SUCCESS
 
 	start := time.Now().UnixNano()
 	ret1 := a.verifyInterActiveProofStorage_Rev(proof)
+	if !ret1 {
+		dbverif.IsSuccess |= V_FAIL_VERIFY_BAC
+	}
 	gap := int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -567,6 +586,10 @@ func (a *btcdbagent) VerifyInterActiveProofStorage(proof *dtype.PoSProof) bool {
 	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
 	ret2 := a.verifyInterActiveProofStorage_Fwd(proof)
+	if !ret2 {
+		dbverif.IsSuccess |= V_FAIL_VERIFY_FWD
+	}
+
 	gap = int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -598,16 +621,35 @@ func (a *btcdbagent) VerifyNonInterActiveProofStorage(tlb int64, trb int64, trp 
 	dbverif.TimeLastBlock = tlb
 	dbverif.TimeRcvLastBlock = trb
 	dbverif.TimeRcvPoS = trp
+	dbverif.IsSuccess = V_SUCCESS
+
+	diff := int64(0)
+	weight := int64(0)
+	if trb > tlb {
+		diff = trb - tlb
+		a.avgdelay.TotalDealy += diff
+		a.avgdelay.NumMeasure += 1
+		weight = (a.avgdelay.TotalDealy / a.avgdelay.NumMeasure)
+	}
+
+	if (trp > trb) && (trp-trb-weight)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
+		log.Printf("Verify Proof : Time Exceed %v", (trp-trb)/1000000)
+		dbverif.IsSuccess |= V_FAIL_TIME
+	}
 
 	b := a.getDecryptBlock(bi)
 	if b == nil {
 		log.Printf("Get Decrypt block error : %v", bi.hash)
+		dbverif.IsSuccess |= V_FAIL_VERIFY
 		return false
 	}
 	vis := poscipher.CalculateXorWithAddress(addr, b)
 
 	f := starks.NewStarks(65536 / 8 / 4)
 	ret := f.VerifyStarksProofPreKey(vis, starks_proof)
+	if !ret {
+		dbverif.IsSuccess |= V_FAIL_VERIFY
+	}
 
 	gap := int(time.Now().UnixNano() - start)
 	{
@@ -769,19 +811,19 @@ func (a *btcdbagent) updateDBProof(dbproof *btcDBProof) {
 func (a *btcdbagent) updateDBVerif(dbverif *btcDBVerif) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev, timelastblock, timercvlastblock, timercvpos) VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?)`)
+	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev, timelastblock, timercvlastblock, timercvpos, issuccess) VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		log.Printf("Prepare adding veriftbl error : %v", err)
 		return
 	}
 	defer st.Close()
 
-	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeLastBlock, dbverif.TimeRcvLastBlock, dbverif.TimeRcvPoS)
+	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeLastBlock, dbverif.TimeRcvLastBlock, dbverif.TimeRcvPoS, dbverif.IsSuccess)
 	if err != nil {
 		log.Panicf("Exec adding veriftbl error : %v", err)
 		return
 	}
-	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeLastBlock, dbverif.TimeRcvLastBlock, dbverif.TimeRcvPoS)
+	log.Printf("Exec adding veriftbl  : %v", dbverif)
 }
 
 func newDBBtcSqlite(path string) DBAgent {
@@ -857,7 +899,8 @@ func newDBBtcSqlite(path string) DBAgent {
 		timeverifrev		INTEGER,
 		timelastblock		INTEGER,
 		timercvlastblock	INTEGER,
-		timercvpos			INTEGER
+		timercvpos			INTEGER,
+		issuccess			INTEGER
 	);`
 
 	st, err = db.Prepare(create_veriftbl)
@@ -871,7 +914,7 @@ func newDBBtcSqlite(path string) DBAgent {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: btcDBStatus{Timestamp: time.Now()}, dirpath: "", lastblock: btcBlock{}, mutex: sync.Mutex{}}
+	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: btcDBStatus{Timestamp: time.Now()}, dirpath: "", lastblock: btcBlock{}, avgdelay: latency{0, 0}, mutex: sync.Mutex{}}
 	dba.getLatestDBStatus(&dba.dbstatus)
 	go dba.updateDBStatus()
 

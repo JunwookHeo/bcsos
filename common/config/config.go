@@ -88,6 +88,6 @@ const FINALITY int = 6
 
 // Proof of Storage
 const NUM_CONSECUTIVE_HASHES int = 4
-const MAX_PROOF_TIME_MSEC int = 2000 * 50
+const MAX_PROOF_TIME_MSEC int = 5000
 const PROOFSTORAGE_METHOD string = "NON-INTERACTIVE"
 const MASK_SELECT_POS_NODE uint32 = 0x0F
