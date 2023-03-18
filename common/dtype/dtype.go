@@ -64,8 +64,9 @@ type StarksProof struct {
 	RandomHash string
 	MerkleRoot []byte
 	TreeRoots  [][]byte
-	TreeVosu   [][][]byte
-	TreeKey    [][][]byte
+	TreeOxu    [][][]byte
+	TreePOxu   [][][]byte
+	TreeKxu    [][][]byte
 	TreeD      [][][]byte
 	TreeB      [][][]byte
 	TreeL      [][][]byte

@@ -317,7 +317,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 		mdata[i] = f.GFP.IntFromBytes(data.Root2[i])
 	}
 
-	roudeg = uint64(len(mdata)/8) * 6
+	roudeg = uint64(len(mdata)/8) * 4
 	log.Printf("rou deg-data deg : %v-%v", roudeg, len(mdata))
 
 	mtree := f.Merklize(mdata)
@@ -350,7 +350,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 		e := f.GFP.EvalPolyAt(poly_t, powers[v])
 		// log.Printf("%v, %v", v, e)
 		if e.Cmp(mdata[v]) != 0 {
-			// log.Printf("Evaluation failed %v, %v", e, mdata[v])
+			log.Printf("Evaluation failed %v, %v", e, mdata[v])
 			return false
 		}
 	}
@@ -552,7 +552,7 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	// proof := make([]interface{}, 8)
 	proof.MerkleRoot = m_root
 	proof.TreeRoots = [][]byte{tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
-	proof.TreeVosu = f.MakeMultiBranch(tree_vosu, augmented_positions)
+	proof.TreeOxu = f.MakeMultiBranch(tree_vosu, augmented_positions)
 	proof.TreeD = f.MakeMultiBranch(tree_d, augmented_positions)
 	proof.TreeB = f.MakeMultiBranch(tree_b, augmented_positions)
 	proof.TreeL = f.MakeMultiBranch(tree_l, positions)
@@ -597,7 +597,7 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 
 	m_root := proof.MerkleRoot
 	tree_roots := proof.TreeRoots
-	tree_vosu := proof.TreeVosu
+	tree_vosu := proof.TreeOxu
 	tree_d := proof.TreeD
 	tree_b := proof.TreeB
 	tree_l := proof.TreeL
@@ -730,37 +730,37 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 }
 
 // hash : random seed to calculate starting point
-// Vis : Input values
+// px : Input values
 // Vos : Output values
 // key : Adress of Prover
 func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, key []byte) *dtype.StarksProof {
 	si := poscipher.GetRandIntFromHash(hash)
 
-	visu := f.GFP.LoadUint256FromStream31(vis)
-	vosu := f.GFP.LoadUint256FromStream32(vos)
-	ks := f.GFP.LoadUint256FromStream32(key)
-	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(ks), len(visu), len(vosu))
+	pxu := f.GFP.LoadUint256FromStream31(vis)
+	oxu := f.GFP.LoadUint256FromStream32(vos)
+	kxu := f.GFP.LoadUint256FromStream32(key)
+	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(kxu), len(pxu), len(oxu))
 
-	if len(ks) < len(visu) {
-		for i := 0; len(ks) < len(visu); i++ {
-			ks = append(ks, ks[i%len(ks)])
+	if len(kxu) < len(pxu) {
+		for i := 0; len(kxu) < len(pxu); i++ {
+			kxu = append(kxu, kxu[i%len(kxu)])
 		}
 	} else {
-		ks = ks[:len(visu)]
+		kxu = kxu[:len(pxu)]
 	}
 
-	for i := len(visu); i < f.steps; i++ {
-		visu = append(visu, uint256.NewInt(0))
+	for i := len(pxu); i < f.steps; i++ {
+		pxu = append(pxu, uint256.NewInt(0))
 	}
-	for i := len(vosu); i < f.steps; i++ {
-		vosu = append(vosu, uint256.NewInt(0))
+	for i := len(oxu); i < f.steps; i++ {
+		oxu = append(oxu, uint256.NewInt(0))
 	}
-	for i := len(ks); i < f.steps; i++ {
-		ks = append(ks, uint256.NewInt(0))
+	for i := len(kxu); i < f.steps; i++ {
+		kxu = append(kxu, uint256.NewInt(0))
 	}
 
-	if len(visu) > f.steps {
-		si = si % (len(visu) - f.steps)
+	if len(pxu) > f.steps {
+		si = si % (len(pxu) - f.steps)
 	} else {
 		si = 0
 	}
@@ -779,42 +779,48 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	// log.Printf("G1 : %v", G1)
 
-	// Vi(x)
-	poly_visu := f.GFP.IDFT(visu[si:f.steps+si], G1)
-	eval_visu := f.GFP.DFT(poly_visu, G2)
-	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
-	// for i := 0; i < 10; i++ {
-	// 	log.Printf("eval_visu : %v, %v", visu[i], eval_visu[i*f.extFactor])
-	// }
+	// P(x)
+	poly_pxu := f.GFP.IDFT(pxu[si:f.steps+si], G1)
+	eval_pxu := f.GFP.DFT(poly_pxu, G2)
 
 	// Vo(x)
-	poly_vosu := f.GFP.IDFT(vosu[si:f.steps+si], G1)
-	eval_vosu := f.GFP.DFT(poly_vosu, G2)
-	// log.Printf("vosu : %v, %v", len(poly_vosu), len(eval_vosu))
-	// for i := 0; i < 10; i++ {
-	// 	log.Printf("eval_vosu : %v, %v", vosu[i], eval_vosu[i*f.extFactor])
-	// }
+	poly_oxu := f.GFP.IDFT(oxu[si:f.steps+si], G1)
+	eval_oxu := f.GFP.DFT(poly_oxu, G2)
 
 	// K(x)
-	poly_key := f.GFP.IDFT(ks[si:f.steps+si], G1)
-	eval_key := f.GFP.DFT(poly_key, G2)
-	// log.Printf("skip for key : %v", len(eval_key))
+	poly_kxu := f.GFP.IDFT(kxu[si:f.steps+si], G1)
+	eval_kxu := f.GFP.DFT(poly_kxu, G2)
 
-	// C(x) = C(Vi(x), Vo(x), K(x))
-	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
-	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+	// Polynomial of O(x/g1)
+	poxu := make([]*uint256.Int, f.steps)
+	if si == 0 {
+		poxu[0] = uint256.NewInt(1)
+	} else {
+		poxu[0] = oxu[si-1]
+	}
+	for i := 1; i < f.steps; i++ {
+		poxu[i] = oxu[si+i-1]
+	}
+	poly_poxu := f.GFP.IDFT(poxu, G1)
+	eval_poxu := f.GFP.DFT(poly_poxu, G2)
+
+	// C(x) = C(P(x), O(x), K(x))
+	// O[i]^3 * O[i-1] - K[i] = P[i]
+	// C(x) = P(x) - (O(x)^3 * O(x/g1) - K(x))
 	eval_cp := make([]*uint256.Int, precision)
+
 	for i := 0; i < precision; i++ {
-		c := eval_vosu[i]
-		if !eval_key[i].IsZero() {
-			c = f.GFP.Mul(c, eval_key[i])
-		}
+		c := eval_oxu[i]
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		if !eval_key[i].IsZero() {
-			c = f.GFP.Mul(c, eval_key[i])
+		if !eval_poxu[i].IsZero() {
+			c = f.GFP.Mul(c, eval_poxu[i])
+		}
+		if !eval_kxu[i].IsZero() {
+			c = f.GFP.Mul(c, eval_kxu[i])
 		}
 
-		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
+		eval_cp[i] = f.GFP.Sub(eval_pxu[i], c)
+
 	}
 
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
@@ -839,7 +845,7 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// Compute polynomial for Vos
 	// Compute interpolant of ((1, input), (x_atlast_step, output))
 	xos := []*uint256.Int{xs[0], xs[(f.steps-1)*f.extFactor]}
-	yos := []*uint256.Int{vosu[si], vosu[si+f.steps-1]}
+	yos := []*uint256.Int{oxu[si], oxu[si+f.steps-1]}
 
 	// Io(x)
 	poly_io := f.GFP.LagrangeInterp(xos, yos)
@@ -869,30 +875,23 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// B(x) = (Vo(x) - Io(x)) / Zo(x)
 	eval_b := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
-		eval_b[i] = f.GFP.Sub(eval_vosu[i], eval_io[i])
+		eval_b[i] = f.GFP.Sub(eval_oxu[i], eval_io[i])
 		eval_b[i] = f.GFP.Mul(eval_b[i], eval_inv_zo[i])
 	}
 
 	// Compute Merkle Root
-	tree_vosu := f.Merklize(eval_vosu)
-	tree_key := f.Merklize(eval_key)
+	tree_oxu := f.Merklize(eval_oxu)
+	tree_poxu := f.Merklize(eval_poxu)
+	tree_kxu := f.Merklize(eval_kxu)
 	tree_d := f.Merklize(eval_d)
 	tree_b := f.Merklize(eval_b)
-	mr := tree_vosu[1]
-	mr = append(mr, tree_key[1]...)
+	mr := tree_oxu[1]
+	mr = append(mr, tree_poxu[1]...)
+	mr = append(mr, tree_kxu[1]...)
 	mr = append(mr, tree_d[1]...)
 	mr = append(mr, tree_b[1]...)
 	m_root := f.GetHashBytes(mr)
 
-	// L(x) : Linear combination
-	// k1 := uint256.NewInt(0)
-	// k1.SetBytes8(m_root[0:])
-	// k2 := uint256.NewInt(0)
-	// k2.SetBytes8(m_root[8:])
-	// k3 := uint256.NewInt(0)
-	// k3.SetBytes8(m_root[16:])
-	// k4 := uint256.NewInt(0)
-	// k4.SetBytes8(m_root[24:])
 	k1 := uint256.NewInt(0)
 	kt := f.GetHashBytes(m_root)
 	k1.SetBytes8(kt)
@@ -916,7 +915,7 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	eval_l := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
 		eval_l[i] = uint256.NewInt(0)
-		p := f.GFP.Add(f.GFP.Mul(eval_vosu[i], k1), f.GFP.Mul(eval_vosu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
+		p := f.GFP.Add(f.GFP.Mul(eval_oxu[i], k1), f.GFP.Mul(eval_oxu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
 		b := f.GFP.Add(f.GFP.Mul(eval_b[i], k3), f.GFP.Mul(eval_b[i], f.GFP.Mul(k4, powers[i%f.extFactor])))
 		eval_l[i] = f.GFP.Add(eval_l[i], p)
 		eval_l[i] = f.GFP.Add(eval_l[i], b)
@@ -946,24 +945,25 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	var proof dtype.StarksProof
 	proof.RandomHash = hash
 	proof.MerkleRoot = m_root
-	proof.TreeRoots = [][]byte{tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}
-	proof.TreeVosu = f.MakeMultiBranch(tree_vosu, positions)
-	proof.TreeKey = f.MakeMultiBranch(tree_key, positions)
+	proof.TreeRoots = [][]byte{tree_oxu[1], tree_poxu[1], tree_kxu[1], tree_d[1], tree_b[1], tree_l[1]}
+	proof.TreeOxu = f.MakeMultiBranch(tree_oxu, positions)
+	proof.TreePOxu = f.MakeMultiBranch(tree_poxu, positions)
+	proof.TreeKxu = f.MakeMultiBranch(tree_kxu, positions)
 	proof.TreeD = f.MakeMultiBranch(tree_d, positions)
 	proof.TreeB = f.MakeMultiBranch(tree_b, positions)
 	proof.TreeL = f.MakeMultiBranch(tree_l, positions)
-	proof.VosuFl = []*uint256.Int{vosu[si], vosu[si+f.steps-1]}
+	proof.VosuFl = []*uint256.Int{oxu[si], oxu[si+f.steps-1]}
 	proof.FriProof = f.ProveLowDegree(eval_l, G2)
 
 	return &proof
 }
 
 func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) bool {
-	visu := f.GFP.LoadUint256FromStream31(vis)
-	log.Printf("Length of Inputs : vi(%v)", len(visu))
+	pxu := f.GFP.LoadUint256FromStream31(vis)
+	log.Printf("Length of Inputs : vi(%v)", len(pxu))
 
-	for i := len(visu); i < f.steps; i++ {
-		visu = append(visu, uint256.NewInt(0))
+	for i := len(pxu); i < f.steps; i++ {
+		pxu = append(pxu, uint256.NewInt(0))
 	}
 
 	precision := f.steps * f.extFactor
@@ -979,25 +979,25 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 	// log.Printf("G1 : %v", G1)
 
 	si := poscipher.GetRandIntFromHash(proof.RandomHash)
-	if len(visu) > f.steps {
-		si = si % (len(visu) - f.steps)
+	if len(pxu) > f.steps {
+		si = si % (len(pxu) - f.steps)
 	} else {
 		si = 0
 	}
 
 	log.Printf("Starting position : %v", si)
 
-	// Vi(x)
-	poly_visu := f.GFP.IDFT(visu[si:si+f.steps], G1)
-	eval_visu := f.GFP.DFT(poly_visu, G2)
-	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
+	// P(x)
+	poly_pxu := f.GFP.IDFT(pxu[si:si+f.steps], G1)
+	eval_pxu := f.GFP.DFT(poly_pxu, G2)
 
 	// Verify root of trees
-	// tree_roots = {tree_vosu[1], tree_key[1], tree_d[1], tree_b[1], tree_l[1]}
+	// tree_roots = {tree_oxu[1], tree_poxu[1], tree_kxu[1], tree_d[1], tree_b[1], tree_l[1]}
 	mr := proof.TreeRoots[0]
 	mr = append(mr, proof.TreeRoots[1]...)
 	mr = append(mr, proof.TreeRoots[2]...)
 	mr = append(mr, proof.TreeRoots[3]...)
+	mr = append(mr, proof.TreeRoots[4]...)
 	h1 := hex.EncodeToString(f.GetHashBytes(mr))
 	h2 := hex.EncodeToString(proof.MerkleRoot)
 	if h1 != h2 {
@@ -1005,21 +1005,11 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 		return false
 	}
 
-	if !f.VerifyLowDegreeProof(proof.TreeRoots[4], proof.FriProof, G2) {
+	if !f.VerifyLowDegreeProof(proof.TreeRoots[5], proof.FriProof, G2) {
 		log.Printf("Low Degree Testing Fail")
 		return false
 	}
 
-	// L(x) : Linear combination
-	// k1 := uint256.NewInt(0)
-	// k1.SetBytes8(proof.MerkleRoot[0:])
-	// k2 := uint256.NewInt(0)
-	// k2.SetBytes8(proof.MerkleRoot[8:])
-	// k3 := uint256.NewInt(0)
-	// k3.SetBytes8(proof.MerkleRoot[16:])
-	// k4 := uint256.NewInt(0)
-	// k4.SetBytes8(proof.MerkleRoot[24:])
-	// k1 := uint256.NewInt(0)
 	k1 := uint256.NewInt(0)
 	kt := f.GetHashBytes(proof.MerkleRoot)
 	k1.SetBytes8(kt)
@@ -1062,11 +1052,12 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 
 	// log.Printf("io : %v, zo : %v", poly_io, poly_zo)
 
-	leaves_vosu := f.VerifyMultiBranch(proof.TreeRoots[0], positions, proof.TreeVosu)
-	leaves_key := f.VerifyMultiBranch(proof.TreeRoots[1], positions, proof.TreeKey)
-	leaves_d := f.VerifyMultiBranch(proof.TreeRoots[2], positions, proof.TreeD)
-	leaves_b := f.VerifyMultiBranch(proof.TreeRoots[3], positions, proof.TreeB)
-	leaves_l := f.VerifyMultiBranch(proof.TreeRoots[4], positions, proof.TreeL)
+	leaves_oxu := f.VerifyMultiBranch(proof.TreeRoots[0], positions, proof.TreeOxu)
+	leaves_poxu := f.VerifyMultiBranch(proof.TreeRoots[1], positions, proof.TreePOxu)
+	leaves_kxu := f.VerifyMultiBranch(proof.TreeRoots[2], positions, proof.TreeKxu)
+	leaves_d := f.VerifyMultiBranch(proof.TreeRoots[3], positions, proof.TreeD)
+	leaves_b := f.VerifyMultiBranch(proof.TreeRoots[4], positions, proof.TreeB)
+	leaves_l := f.VerifyMultiBranch(proof.TreeRoots[5], positions, proof.TreeL)
 
 	// log.Printf("leaves %v, %v, %v, %v", len(leaves_vosu), len(leaves_d), len(leaves_b), len(leaves_l))
 
@@ -1075,10 +1066,10 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 		x := f.GFP.Exp(G2, power)
 		x_to_steps := f.GFP.Exp(x, uint256.NewInt(uint64(f.steps)))
 
-		vi_x := eval_visu[positions[i]]
-		vo_x := f.GFP.IntFromBytes(leaves_vosu[i])
-		// vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
-		k_x := f.GFP.IntFromBytes(leaves_key[i])
+		vi_x := eval_pxu[positions[i]]
+		vo_x := f.GFP.IntFromBytes(leaves_oxu[i])
+		vo_xpre := f.GFP.IntFromBytes(leaves_poxu[i])
+		k_x := f.GFP.IntFromBytes(leaves_kxu[i])
 		d_x := f.GFP.IntFromBytes(leaves_d[i])
 		b_x := f.GFP.IntFromBytes(leaves_b[i])
 		l_x := f.GFP.IntFromBytes(leaves_l[i])
@@ -1089,13 +1080,13 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 
 		// log.Printf("vi : %v, vo : %v, vo_pre : %v, kx : %v", vi_x, vo_x, vo_xpre, k_x)
 
-		// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+		// C(x) = P(x) - (O(x)^3 * O(x/g1) - K(x))
 		// C(x) = Z(x)*D(x)
 		c := vo_x.Clone()
-		if !k_x.IsZero() {
-			c = f.GFP.Mul(c, k_x)
-		}
 		c = f.GFP.Exp(c, uint256.NewInt(3))
+		if !vo_xpre.IsZero() {
+			c = f.GFP.Mul(c, vo_xpre)
+		}
 		if !k_x.IsZero() {
 			c = f.GFP.Mul(c, k_x)
 		}
@@ -1144,16 +1135,22 @@ func (f *starks) GetSizeStarksProofPreKey(proof *dtype.StarksProof) int {
 	}
 	log.Printf("sizof buf : %v", size)
 
-	for i := 0; i < len(proof.TreeVosu); i++ {
-		for j := 0; j < len(proof.TreeVosu[i]); j++ {
-			size += len(proof.TreeVosu[i][j])
+	for i := 0; i < len(proof.TreeOxu); i++ {
+		for j := 0; j < len(proof.TreeOxu[i]); j++ {
+			size += len(proof.TreeOxu[i][j])
+		}
+	}
+
+	for i := 0; i < len(proof.TreePOxu); i++ {
+		for j := 0; j < len(proof.TreePOxu[i]); j++ {
+			size += len(proof.TreePOxu[i][j])
 		}
 	}
 
 	log.Printf("sizof buf : %v", size)
-	for i := 0; i < len(proof.TreeKey); i++ {
-		for j := 0; j < len(proof.TreeKey[i]); j++ {
-			size += len(proof.TreeKey[i][j])
+	for i := 0; i < len(proof.TreeKxu); i++ {
+		for j := 0; j < len(proof.TreeKxu[i]); j++ {
+			size += len(proof.TreeKxu[i][j])
 		}
 	}
 
