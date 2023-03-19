@@ -339,12 +339,9 @@ func (h *StorageMgr) nonInteractiveProofHandler(w http.ResponseWriter, r *http.R
 		start := h.ltb.RcvTime //h.db.GetLastBlockTime()
 		current := time.Now().UnixNano()
 		log.Printf("Event Proof Time : T1:%v, T2:%v, T3:%v", (h.ltb.RcvTime-h.ltb.GenTime)/1000000, (current-h.ltb.GenTime)/1000000, (current-h.ltb.RcvTime)/1000000)
-		// if (current-start)/1000000 > int64(config.MAX_PROOF_TIME_MSEC) {
-		// 	log.Printf("Verify Proof : Time Exceed %v", (current-start)/1000000)
-		// 	return
-		// } else {
-		// 	log.Printf("Receive Verify Proof : Time %v", (current-start)/1000000)
-		// }
+		if h.ltb.GenTime > h.ltb.RcvTime {
+			return // It cannot calculate time difference for verification
+		}
 
 		h.VerifyNonInteractiveProofStorage(h.ltb.GenTime, start, current, &proof)
 	} else {
