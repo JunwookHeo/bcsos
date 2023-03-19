@@ -30,7 +30,14 @@ func NewRawBlock(raw string) *RawBlock {
 	return &RawBlock{rawBuf: append(rawb, pad...), pos: 0}
 }
 
-func (rb *RawBlock) GetBlockBytes() []byte {
+func (rb *RawBlock) GetBlockBytes(ml int) []byte {
+	if ml > len(rb.rawBuf) {
+		buf := rb.rawBuf
+		for i := len(rb.rawBuf); i < ml; i++ {
+			buf = append(buf, 0)
+		}
+		return buf
+	}
 	return rb.rawBuf
 }
 

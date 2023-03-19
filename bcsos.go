@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"log"
 	"math/big"
@@ -46,7 +47,7 @@ func test_encypt_decrypt() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(0)
 		// log.Printf("Block : %v", x[:80])
 
 		// Start Encryption
@@ -154,7 +155,7 @@ func test_encypt_decrypt_prime() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(0)
 		// log.Printf("Block : %v", x[:80])
 
 		// Start Encryption
@@ -262,6 +263,7 @@ func test_starks_prime() {
 	tdec := int64(0)
 	tpro := int64(0)
 	tver := int64(0)
+	loop := 0
 
 	f := starks.NewStarks(65536 / 8 / 4)
 
@@ -277,7 +279,8 @@ func test_starks_prime() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(f.GetSteps() * 31)
+
 		// log.Printf("Block len : %v", len(x))
 		// if len(x) < 64000 {
 		// 	continue
@@ -321,13 +324,14 @@ func test_starks_prime() {
 		}
 
 		key = y
+		loop++
 		// return
 	}
 	close(msg)
 }
 
 func test_starks_prime_prekey() {
-	const PATH_TEST = "./blocks_360.json"
+	const PATH_TEST = "./blocks_720.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	addr := w.PublicKey
 	key := make([]byte, 0, len(addr)*32)
@@ -359,7 +363,7 @@ func test_starks_prime_prekey() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(f.GetSteps() * 31)
 
 		block := bitcoin.NewBlock()
 		block.SetHash(rb.GetRawBytes(0, 80))
@@ -378,7 +382,7 @@ func test_starks_prime_prekey() {
 		start = time.Now().UnixNano()
 		proof := f.GenerateStarksProofPreKey(hash, vis, y, key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, proof.MerkleRoot)
+		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, hex.EncodeToString(proof.MerkleRoot))
 
 		// Start verification
 		start = time.Now().UnixNano()
@@ -448,7 +452,7 @@ func test_error_1byte_detect_starks() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(f.GetSteps() * 31)
 
 		block := bitcoin.NewBlock()
 		block.SetHash(rb.GetRawBytes(0, 80))
@@ -620,9 +624,9 @@ func main() {
 	// test_encypt_decrypt()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
-	test_starks_prime()
+	// test_starks_prime()
 	// test_starks_prime_prekey()
-	// test_error_1byte_detect_starks()
+	test_error_1byte_detect_starks()
 	// test_prime_field()
 	// test_fft()
 }

@@ -3,7 +3,6 @@ package starks
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"log"
 	"time"
 
@@ -204,8 +203,8 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []*dtyp
 	special_x := f.GFP.IntFromBytes(m1[1])
 	quarter_len := len(xxs) >> 2
 
-	start := time.Now().UnixNano()
-	log.Printf("ProveLowDegree 1: %v", time.Now().UnixNano()-start)
+	// start := time.Now().UnixNano()
+	// log.Printf("ProveLowDegree 1: %v", time.Now().UnixNano()-start)
 
 	// x_polys := make([][]*uint256.Int, quarter_len)
 	// dxs := make([][]*uint256.Int, quarter_len)
@@ -221,7 +220,8 @@ func (f *starks) ProveLowDegree(values []*uint256.Int, rou *uint256.Int) []*dtyp
 		// dxs[i] = xs
 		// dys[i] = ys
 	}
-	log.Printf("ProveLowDegree 2: %v", time.Now().UnixNano()-start)
+	// log.Printf("ProveLowDegree 2: %v", time.Now().UnixNano()-start)
+
 	m2 := f.Merklize(colums)
 	yys := f.GetPseudorandomIndices(m2[1], uint32(len(colums)), f.numIdx, uint32(f.extFactor))
 
@@ -371,7 +371,7 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 
 	klen := len(kxu)
 	if len(kxu) < len(pxu) {
-		for i := len(kxu); len(kxu) < len(pxu); i++ {
+		for i := klen; i < len(pxu); i++ {
 			kxu = append(kxu, kxu[i%klen])
 		}
 	} else {
@@ -730,9 +730,10 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	kxu := f.GFP.LoadUint256FromStream32(key)
 	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(kxu), len(pxu), len(oxu))
 
+	klen := len(kxu)
 	if len(kxu) < len(pxu) {
 		for i := 0; len(kxu) < len(pxu); i++ {
-			kxu = append(kxu, kxu[i%len(kxu)])
+			kxu = append(kxu, kxu[i%klen])
 		}
 	} else {
 		kxu = kxu[:len(pxu)]
@@ -783,7 +784,7 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// Polynomial of O(x/g1)
 	poxu := make([]*uint256.Int, f.steps)
 	if si == 0 {
-		poxu[0] = uint256.NewInt(1)
+		poxu[0] = uint256.NewInt(0)
 	} else {
 		poxu[0] = oxu[si-1]
 	}
@@ -797,20 +798,12 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// O[i]^3 * O[i-1] - K[i] = P[i]
 	// C(x) = P(x) - (O(x)^3 * O(x/g1) - K(x))
 	eval_cp := make([]*uint256.Int, precision)
-
 	for i := 0; i < precision; i++ {
-		c := eval_oxu[i]
+		c := eval_oxu[i].Clone()
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		if !eval_poxu[i].IsZero() {
-			c = f.GFP.Mul(c, eval_poxu[i])
-		} else {
-			log.Printf(">>>> zero pre")
-		}
-		if !eval_kxu[i].IsZero() {
-			c = f.GFP.Mul(c, eval_kxu[i])
-		} else {
-			log.Printf(">>>> zero key")
-		}
+		c = f.GFP.Add(c, eval_kxu[i])
+		c = f.GFP.Exp(c, uint256.NewInt(3))
+		c = f.GFP.Add(c, eval_poxu[i])
 
 		eval_cp[i] = f.GFP.Sub(eval_pxu[i], c)
 
@@ -919,20 +912,6 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	tree_l := f.Merklize(eval_l)
 
 	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
-	// augmented_positions := make([]uint32, len(positions)*2)
-	// for i := 0; i < len(positions); i++ {
-	// 	// In this case, we need previous Vo(x) for encryption/decryption
-	// 	augmented_positions[i*2] = positions[i]
-	// 	if positions[i] >= uint32(skips) {
-	// 		augmented_positions[i*2+1] = positions[i] - uint32(skips)
-	// 	} else {
-	// 		augmented_positions[i*2+1] = uint32(precision) + positions[i] - uint32(skips)
-	// 	}
-	// }
-
-	// log.Printf("positions : %v", positions)
-	// log.Printf("augmented_positions : %v", augmented_positions)
-	// log.Printf("tree_l : %v", tree_l[1])
 
 	// proof := make([]interface{}, 9)
 	var proof dtype.StarksProof
@@ -1017,17 +996,6 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 	k4.SetBytes8(kt)
 
 	positions := f.GetPseudorandomIndices(proof.MerkleRoot, uint32(precision), 80, uint32(f.extFactor))
-	// augmented_positions := make([]uint32, len(positions)*2)
-
-	// for i := 0; i < len(positions); i++ {
-	// 	// In this case, we need previous Vo(x) for encryption/decryption
-	// 	augmented_positions[i*2] = positions[i]
-	// 	if positions[i] >= uint32(skips) {
-	// 		augmented_positions[i*2+1] = positions[i] - uint32(skips)
-	// 	} else {
-	// 		augmented_positions[i*2+1] = uint32(precision) + positions[i] - uint32(skips)
-	// 	}
-	// }
 
 	// Compute Io(x)
 	lp := uint256.NewInt(uint64((f.steps - 1) * f.extFactor))
@@ -1073,16 +1041,14 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 
 		// log.Printf("vi : %v, vo : %v, vo_pre : %v, kx : %v", vi_x, vo_x, vo_xpre, k_x)
 
-		// C(x) = P(x) - (O(x)^3 * O(x/g1) - K(x))
+		// C(x) = P(x) - (((O(x)^3 + K(x))^3 + O(x/g1))
 		// C(x) = Z(x)*D(x)
 		c := vo_x.Clone()
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		if !vo_xpre.IsZero() {
-			c = f.GFP.Mul(c, vo_xpre)
-		}
-		if !k_x.IsZero() {
-			c = f.GFP.Mul(c, k_x)
-		}
+		c = f.GFP.Add(c, k_x)
+		c = f.GFP.Exp(c, uint256.NewInt(3))
+		c = f.GFP.Add(c, vo_xpre)
+
 		c = f.GFP.Sub(vi_x, c)
 		q := f.GFP.Mul(d_x, z)
 
@@ -1126,7 +1092,7 @@ func (f *starks) GetSizeStarksProofPreKey(proof *dtype.StarksProof) int {
 	for i := 0; i < len(proof.TreeRoots); i++ {
 		size += len(proof.TreeRoots[i])
 	}
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 
 	for i := 0; i < len(proof.TreeOxu); i++ {
 		for j := 0; j < len(proof.TreeOxu[i]); j++ {
@@ -1140,38 +1106,38 @@ func (f *starks) GetSizeStarksProofPreKey(proof *dtype.StarksProof) int {
 		}
 	}
 
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 	for i := 0; i < len(proof.TreeKxu); i++ {
 		for j := 0; j < len(proof.TreeKxu[i]); j++ {
 			size += len(proof.TreeKxu[i][j])
 		}
 	}
 
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 	for i := 0; i < len(proof.TreeD); i++ {
 		for j := 0; j < len(proof.TreeD[i]); j++ {
 			size += len(proof.TreeD[i][j])
 		}
 	}
 
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 	for i := 0; i < len(proof.TreeB); i++ {
 		for j := 0; j < len(proof.TreeB[i]); j++ {
 			size += len(proof.TreeB[i][j])
 		}
 	}
 
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 	for i := 0; i < len(proof.TreeL); i++ {
 		for j := 0; j < len(proof.TreeL[i]); j++ {
 			size += len(proof.TreeL[i][j])
 		}
 	}
 
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 	size += len(proof.VosuFl) * 4 * 8
 
-	log.Printf("sizof buf : %v", size)
+	// log.Printf("sizof buf : %v", size)
 	for i := 0; i < len(proof.FriProof)-1; i++ {
 		p := proof.FriProof[i]
 		root2 := p.Root2[0]
@@ -1198,11 +1164,11 @@ func (f *starks) GetSizeStarksProofPreKey(proof *dtype.StarksProof) int {
 		size += len(rootl[i])
 	}
 
-	buf_proof, err := json.Marshal(proof)
-	if err != nil {
-		log.Printf("json.Marshel error : %v", err)
-	}
-	log.Printf("sizof buf : %v", len(buf_proof))
+	// buf_proof, err := json.Marshal(proof)
+	// if err != nil {
+	// 	log.Printf("json.Marshel error : %v", err)
+	// }
+	// log.Printf("sizof buf : %v", len(buf_proof))
 
 	return size
 }

@@ -310,34 +310,40 @@ func EncryptPoSWithPrimeFieldPreKey(key, s []byte) (string, []byte) {
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
-	pre := uint256.NewInt(1)
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			if !ks[i%lk].IsZero() {
-				d = GFP.Div(xs[i], ks[i%lk])
-			}
-			if !pre.IsZero() {
-				d = GFP.Div(d, pre)
-			}
-			d = GFP.Exp(d, Ix3)
-			pre = d
-			y[i] = d
+	pre := uint256.NewInt(0)
+	for i := 0; i < ls; i++ {
+		var k *uint256.Int
+		if lk < ls {
+			k = ks[i%lk]
+		} else {
+			k = ks[i]
 		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			if !ks[i%lk].IsZero() {
-				d = GFP.Div(xs[i], ks[i])
-			}
-			if !pre.IsZero() {
-				d = GFP.Div(d, pre)
-			}
-			d = GFP.Exp(d, Ix3)
-			pre = d
-			y[i] = d
-		}
+		d := xs[i].Clone()
+		d = GFP.Sub(d, pre)
+		d = GFP.Exp(d, Ix3)
+		d = GFP.Sub(d, k)
+		y[i] = GFP.Exp(d, Ix3)
+		pre = y[i]
 	}
+	// if lk < ls {
+	// 	for i := 0; i < ls; i++ {
+	// 		d := xs[i].Clone()
+	// 		d = GFP.Sub(d, pre)
+	// 		d = GFP.Exp(d, Ix3)
+	// 		d = GFP.Sub(d, ks[i%lk])
+	// 		y[i] = GFP.Exp(d, Ix3)
+	// 		pre = y[i]
+	// 	}
+	// } else {
+	// 	for i := 0; i < ls; i++ {
+	// 		d := xs[i].Clone()
+	// 		d = GFP.Sub(d, pre)
+	// 		d = GFP.Exp(d, Ix3)
+	// 		d = GFP.Sub(d, ks[i])
+	// 		y[i] = GFP.Exp(d, Ix3)
+	// 		pre = y[i]
+	// 	}
+	// }
 
 	buf := new(bytes.Buffer)
 	for i := 0; i < len(y); i++ {
@@ -358,35 +364,25 @@ func DecryptPoSWithPrimeFieldPreKey(key, s []byte) []byte {
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
-	pre := uint256.NewInt(1)
+	pre := uint256.NewInt(0)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
 			d := xs[i].Clone()
 			d = GFP.Exp(d, uint256.NewInt(3))
-			if !pre.IsZero() {
-				d = GFP.Mul(d, pre)
-			}
-			if !ks[i%lk].IsZero() {
-				d = GFP.Mul(d, ks[i%lk])
-			}
-
+			d = GFP.Add(d, ks[i%lk])
+			d = GFP.Exp(d, uint256.NewInt(3))
+			y[i] = GFP.Add(d, pre)
 			pre = xs[i]
-			y[i] = d
 
 		}
 	} else {
 		for i := 0; i < ls; i++ {
 			d := xs[i].Clone()
 			d = GFP.Exp(d, uint256.NewInt(3))
-			if !pre.IsZero() {
-				d = GFP.Mul(d, pre)
-			}
-			if !ks[i].IsZero() {
-				d = GFP.Mul(d, ks[i])
-			}
-
+			d = GFP.Add(d, ks[i])
+			d = GFP.Exp(d, uint256.NewInt(3))
+			y[i] = GFP.Add(d, pre)
 			pre = xs[i]
-			y[i] = d
 		}
 	}
 

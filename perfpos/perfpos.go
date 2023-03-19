@@ -92,7 +92,7 @@ func test_aes_cbc() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(0)
 		size += int64(len(x))
 		// log.Printf("Block : %v", x[:80])
 
@@ -149,7 +149,7 @@ func test_asymm_ppos() {
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
-		x := rb.GetBlockBytes()
+		x := rb.GetBlockBytes(0)
 		size += int64(len(x))
 		// log.Printf("Block : %v", x[:80])
 
