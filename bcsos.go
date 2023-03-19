@@ -248,8 +248,12 @@ func test_fri_prove_low_degree() {
 func test_starks_prime() {
 	const PATH_TEST = "./blocks_360.json"
 	w := wallet.NewWallet("blocks.json.wallet")
-	key := w.PublicKey
-	// addr := w.PublicKey
+	addr := w.PublicKey
+	key := make([]byte, 0, len(addr)*32)
+	for i := 0; i < len(addr); i++ {
+		t := uint256.NewInt(uint64(addr[i])).Bytes32()
+		key = append(key, t[:]...)
+	}
 
 	msg := make(chan bitcoin.BlockPkt)
 	go simulation.LoadBtcData(PATH_TEST, msg)
@@ -274,15 +278,15 @@ func test_starks_prime() {
 
 		rb := bitcoin.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
-		log.Printf("Block len : %v", len(x))
-		if len(x) < 64000 {
-			continue
-		}
+		// log.Printf("Block len : %v", len(x))
+		// if len(x) < 64000 {
+		// 	continue
+		// }
 
 		// Start Encryption
 		start := time.Now().UnixNano()
-		// vis := poscipher.CalculateXorWithAddress(addr, x)
-		_, y := poscipher.EncryptPoSWithPrimeField(key, x)
+		vis := poscipher.CalculateXorWithAddress(addr, x)
+		_, y := poscipher.EncryptPoSWithPrimeField(key, vis)
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
 		// y[100] += 100
@@ -290,13 +294,13 @@ func test_starks_prime() {
 
 		// Start generating proof
 		start = time.Now().UnixNano()
-		proof := f.GenerateStarksProof(x, y, key)
+		proof := f.GenerateStarksProof(vis, y, key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, proof.MerkleRoot)
 
 		// Start verification
 		start = time.Now().UnixNano()
-		ret := f.VerifyStarksProof(x, key, proof)
+		ret := f.VerifyStarksProof(vis, proof)
 		tver += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Verifying Proof Time : %v, %v", tver, ret)
 		if !ret {
@@ -305,18 +309,18 @@ func test_starks_prime() {
 
 		start = time.Now().UnixNano()
 		x_t := poscipher.DecryptPoSWithPrimeField(key, y)
-		// x_t = poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
+		x_o := poscipher.CalculateXorWithAddress(addr, x_t[:len(x)])
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 
 		for i := 0; i < 10; i++ {
 			r := rand.Int() % len(x)
-			if x_t[r] != x[r] {
-				log.Panicf("Decryption Fail : %v", x_t[r])
+			if x_o[r] != x[r] {
+				log.Panicf("Decryption Fail : %v", x_o[r])
 			}
 		}
 
-		// key = y
+		key = y
 		// return
 	}
 	close(msg)
@@ -616,8 +620,8 @@ func main() {
 	// test_encypt_decrypt()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
-	// test_starks_prime()
-	test_starks_prime_prekey()
+	test_starks_prime()
+	// test_starks_prime_prekey()
 	// test_error_1byte_detect_starks()
 	// test_prime_field()
 	// test_fft()

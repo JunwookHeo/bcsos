@@ -221,27 +221,30 @@ func GetInverseX3() *uint256.Int {
 }
 
 func EncryptPoSWithPrimeField(key, s []byte) (string, []byte) {
-	ks := GFP.LoadUint256FromKey(key)
+	ks := GFP.LoadUint256FromStream32(key)
 	xs := GFP.LoadUint256FromStream31(s)
 	lk := len(ks)
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
+	pre := uint256.NewInt(0)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
 			d := xs[i].Clone()
-			if !ks[i%lk].IsZero() {
-				d = GFP.Div(d, ks[i%lk])
-			}
+			d = GFP.Sub(d, pre)
+			d = GFP.Exp(d, Ix3)
+			d = GFP.Sub(d, ks[i%lk])
 			y[i] = GFP.Exp(d, Ix3)
+			pre = y[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
 			d := xs[i].Clone()
-			if !ks[i].IsZero() {
-				d = GFP.Div(d, ks[i])
-			}
+			d = GFP.Sub(d, pre)
+			d = GFP.Exp(d, Ix3)
+			d = GFP.Sub(d, ks[i])
 			y[i] = GFP.Exp(d, Ix3)
+			pre = y[i]
 		}
 	}
 
@@ -258,27 +261,32 @@ func EncryptPoSWithPrimeField(key, s []byte) (string, []byte) {
 }
 
 func DecryptPoSWithPrimeField(key, s []byte) []byte {
-	ks := GFP.LoadUint256FromKey(key)
+	ks := GFP.LoadUint256FromStream32(key)
 	xs := GFP.LoadUint256FromStream32(s)
 	lk := len(ks)
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
+	pre := uint256.NewInt(0)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			d := GFP.Exp(xs[i], uint256.NewInt(3))
-			if !ks[i%lk].IsZero() {
-				d = GFP.Mul(d, ks[i%lk])
-			}
+			d := xs[i].Clone()
+			d = GFP.Exp(d, uint256.NewInt(3))
+			d = GFP.Add(d, ks[i%lk])
+			d = GFP.Exp(d, uint256.NewInt(3))
+			d = GFP.Add(d, pre)
 			y[i] = d
+			pre = xs[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			d := GFP.Exp(xs[i], uint256.NewInt(3))
-			if !ks[i].IsZero() {
-				d = GFP.Mul(d, ks[i])
-			}
+			d := xs[i].Clone()
+			d = GFP.Exp(d, uint256.NewInt(3))
+			d = GFP.Add(d, ks[i])
+			d = GFP.Exp(d, uint256.NewInt(3))
+			d = GFP.Add(d, pre)
 			y[i] = d
+			pre = xs[i]
 		}
 	}
 

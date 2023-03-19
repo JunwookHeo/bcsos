@@ -22,13 +22,13 @@ type starks struct {
 }
 
 const PSIZE = 31
-const MAXDEG = 16
+const MAXDEG = 32
 
 func NewStarks(steps int) *starks {
 	if steps == 0 {
 		steps = 2048 // 8192 / 4
 	}
-	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: steps, extFactor: 8}
+	f := starks{GFP: galois.NewGFP(), numIdx: 40, steps: steps, extFactor: 8 * 2}
 
 	return &f
 }
@@ -309,7 +309,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 
 	}
 
-	roudeg = roudeg / 2
+	// roudeg = roudeg / 2
 
 	data := proof[len(proof)-1]
 	mdata := make([]*uint256.Int, len(data.Root2))
@@ -317,7 +317,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 		mdata[i] = f.GFP.IntFromBytes(data.Root2[i])
 	}
 
-	roudeg = uint64(len(mdata)/8) * 4
+	roudeg = uint64(len(mdata)/f.extFactor) * 8
 	log.Printf("rou deg-data deg : %v-%v", roudeg, len(mdata))
 
 	mtree := f.Merklize(mdata)
@@ -363,17 +363,29 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 // Vos : Output values
 // key : Adress of Prover
 func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.StarksProof {
-	visu := f.GFP.LoadUint256FromStream31(vis)
-	vosu := f.GFP.LoadUint256FromStream32(vos)
-	ks := f.GFP.LoadUint256FromKey(key)
+	pxu := f.GFP.LoadUint256FromStream31(vis)
+	oxu := f.GFP.LoadUint256FromStream32(vos)
+	kxu := f.GFP.LoadUint256FromStream32(key)
 
-	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(ks), len(visu), len(vosu))
+	log.Printf("Size of Inputs ks(%v), vi(%v), vo(%v)", len(kxu), len(pxu), len(oxu))
 
-	for i := len(visu); i < f.steps; i++ {
-		visu = append(visu, uint256.NewInt(0))
+	klen := len(kxu)
+	if len(kxu) < len(pxu) {
+		for i := len(kxu); len(kxu) < len(pxu); i++ {
+			kxu = append(kxu, kxu[i%klen])
+		}
+	} else {
+		kxu = kxu[:len(pxu)]
 	}
-	for i := len(vosu); i < f.steps; i++ {
-		vosu = append(vosu, uint256.NewInt(0))
+
+	for i := len(pxu); i < f.steps; i++ {
+		pxu = append(pxu, uint256.NewInt(0))
+	}
+	for i := len(oxu); i < f.steps; i++ {
+		oxu = append(oxu, uint256.NewInt(0))
+	}
+	for i := len(kxu); i < f.steps; i++ {
+		kxu = append(kxu, uint256.NewInt(0))
 	}
 
 	precision := f.steps * f.extFactor
@@ -388,54 +400,54 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	// log.Printf("G1 : %v", G1)
 
-	// Vi(x)
-	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
-	eval_visu := f.GFP.DFT(poly_visu, G2)
+	// P(x)
+	poly_pxu := f.GFP.IDFT(pxu[0:f.steps], G1)
+	eval_pxu := f.GFP.DFT(poly_pxu, G2)
 	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
 	// for i := 0; i < 10; i++ {
 	// 	log.Printf("eval_visu : %v, %v", visu[i], eval_visu[i*f.extFactor])
 	// }
 
-	// Vo(x)
-	poly_vosu := f.GFP.IDFT(vosu[0:f.steps], G1)
-	eval_vosu := f.GFP.DFT(poly_vosu, G2)
+	// O(x)
+	poly_oxu := f.GFP.IDFT(oxu[0:f.steps], G1)
+	eval_oxu := f.GFP.DFT(poly_oxu, G2)
 	// log.Printf("vosu : %v, %v", len(poly_vosu), len(eval_vosu))
 	// for i := 0; i < 10; i++ {
 	// 	log.Printf("eval_vosu : %v, %v", vosu[i], eval_vosu[i*f.extFactor])
 	// }
 
-	skip2 := f.steps / len(ks)
+	// O(x/g1)
+	poxu := make([]*uint256.Int, f.steps)
+	poxu[0] = uint256.NewInt(0)
+	for i := 1; i < f.steps; i++ {
+		poxu[i] = oxu[i-1]
+	}
+	poly_poxu := f.GFP.IDFT(poxu, G1)
+	eval_poxu := f.GFP.DFT(poly_poxu, G2)
+
+	// skip2 := f.steps / len(kxu)
 	// log.Printf("skip for key : %v", skip2)
 
 	// K(x)
-	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G1, uint256.NewInt(uint64(skip2))))
-	eval_key := f.GFP.DFT(poly_key, f.GFP.Exp(G2, uint256.NewInt(uint64(skip2))))
+	poly_kxu := f.GFP.IDFT(kxu[:f.steps], G1)
+	eval_kxu := f.GFP.DFT(poly_kxu, G2)
 	// log.Printf("skip for key : %v", len(eval_key))
 
-	// C(x) = C(Vi(x), Vo(x), K(x))
-	// Vo[i]^3 * Vo[i-1] - K[i] = Vi[i]
-	// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+	// C(x) = C(P(x), O(x), K(x))
+	// C(x) = P(x) - (((O(x)^3 - K(x))^3 - O(x/g1))
 	eval_cp := make([]*uint256.Int, precision)
-	// pre := uint256.NewInt(1)
 	for i := 0; i < precision; i++ {
-		c := f.GFP.Exp(eval_vosu[i], uint256.NewInt(3))
-		if !eval_key[i%len(eval_key)].IsZero() {
-			c = f.GFP.Mul(c, eval_key[i%len(eval_key)])
-		}
+		c := eval_oxu[i].Clone()
+		c = f.GFP.Exp(c, uint256.NewInt(3))
+		c = f.GFP.Add(c, eval_kxu[i])
+		c = f.GFP.Exp(c, uint256.NewInt(3))
+		c = f.GFP.Add(c, eval_poxu[i])
 
-		eval_cp[i] = f.GFP.Sub(eval_visu[i], c)
-
-		// if i+1-f.extFactor < 0 {
-		// 	pre = eval_vosu[(i+1-f.extFactor)+precision]
-		// } else {
-		// 	pre = eval_vosu[i+1-f.extFactor]
-		// }
-
+		eval_cp[i] = f.GFP.Sub(eval_pxu[i], c)
 	}
 
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
-	size -= 1
-	xs = xs[0:size]
+	xs = xs[:size-1]
 	// log.Printf("size : %v, xs[0] : %v, xs[-1] : %v", size, xs[0], xs[len(xs)-1])
 
 	// Z(x)
@@ -456,7 +468,7 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	// Compute polynomial for Vos
 	// Compute interpolant of ((1, input), (x_atlast_step, output))
 	xos := []*uint256.Int{xs[0], xs[(f.steps-1)*f.extFactor]}
-	yos := []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	yos := []*uint256.Int{oxu[0], oxu[f.steps-1]}
 
 	// Io(x)
 	poly_io := f.GFP.LagrangeInterp(xos, yos)
@@ -486,15 +498,19 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	// B(x) = (Vo(x) - Io(x)) / Zo(x)
 	eval_b := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
-		eval_b[i] = f.GFP.Sub(eval_vosu[i], eval_io[i])
+		eval_b[i] = f.GFP.Sub(eval_oxu[i], eval_io[i])
 		eval_b[i] = f.GFP.Mul(eval_b[i], eval_inv_zo[i])
 	}
 
 	// Compute Merkle Root
-	tree_vosu := f.Merklize(eval_vosu)
+	tree_oxu := f.Merklize(eval_oxu)
+	tree_poxu := f.Merklize(eval_poxu)
+	tree_kxu := f.Merklize(eval_kxu)
 	tree_d := f.Merklize(eval_d)
 	tree_b := f.Merklize(eval_b)
-	mr := tree_vosu[1]
+	mr := tree_oxu[1]
+	mr = append(mr, tree_poxu[1]...)
+	mr = append(mr, tree_kxu[1]...)
 	mr = append(mr, tree_d[1]...)
 	mr = append(mr, tree_b[1]...)
 	m_root := f.GetHashBytes(mr)
@@ -523,52 +539,41 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	eval_l := make([]*uint256.Int, precision)
 	for i := 0; i < precision; i++ {
 		eval_l[i] = uint256.NewInt(0)
-		p := f.GFP.Add(f.GFP.Mul(eval_vosu[i], k1), f.GFP.Mul(eval_vosu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
+		p := f.GFP.Add(f.GFP.Mul(eval_oxu[i], k1), f.GFP.Mul(eval_oxu[i], f.GFP.Mul(k2, powers[i%f.extFactor])))
 		b := f.GFP.Add(f.GFP.Mul(eval_b[i], k3), f.GFP.Mul(eval_b[i], f.GFP.Mul(k4, powers[i%f.extFactor])))
 		eval_l[i] = f.GFP.Add(eval_l[i], p)
-		eval_l[i] = f.GFP.Add(eval_l[i], eval_d[i])
 		eval_l[i] = f.GFP.Add(eval_l[i], b)
+		eval_l[i] = f.GFP.Add(eval_l[i], eval_d[i])
 	}
 
 	// Compute Merkle root of L(x)
 	tree_l := f.Merklize(eval_l)
 
 	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
-	augmented_positions := make([]uint32, len(positions)*2)
-	for i := 0; i < len(positions); i++ {
-		// In this case, we need previous Vo(x) for encryption/decryption
-		augmented_positions[i*2] = positions[i]
-		if positions[i] >= uint32(skips) {
-			augmented_positions[i*2+1] = positions[i] - uint32(skips)
-		} else {
-			augmented_positions[i*2+1] = uint32(precision) + positions[i] - uint32(skips)
-		}
-	}
-	// log.Printf("positions : %v", positions)
-	// log.Printf("augmented_positions : %v", augmented_positions)
-	// log.Printf("tree_l : %v", tree_l[1])
 
 	var proof dtype.StarksProof
 	// proof := make([]interface{}, 8)
 	proof.MerkleRoot = m_root
-	proof.TreeRoots = [][]byte{tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
-	proof.TreeOxu = f.MakeMultiBranch(tree_vosu, augmented_positions)
-	proof.TreeD = f.MakeMultiBranch(tree_d, augmented_positions)
-	proof.TreeB = f.MakeMultiBranch(tree_b, augmented_positions)
+	proof.TreeRoots = [][]byte{tree_oxu[1], tree_poxu[1], tree_kxu[1], tree_d[1], tree_b[1], tree_l[1]}
+	proof.TreeOxu = f.MakeMultiBranch(tree_oxu, positions)
+	proof.TreePOxu = f.MakeMultiBranch(tree_poxu, positions)
+	proof.TreeKxu = f.MakeMultiBranch(tree_kxu, positions)
+	proof.TreeD = f.MakeMultiBranch(tree_d, positions)
+	proof.TreeB = f.MakeMultiBranch(tree_b, positions)
 	proof.TreeL = f.MakeMultiBranch(tree_l, positions)
-	proof.VosuFl = []*uint256.Int{vosu[0], vosu[f.steps-1]}
+	proof.VosuFl = []*uint256.Int{oxu[0], oxu[f.steps-1]}
 	proof.FriProof = f.ProveLowDegree(eval_l, G2)
 
 	return &proof
 }
 
-func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksProof) bool {
-	visu := f.GFP.LoadUint256FromStream31(vis)
-	ks := f.GFP.LoadUint256FromKey(key)
-	log.Printf("Length of Inputs : ks(%v), vi(%v)", len(ks), len(visu))
+func (f *starks) VerifyStarksProof(vis []byte, proof *dtype.StarksProof) bool {
+	pxu := f.GFP.LoadUint256FromStream31(vis)
+	// kxu := f.GFP.LoadUint256FromKey(key)
+	// log.Printf("Length of Inputs : ks(%v), vi(%v)", len(kxu), len(pxu))
 
-	for i := len(visu); i < f.steps; i++ {
-		visu = append(visu, uint256.NewInt(0))
+	for i := len(pxu); i < f.steps; i++ {
+		pxu = append(pxu, uint256.NewInt(0))
 	}
 
 	precision := f.steps * f.extFactor
@@ -583,47 +588,40 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	// log.Printf("G1 : %v", G1)
 
-	skip2 := f.steps / len(ks)
+	// skip2 := f.steps / len(kxu)
 	// log.Printf("skip for key : %v", skip2)
 
-	// Vi(x)
-	poly_visu := f.GFP.IDFT(visu[0:f.steps], G1)
-	eval_visu := f.GFP.DFT(poly_visu, G2)
+	// P(x)
+	poly_pxu := f.GFP.IDFT(pxu[0:f.steps], G1)
+	eval_pxu := f.GFP.DFT(poly_pxu, G2)
 	// log.Printf("visu : %v, %v", len(poly_visu), len(eval_visu))
 
 	// K(x)
-	poly_key := f.GFP.IDFT(ks, f.GFP.Exp(G2, f.GFP.Mul(uint256.NewInt(uint64(f.extFactor)), uint256.NewInt(uint64(skip2)))))
+	// poly_kxu := f.GFP.IDFT(kxu, f.GFP.Exp(G2, f.GFP.Mul(uint256.NewInt(uint64(f.extFactor)), uint256.NewInt(uint64(skip2)))))
 	// log.Printf("poly_key %v", len(poly_key))
-
-	m_root := proof.MerkleRoot
-	tree_roots := proof.TreeRoots
-	tree_vosu := proof.TreeOxu
-	tree_d := proof.TreeD
-	tree_b := proof.TreeB
-	tree_l := proof.TreeL
-	vosu_fl := proof.VosuFl
-	fri_proof := proof.FriProof
 
 	// Verify root of trees
 	// tree_roots = {tree_vosu[1], tree_d[1], tree_b[1], tree_l[1]}
-	mr := tree_roots[0]
-	mr = append(mr, tree_roots[1]...)
-	mr = append(mr, tree_roots[2]...)
+	mr := proof.TreeRoots[0]
+	mr = append(mr, proof.TreeRoots[1]...)
+	mr = append(mr, proof.TreeRoots[2]...)
+	mr = append(mr, proof.TreeRoots[3]...)
+	mr = append(mr, proof.TreeRoots[4]...)
 	h1 := hex.EncodeToString(f.GetHashBytes(mr))
-	h2 := hex.EncodeToString(m_root)
+	h2 := hex.EncodeToString(proof.MerkleRoot)
 	if h1 != h2 {
 		log.Printf("Verifying m_root hash : %v != %v", h1, h2)
 		return false
 	}
 
-	if !f.VerifyLowDegreeProof(tree_roots[3], fri_proof, G2) {
+	if !f.VerifyLowDegreeProof(proof.TreeRoots[5], proof.FriProof, G2) {
 		log.Printf("Low Degree Testing Fail")
 		return false
 	}
 
 	// L(x) : Linear combination
 	k1 := uint256.NewInt(0)
-	kt := f.GetHashBytes(m_root)
+	kt := f.GetHashBytes(proof.MerkleRoot)
 	k1.SetBytes8(kt)
 	k2 := uint256.NewInt(0)
 	kt = f.GetHashBytes(k1.Bytes())
@@ -635,18 +633,7 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 	kt = f.GetHashBytes(k3.Bytes())
 	k4.SetBytes8(kt)
 
-	positions := f.GetPseudorandomIndices(m_root, uint32(precision), 80, uint32(f.extFactor))
-	augmented_positions := make([]uint32, len(positions)*2)
-
-	for i := 0; i < len(positions); i++ {
-		// In this case, we need previous Vo(x) for encryption/decryption
-		augmented_positions[i*2] = positions[i]
-		if positions[i] >= uint32(skips) {
-			augmented_positions[i*2+1] = positions[i] - uint32(skips)
-		} else {
-			augmented_positions[i*2+1] = uint32(precision) + positions[i] - uint32(skips)
-		}
-	}
+	positions := f.GetPseudorandomIndices(proof.MerkleRoot, uint32(precision), 80, uint32(f.extFactor))
 
 	// Compute Io(x)
 	lp := uint256.NewInt(uint64((f.steps - 1) * f.extFactor))
@@ -654,7 +641,7 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 
 	// Io(x)
 	xos := []*uint256.Int{uint256.NewInt(1), last_step_position}
-	yos := []*uint256.Int{vosu_fl[0], vosu_fl[1]}
+	yos := []*uint256.Int{proof.VosuFl[0], proof.VosuFl[1]}
 	poly_io := f.GFP.LagrangeInterp(xos, yos)
 
 	// Zo(x)
@@ -664,10 +651,12 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 
 	// log.Printf("io : %v, zo : %v", poly_io, poly_zo)
 
-	leaves_vosu := f.VerifyMultiBranch(tree_roots[0], augmented_positions, tree_vosu)
-	leaves_d := f.VerifyMultiBranch(tree_roots[1], augmented_positions, tree_d)
-	leaves_b := f.VerifyMultiBranch(tree_roots[2], augmented_positions, tree_b)
-	leaves_l := f.VerifyMultiBranch(tree_roots[3], positions, tree_l)
+	leaves_oxu := f.VerifyMultiBranch(proof.TreeRoots[0], positions, proof.TreeOxu)
+	leaves_poxu := f.VerifyMultiBranch(proof.TreeRoots[1], positions, proof.TreePOxu)
+	leaves_kxu := f.VerifyMultiBranch(proof.TreeRoots[2], positions, proof.TreeKxu)
+	leaves_d := f.VerifyMultiBranch(proof.TreeRoots[3], positions, proof.TreeD)
+	leaves_b := f.VerifyMultiBranch(proof.TreeRoots[4], positions, proof.TreeB)
+	leaves_l := f.VerifyMultiBranch(proof.TreeRoots[5], positions, proof.TreeL)
 
 	// log.Printf("leaves %v, %v, %v, %v", len(leaves_vosu), len(leaves_d), len(leaves_b), len(leaves_l))
 
@@ -676,27 +665,27 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 		x := f.GFP.Exp(G2, power)
 		x_to_steps := f.GFP.Exp(x, uint256.NewInt(uint64(f.steps)))
 
-		vi_x := eval_visu[positions[i]]
-		vo_x := f.GFP.IntFromBytes(leaves_vosu[i*2])
-		// vo_xpre := f.GFP.IntFromBytes(leaves_vosu[i*2+1])
-		d_x := f.GFP.IntFromBytes(leaves_d[i*2])
-		b_x := f.GFP.IntFromBytes(leaves_b[i*2])
+		p_x := eval_pxu[positions[i]]
+		o_x := f.GFP.IntFromBytes(leaves_oxu[i])
+		po_x := f.GFP.IntFromBytes(leaves_poxu[i])
+		k_x := f.GFP.IntFromBytes(leaves_kxu[i])
+		d_x := f.GFP.IntFromBytes(leaves_d[i])
+		b_x := f.GFP.IntFromBytes(leaves_b[i])
 		l_x := f.GFP.IntFromBytes(leaves_l[i])
 
 		z := f.GFP.Exp(x, uint256.NewInt(uint64(f.steps)))
 		z = f.GFP.Sub(z, uint256.NewInt(1))
-		k_x := f.GFP.EvalPolyAt(poly_key, f.GFP.Exp(x, uint256.NewInt(uint64(skip2))))
 
 		// log.Printf("vi : %v, vo : %v, vo_pre : %v, kx : %v", vi_x, vo_x, vo_xpre, k_x)
 
-		// C(x) = Vi(x) - (Vo(x)^3 * Vo(x/g1) - K(x))
+		// C(x) = P(x) - (((O(x)^3 + K(x))^3 + O(x/g1))
 		// C(x) = Z(x)*D(x)
-		c := f.GFP.Exp(vo_x, uint256.NewInt(3))
-		if !k_x.IsZero() {
-			c = f.GFP.Mul(c, k_x)
-		}
+		c := f.GFP.Exp(o_x, uint256.NewInt(3))
+		c = f.GFP.Add(c, k_x)
+		c = f.GFP.Exp(c, uint256.NewInt(3))
+		c = f.GFP.Add(c, po_x)
 
-		c = f.GFP.Sub(vi_x, c)
+		c = f.GFP.Sub(p_x, c)
 		q := f.GFP.Mul(d_x, z)
 
 		if c.Cmp(q) != 0 {
@@ -709,13 +698,13 @@ func (f *starks) VerifyStarksProof(vis []byte, key []byte, proof *dtype.StarksPr
 		io := f.GFP.EvalPolyAt(poly_io, x)
 		zo := f.GFP.EvalPolyAt(poly_zo, x)
 		vb := f.GFP.Add(f.GFP.Mul(b_x, zo), io)
-		if vb.Cmp(vo_x) != 0 {
-			log.Printf("Verification fail : B(x) * Zo(x) + Io(x) != Vo(x), %v, %v", vb, vo_x)
+		if vb.Cmp(o_x) != 0 {
+			log.Printf("Verification fail : B(x) * Zo(x) + Io(x) != Vo(x), %v, %v", vb, o_x)
 			return false
 		}
 
 		// Check correctness of the linear combination
-		p := f.GFP.Add(f.GFP.Mul(vo_x, k1), f.GFP.Mul(vo_x, f.GFP.Mul(k2, x_to_steps)))
+		p := f.GFP.Add(f.GFP.Mul(o_x, k1), f.GFP.Mul(o_x, f.GFP.Mul(k2, x_to_steps)))
 		b := f.GFP.Add(f.GFP.Mul(b_x, k3), f.GFP.Mul(b_x, f.GFP.Mul(k4, x_to_steps)))
 		vl := f.GFP.Add(d_x, p)
 		vl = f.GFP.Add(vl, b)
@@ -814,9 +803,13 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 		c = f.GFP.Exp(c, uint256.NewInt(3))
 		if !eval_poxu[i].IsZero() {
 			c = f.GFP.Mul(c, eval_poxu[i])
+		} else {
+			log.Printf(">>>> zero pre")
 		}
 		if !eval_kxu[i].IsZero() {
 			c = f.GFP.Mul(c, eval_kxu[i])
+		} else {
+			log.Printf(">>>> zero key")
 		}
 
 		eval_cp[i] = f.GFP.Sub(eval_pxu[i], c)
