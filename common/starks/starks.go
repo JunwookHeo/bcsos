@@ -317,7 +317,7 @@ func (f *starks) VerifyLowDegreeProof(root []byte, proof []*dtype.FriProofElemen
 		mdata[i] = f.GFP.IntFromBytes(data.Root2[i])
 	}
 
-	roudeg = uint64(len(mdata)/f.extFactor) * 8
+	roudeg = uint64(len(mdata)/f.extFactor) * 12
 	log.Printf("rou deg-data deg : %v-%v", roudeg, len(mdata))
 
 	mtree := f.Merklize(mdata)
@@ -388,6 +388,11 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 		kxu = append(kxu, uint256.NewInt(0))
 	}
 
+	// make K non-zero
+	for i := 0; i < f.steps; i++ {
+		kxu[i] = f.GFP.OrOne(kxu[i])
+	}
+
 	precision := f.steps * f.extFactor
 	skips := precision / f.steps
 	log.Printf("precision : %v, skips : %v", precision, skips)
@@ -418,9 +423,9 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 
 	// O(x/g1)
 	poxu := make([]*uint256.Int, f.steps)
-	poxu[0] = uint256.NewInt(0)
+	poxu[0] = uint256.NewInt(1)
 	for i := 1; i < f.steps; i++ {
-		poxu[i] = oxu[i-1]
+		poxu[i] = f.GFP.OrOne(oxu[i-1])
 	}
 	poly_poxu := f.GFP.IDFT(poxu, G1)
 	eval_poxu := f.GFP.DFT(poly_poxu, G2)
@@ -439,9 +444,9 @@ func (f *starks) GenerateStarksProof(vis []byte, vos []byte, key []byte) *dtype.
 	for i := 0; i < precision; i++ {
 		c := eval_oxu[i].Clone()
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, eval_kxu[i])
+		c = f.GFP.Mul(c, eval_kxu[i])
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, eval_poxu[i])
+		c = f.GFP.Mul(c, eval_poxu[i])
 
 		eval_cp[i] = f.GFP.Sub(eval_pxu[i], c)
 	}
@@ -681,9 +686,9 @@ func (f *starks) VerifyStarksProof(vis []byte, proof *dtype.StarksProof) bool {
 		// C(x) = P(x) - (((O(x)^3 + K(x))^3 + O(x/g1))
 		// C(x) = Z(x)*D(x)
 		c := f.GFP.Exp(o_x, uint256.NewInt(3))
-		c = f.GFP.Add(c, k_x)
+		c = f.GFP.Mul(c, k_x)
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, po_x)
+		c = f.GFP.Mul(c, po_x)
 
 		c = f.GFP.Sub(p_x, c)
 		q := f.GFP.Mul(d_x, z)
@@ -778,18 +783,22 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	eval_oxu := f.GFP.DFT(poly_oxu, G2)
 
 	// K(x)
+	// make K non-zero
+	for i := 0; i < f.steps; i++ {
+		kxu[si+i] = f.GFP.OrOne(kxu[si+i])
+	}
 	poly_kxu := f.GFP.IDFT(kxu[si:f.steps+si], G1)
 	eval_kxu := f.GFP.DFT(poly_kxu, G2)
 
 	// Polynomial of O(x/g1)
 	poxu := make([]*uint256.Int, f.steps)
 	if si == 0 {
-		poxu[0] = uint256.NewInt(0)
+		poxu[0] = uint256.NewInt(1)
 	} else {
-		poxu[0] = oxu[si-1]
+		poxu[0] = f.GFP.OrOne(oxu[si-1])
 	}
 	for i := 1; i < f.steps; i++ {
-		poxu[i] = oxu[si+i-1]
+		poxu[i] = f.GFP.OrOne(oxu[si+i-1])
 	}
 	poly_poxu := f.GFP.IDFT(poxu, G1)
 	eval_poxu := f.GFP.DFT(poly_poxu, G2)
@@ -801,12 +810,11 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	for i := 0; i < precision; i++ {
 		c := eval_oxu[i].Clone()
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, eval_kxu[i])
+		c = f.GFP.Mul(c, eval_kxu[i])
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, eval_poxu[i])
+		c = f.GFP.Mul(c, eval_poxu[i])
 
 		eval_cp[i] = f.GFP.Sub(eval_pxu[i], c)
-
 	}
 
 	size, xs := f.GFP.ExtRootUnity(G2, false) // return from x^0 to x^n, x^n == x^0
@@ -1045,9 +1053,9 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 		// C(x) = Z(x)*D(x)
 		c := vo_x.Clone()
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, k_x)
+		c = f.GFP.Mul(c, k_x)
 		c = f.GFP.Exp(c, uint256.NewInt(3))
-		c = f.GFP.Add(c, vo_xpre)
+		c = f.GFP.Mul(c, vo_xpre)
 
 		c = f.GFP.Sub(vi_x, c)
 		q := f.GFP.Mul(d_x, z)

@@ -227,25 +227,20 @@ func EncryptPoSWithPrimeField(key, s []byte) (string, []byte) {
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
-	pre := uint256.NewInt(0)
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			d = GFP.Sub(d, pre)
-			d = GFP.Exp(d, Ix3)
-			d = GFP.Sub(d, ks[i%lk])
-			y[i] = GFP.Exp(d, Ix3)
-			pre = y[i]
+	pre := uint256.NewInt(1)
+	for i := 0; i < ls; i++ {
+		var k *uint256.Int
+		if lk < ls {
+			k = GFP.OrOne(ks[i%lk])
+		} else {
+			k = GFP.OrOne(ks[i])
 		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			d = GFP.Sub(d, pre)
-			d = GFP.Exp(d, Ix3)
-			d = GFP.Sub(d, ks[i])
-			y[i] = GFP.Exp(d, Ix3)
-			pre = y[i]
-		}
+		d := xs[i].Clone()
+		d = GFP.Div(d, pre)
+		d = GFP.Exp(d, Ix3)
+		d = GFP.Div(d, k)
+		y[i] = GFP.Exp(d, Ix3)
+		pre = GFP.OrOne(y[i])
 	}
 
 	buf := new(bytes.Buffer)
@@ -267,27 +262,20 @@ func DecryptPoSWithPrimeField(key, s []byte) []byte {
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
-	pre := uint256.NewInt(0)
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			d = GFP.Exp(d, uint256.NewInt(3))
-			d = GFP.Add(d, ks[i%lk])
-			d = GFP.Exp(d, uint256.NewInt(3))
-			d = GFP.Add(d, pre)
-			y[i] = d
-			pre = xs[i]
+	pre := uint256.NewInt(1)
+	for i := 0; i < ls; i++ {
+		var k *uint256.Int
+		if lk < ls {
+			k = GFP.OrOne(ks[i%lk])
+		} else {
+			k = GFP.OrOne(ks[i])
 		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			d = GFP.Exp(d, uint256.NewInt(3))
-			d = GFP.Add(d, ks[i])
-			d = GFP.Exp(d, uint256.NewInt(3))
-			d = GFP.Add(d, pre)
-			y[i] = d
-			pre = xs[i]
-		}
+		d := xs[i].Clone()
+		d = GFP.Exp(d, uint256.NewInt(3))
+		d = GFP.Mul(d, k)
+		d = GFP.Exp(d, uint256.NewInt(3))
+		y[i] = GFP.Mul(d, pre)
+		pre = GFP.OrOne(xs[i])
 	}
 
 	buf := new(bytes.Buffer)
@@ -310,40 +298,21 @@ func EncryptPoSWithPrimeFieldPreKey(key, s []byte) (string, []byte) {
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
-	pre := uint256.NewInt(0)
+	pre := uint256.NewInt(1)
 	for i := 0; i < ls; i++ {
 		var k *uint256.Int
 		if lk < ls {
-			k = ks[i%lk]
+			k = GFP.OrOne(ks[i%lk])
 		} else {
-			k = ks[i]
+			k = GFP.OrOne(ks[i])
 		}
 		d := xs[i].Clone()
-		d = GFP.Sub(d, pre)
+		d = GFP.Div(d, pre)
 		d = GFP.Exp(d, Ix3)
-		d = GFP.Sub(d, k)
+		d = GFP.Div(d, k)
 		y[i] = GFP.Exp(d, Ix3)
-		pre = y[i]
+		pre = GFP.OrOne(y[i])
 	}
-	// if lk < ls {
-	// 	for i := 0; i < ls; i++ {
-	// 		d := xs[i].Clone()
-	// 		d = GFP.Sub(d, pre)
-	// 		d = GFP.Exp(d, Ix3)
-	// 		d = GFP.Sub(d, ks[i%lk])
-	// 		y[i] = GFP.Exp(d, Ix3)
-	// 		pre = y[i]
-	// 	}
-	// } else {
-	// 	for i := 0; i < ls; i++ {
-	// 		d := xs[i].Clone()
-	// 		d = GFP.Sub(d, pre)
-	// 		d = GFP.Exp(d, Ix3)
-	// 		d = GFP.Sub(d, ks[i])
-	// 		y[i] = GFP.Exp(d, Ix3)
-	// 		pre = y[i]
-	// 	}
-	// }
 
 	buf := new(bytes.Buffer)
 	for i := 0; i < len(y); i++ {
@@ -364,26 +333,21 @@ func DecryptPoSWithPrimeFieldPreKey(key, s []byte) []byte {
 	ls := len(xs)
 
 	y := make([]*uint256.Int, ls)
-	pre := uint256.NewInt(0)
-	if lk < ls {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			d = GFP.Exp(d, uint256.NewInt(3))
-			d = GFP.Add(d, ks[i%lk])
-			d = GFP.Exp(d, uint256.NewInt(3))
-			y[i] = GFP.Add(d, pre)
-			pre = xs[i]
+	pre := uint256.NewInt(1)
+	for i := 0; i < ls; i++ {
+		var k *uint256.Int
+		if lk < ls {
+			k = GFP.OrOne(ks[i%lk])
+		} else {
+			k = GFP.OrOne(ks[i])
+		}
+		d := xs[i].Clone()
+		d = GFP.Exp(d, uint256.NewInt(3))
+		d = GFP.Mul(d, k)
+		d = GFP.Exp(d, uint256.NewInt(3))
+		y[i] = GFP.Mul(d, pre)
+		pre = GFP.OrOne(xs[i])
 
-		}
-	} else {
-		for i := 0; i < ls; i++ {
-			d := xs[i].Clone()
-			d = GFP.Exp(d, uint256.NewInt(3))
-			d = GFP.Add(d, ks[i])
-			d = GFP.Exp(d, uint256.NewInt(3))
-			y[i] = GFP.Add(d, pre)
-			pre = xs[i]
-		}
 	}
 
 	buf := new(bytes.Buffer)

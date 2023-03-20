@@ -77,6 +77,11 @@ func (gf *GFP) Div(x, y *uint256.Int) *uint256.Int {
 	return gf.Mul(x, gf.Inv(y))
 }
 
+func (gf *GFP) OrOne(x *uint256.Int) *uint256.Int {
+	s := new(uint256.Int)
+	return s.Or(x, uint256.NewInt(1))
+}
+
 func (gf *GFP) Exp(x, y *uint256.Int) *uint256.Int {
 	a := x.ToBig()
 	b := y.ToBig()

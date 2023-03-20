@@ -247,7 +247,7 @@ func test_fri_prove_low_degree() {
 }
 
 func test_starks_prime() {
-	const PATH_TEST = "./blocks_360.json"
+	const PATH_TEST = "./blocks.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	addr := w.PublicKey
 	key := make([]byte, 0, len(addr)*32)
@@ -299,7 +299,7 @@ func test_starks_prime() {
 		start = time.Now().UnixNano()
 		proof := f.GenerateStarksProof(vis, y, key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
-		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, proof.MerkleRoot)
+		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, hex.EncodeToString(proof.MerkleRoot))
 
 		// Start verification
 		start = time.Now().UnixNano()
@@ -331,7 +331,7 @@ func test_starks_prime() {
 }
 
 func test_starks_prime_prekey() {
-	const PATH_TEST = "./blocks_720.json"
+	const PATH_TEST = "./blocks.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	addr := w.PublicKey
 	key := make([]byte, 0, len(addr)*32)
