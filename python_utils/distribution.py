@@ -87,7 +87,7 @@ def probability_detecting_sim():
     # print(block_size)
 
     random.seed()
-    K = 31*2048
+    K = 31*1024
     d = 0
     p = 0.
     for i, s in enumerate(block_size):
@@ -108,5 +108,5 @@ def probability_detecting_sim():
     
 # exponential_select()
 # exponential_distribution()
-probability_detecting()
-# probability_detecting_sim()
+# probability_detecting()
+probability_detecting_sim()

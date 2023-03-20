@@ -265,7 +265,7 @@ func test_starks_prime() {
 	tver := int64(0)
 	loop := 0
 
-	f := starks.NewStarks(65536 / 8 / 4)
+	f := starks.NewStarks(65536 / 16 / 4)
 
 	for {
 		d, ok := <-msg
@@ -349,7 +349,7 @@ func test_starks_prime_prekey() {
 	tver := int64(0)
 	loop := 0
 
-	f := starks.NewStarks(65536 / 8 / 4)
+	f := starks.NewStarks(65536 / 16 / 4)
 
 	for {
 		d, ok := <-msg
@@ -431,7 +431,7 @@ func test_error_1byte_detect_starks() {
 	msg := make(chan bitcoin.BlockPkt)
 	go simulation.LoadBtcData(PATH_TEST, msg)
 
-	step := 65536 / 8 / 4
+	step := 65536 / 16 / 4
 	f := starks.NewStarks(step)
 
 	det := 0

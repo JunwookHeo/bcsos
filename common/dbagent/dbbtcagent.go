@@ -80,7 +80,7 @@ type btcdbagent struct {
 }
 
 const SIZE_PROOF = 8 + 32 + 32*config.NUM_CONSECUTIVE_HASHES + 32*config.NUM_CONSECUTIVE_HASHES
-const SIZE_STARKS = 65536 / 8 / 4
+const SIZE_STEPS_STARKS = 65536 / 16 / 4
 const (
 	V_SUCCESS         int = 0
 	V_FAIL_TIME           = 1
@@ -194,7 +194,7 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 
 	block.SetHash(rb.GetRawBytes(0, 80))
 	hash := block.GetHashString()
-	s := rb.GetBlockBytes(SIZE_STARKS * 31)
+	s := rb.GetBlockBytes(SIZE_STEPS_STARKS * 31)
 	size := len(s)
 	addr := a.getEncryptKeyforGenesis()
 
@@ -385,7 +385,7 @@ func (a *btcdbagent) generateStarksProof(height int, hash string) *dtype.NonInte
 
 	vis := a.decryptPoSWithVariableLength(key, cb)
 
-	f := starks.NewStarks(SIZE_STARKS)
+	f := starks.NewStarks(SIZE_STEPS_STARKS)
 	starks_proof := f.GenerateStarksProofPreKey(hash, vis, cb, key)
 	proof_size := f.GetSizeStarksProofPreKey(starks_proof)
 	gap := int(time.Now().UnixNano() - start)
@@ -645,7 +645,7 @@ func (a *btcdbagent) VerifyNonInterActiveProofStorage(tlb int64, trb int64, trp 
 	}
 	vis := poscipher.CalculateXorWithAddress(addr, b)
 
-	f := starks.NewStarks(65536 / 8 / 4)
+	f := starks.NewStarks(SIZE_STEPS_STARKS)
 	ret := f.VerifyStarksProofPreKey(vis, starks_proof)
 	if !ret {
 		dbverif.IsSuccess |= V_FAIL_VERIFY

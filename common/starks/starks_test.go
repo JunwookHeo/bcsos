@@ -21,6 +21,10 @@ func TestStarksMerklize(t *testing.T) {
 
 	ys := f.Merklize(xs)
 	assert.Equal(t, len(xs)*2, len(ys))
+
+	dices := f.GetPseudorandomIndices(ys[1], uint32(len(xs)), 10, uint32(f.extFactor))
+	branches := f.MakeMultiBranch(ys, dices)
+	log.Printf("%v", branches)
 }
 
 func TestStarksDivid(t *testing.T) {
