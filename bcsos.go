@@ -331,7 +331,7 @@ func test_starks_prime() {
 }
 
 func test_starks_prime_prekey() {
-	const PATH_TEST = "./blocks.json"
+	const PATH_TEST = "./blocks_720.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	addr := w.PublicKey
 	key := make([]byte, 0, len(addr)*32)
@@ -416,8 +416,11 @@ func test_starks_prime_prekey() {
 	close(msg)
 }
 
-func test_error_1byte_detect_starks() {
+func test_error_1byte_detect_starks(target string) {
 	const PATH_TEST = "./blocks_720.json"
+	if target == "" {
+		target = PATH_TEST
+	}
 	w := wallet.NewWallet("blocks.json.wallet")
 	addr := w.PublicKey
 	key := make([]byte, 0, len(addr)*32)
@@ -429,7 +432,7 @@ func test_error_1byte_detect_starks() {
 	rand.Seed(time.Now().Local().UnixNano())
 
 	msg := make(chan bitcoin.BlockPkt)
-	go simulation.LoadBtcData(PATH_TEST, msg)
+	go simulation.LoadBtcData(target, msg)
 
 	step := 65536 / 16 / 4
 	f := starks.NewStarks(step)
@@ -610,6 +613,7 @@ func test_fft() {
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func main() {
+	target := flag.String("bfile", "", "Blocks.Json")
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -620,13 +624,15 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	log.Printf("Target : %v", *target)
+
 	// test_encypt_2()
 	// test_encypt_decrypt()
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
 	// test_starks_prime_prekey()
-	test_error_1byte_detect_starks()
+	test_error_1byte_detect_starks(*target)
 	// test_prime_field()
 	// test_fft()
 }

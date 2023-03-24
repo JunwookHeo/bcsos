@@ -4,7 +4,7 @@ echo "Build MLDC Simulator Performance measure"
 
 CGO_ENABLED=1
 
-DIR=./out
+DIR=./out/bcsos
 if [ -d "$DIR" ] 
 then
     rm -rf "$DIR"
@@ -39,8 +39,8 @@ done
 
 env GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED CC=$CC go build -o $DIR/$OUT_FILE
 
-if [ -d "$DIR" ] 
-then
-    mv "$DIR" ../out/bcsos
-    echo "mv dir"
-fi
+# if [ -d "$DIR" ] 
+# then
+#     mv "$DIR" ../out/bcsos
+#     echo "mv dir"
+# fi

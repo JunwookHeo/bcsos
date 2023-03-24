@@ -8,13 +8,14 @@ import argparse
 
 USER = 'mldc'
 PASSWD = 'mldc'
+PBINARY = 'out/client'
 class Node:
     def __init__(self, url, sc, port):
         self.url = url
         self.sc = sc
         self.port = port
     def toString(self):
-        return 'url={} sc={} port={}'.format(self.url, self.sc, self.port)
+        return '{} {} {}'.format(self.url, self.sc, self.port)
 
 def getNodes():
     nodes = []
@@ -31,13 +32,13 @@ def getNodes():
 
 def putBinary(nodes):
     for node in nodes:
-        print("Put out/client %s"%(node.toString()))
+        print("Put %s %s"%(PBINARY, node.toString()))
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         ssh.connect(node.url, 22, USER, PASSWD, timeout=5)
 
         with SCPClient(ssh.get_transport()) as scp:
-            scp.put('out/client', recursive=True)
+            scp.put(PBINARY, recursive=True)
 
         ssh.close()
 
@@ -73,10 +74,16 @@ def runSim(pane, node):
     tmux_shell(pane, 'rm -rf db_nodes')
     tmux_shell(pane, './blockchainnode %s %s'%(node.sc, node.port))
 
+def runBcsos(pane, node):
+    tmux_shell(pane, 'sshpass -p %s ssh -o StrictHostKeyChecking=no mldc@%s' %(PASSWD, node.url))
+    tmux_shell(pane, 'cd bcsos')
+    # tmux_shell(pane, 'rm -rf db_nodes')
+    tmux_shell(pane, './bcsos -bfile=../blocks.json')
+
 ### Configuration of GUI with tmux
 ### Split window and connect to each RPI node with ssh
 ### Then run client
-def connectNodes(nodes):    
+def connectNodes(nodes, bcsos=False):    
     tmux('kill-server')
     tmux('new-session -s MLDC -n "RPI" -d')
 
@@ -90,7 +97,10 @@ def connectNodes(nodes):
         tmux('split-window -h -t %d'%(i*2))
 
     for i, node in enumerate(nodes):
-        runSim(i, node)    
+        if bcsos == True:
+            runBcsos(i, node)
+        else:
+            runSim(i, node)    
 
     tmux('attach -t MLDC')
 
@@ -107,7 +117,7 @@ def checkInput(job):
 def getResults():
     ## Get nodes from rpi.nodes
     nodes = getNodes()
-    outputname = time.strftime("MLDC_%Y%m%d_%H%M%S")
+    outputname = time.strftime("PoS_Starks_%Y%m%d_%H%M%S")
     os.mkdir(outputname)
     getResult(outputname, nodes)
     print(outputname)
@@ -126,18 +136,30 @@ if len(sys.argv) == 1:
     
 parser = argparse.ArgumentParser()
 parser.add_argument('--get_result', type=str, default="yes", help='Get result data')
+parser.add_argument('--bcsos', type=str, default="", help='bcsos file to execute')
 args = parser.parse_args()
-print(args.get_result)
 
-if args.get_result.lower() == 'yes':
-    getResults()
-
-elif args.get_result.lower() == 'no':
+if args.bcsos.lower() != '':
+    print(args.bcsos)
+    PBINARY = args.bcsos
     ### Get nodes from rpi.nodes
     nodes = getNodes()
     ### push output file to nodes
     putBinary(nodes)
 
     ### Run client
-    connectNodes(nodes)
+    connectNodes(nodes, bcsos=True)
+else:
+    print(args.get_result)
+    if args.get_result.lower() == 'yes':
+        getResults()
+
+    elif args.get_result.lower() == 'no':
+        ### Get nodes from rpi.nodes
+        nodes = getNodes()
+        ### push output file to nodes
+        putBinary(nodes)
+
+        ### Run client        
+        connectNodes(nodes)
 
