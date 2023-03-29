@@ -137,7 +137,22 @@ if len(sys.argv) == 1:
 parser = argparse.ArgumentParser()
 parser.add_argument('--get_result', type=str, default="yes", help='Get result data')
 parser.add_argument('--bcsos', type=str, default="", help='bcsos file to execute')
+parser.add_argument('--checknodes', type=str, default="", help='bcsos file to execute')
 args = parser.parse_args()
+
+if args.checknodes.lower() != '':
+    nodes = getNodes()
+    for node in nodes:
+        print("Put %s %s"%(PBINARY, node.toString()))
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            ssh.connect(node.url, 22, USER, PASSWD, timeout=5)
+            ssh.close()
+        except Exception as e:
+            print(node.toString(), e)
+            
+    sys.exit()
 
 if args.bcsos.lower() != '':
     print(args.bcsos)
