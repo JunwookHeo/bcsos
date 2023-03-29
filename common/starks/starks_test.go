@@ -11,7 +11,7 @@ import (
 )
 
 func TestStarksMerklize(t *testing.T) {
-	f := NewStarks(65536 / 8)
+	f := NewStarks(65536 / 8 / 8)
 
 	xs := make([]*uint256.Int, 65536)
 	for i := 0; i < len(xs); i++ {
@@ -25,12 +25,24 @@ func TestStarksMerklize(t *testing.T) {
 	dices := f.GetPseudorandomIndices(ys[1], uint32(len(xs)), 10, uint32(f.extFactor))
 	branches := f.MakeMultiBranch(ys, dices)
 	log.Printf("%v", branches)
+	leaves := f.VerifyMultiBranch(ys[1], dices, branches)
+	log.Printf("%v", leaves)
 }
 
 func TestStarksDivid(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		log.Printf("%v, %v", i, i>>2)
+	f := NewStarks(65536 / 8 / 8)
+
+	xs := make([]*uint256.Int, 65536)
+	for i := 0; i < len(xs); i++ {
+		r := rand.Int63()
+		xs[i] = uint256.NewInt(uint64(r))
 	}
+
+	si1, root, ptree := f.BuildTreeForStarting("1234567", len(xs), xs)
+	ret, si2 := f.VerifyTreeForStarting("1234567", len(xs), root, ptree)
+	assert.Equal(t, ret, true)
+	assert.Equal(t, si1, si2)
+
 }
 
 func TestStarksGetPseudorandomIndices(t *testing.T) {

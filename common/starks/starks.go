@@ -35,12 +35,30 @@ func NewStarks(steps int) *starks {
 func (f *starks) GetSteps() int {
 	return f.steps
 }
+
 func (f *starks) GetHashBytes(b []byte) []byte {
 	return blockchain.CalHashSha256(b)
 }
 
 func (f *starks) Merklize(values []*uint256.Int) [][]byte {
-	L := len(values)
+	// Check 2^x size
+	L := len(values) - 1
+	size := 0
+	for i := 0; ; i++ {
+		if L == 0 {
+			size = 1 << i
+			break
+		}
+		L = L >> 1
+	}
+
+	// Make values with size of 2^x
+	L = len(values)
+	for i := L; i < size; i++ {
+		values = append(values, uint256.NewInt(0))
+	}
+
+	L = len(values)
 	ms := make([][]byte, L*2)
 	for i := 0; i < L; i++ {
 		// ms[L+i] = blockchain.CalHashSha256(values[i].Bytes())
@@ -104,7 +122,7 @@ func (f *starks) verifyMerkleBranch(root []byte, tree_cache map[int][]byte, inde
 		return d
 	}
 
-	index += 1 << len(proof)
+	index += 1 << (len(proof) - 1)
 	// v := proof[0]
 	p0 := cacheCache(index, proof[0])
 	v := p0
@@ -723,13 +741,106 @@ func (f *starks) VerifyStarksProof(vis []byte, proof *dtype.StarksProof) bool {
 	return true
 }
 
+/** For Testing */
+var StartingPos = 0
+
+func (f *starks) GetStartingPos() int {
+	return StartingPos
+}
+
+func (f *starks) SetStartingPos(pos int) {
+	StartingPos = pos
+}
+
+func (f *starks) BuildTreeForStarting(hash string, size_pxu int, oxu []*uint256.Int) (int, []byte, [][][]byte) {
+	h1, _ := hex.DecodeString(hash)
+	tree_oxu := f.Merklize(oxu)
+
+	root := blockchain.CalMerkleNodeHash(h1, tree_oxu[1])
+
+	lox := size_pxu
+	num_sections := lox / f.steps
+	positions := f.GetPseudorandomIndices(root, uint32(f.steps), num_sections, 0)
+
+	if lox%f.steps > 0 {
+		num_sections += 1
+		last_section_size := lox % f.steps
+		pos := f.GetPseudorandomIndices(root, uint32(last_section_size), 1, 0)
+		positions = append(positions, pos...)
+	}
+
+	for i := 0; i < len(positions); i++ {
+		positions[i] += uint32(i) * uint32(f.steps)
+	}
+
+	var values [][]byte
+	for i := 0; i < len(positions); i++ {
+		index := positions[i] + uint32(len(tree_oxu)>>1)
+		values = append(values, tree_oxu[index])
+	}
+	// log.Printf("values : %v", values)
+
+	root2 := blockchain.CalMerkleRootHash(values)
+	si := poscipher.GetRandIntFromHash(hex.EncodeToString(root2))
+	if size_pxu > f.steps {
+		si = si % (size_pxu - f.steps)
+	} else {
+		si = 0
+	}
+
+	addpos := []uint32{uint32(si), uint32(si + f.steps - 1)}
+	positions = append(positions, addpos...)
+	partial_trees := f.MakeMultiBranch(tree_oxu, positions)
+
+	return si, tree_oxu[1], partial_trees
+}
+
+func (f *starks) VerifyTreeForStarting(hash string, size_pxu int, treeroot []byte, trees [][][]byte) (bool, int) {
+	h1, _ := hex.DecodeString(hash)
+	root := blockchain.CalMerkleNodeHash(h1, treeroot)
+
+	lox := size_pxu
+	num_sections := lox / f.steps
+	positions := f.GetPseudorandomIndices(root, uint32(f.steps), num_sections, 0)
+
+	if lox%f.steps > 0 {
+		num_sections += 1
+		last_section_size := lox % f.steps
+		pos := f.GetPseudorandomIndices(root, uint32(last_section_size), 1, 0)
+		positions = append(positions, pos...)
+	}
+
+	for i := 0; i < len(positions); i++ {
+		positions[i] += uint32(i) * uint32(f.steps)
+	}
+
+	var values [][]byte
+	for i := 0; i < len(positions); i++ {
+		values = append(values, trees[i][0])
+	}
+	// log.Printf("values : %v", values)
+
+	root2 := blockchain.CalMerkleRootHash(values)
+	si := poscipher.GetRandIntFromHash(hex.EncodeToString(root2))
+	if size_pxu > f.steps {
+		si = si % (size_pxu - f.steps)
+	} else {
+		si = 0
+	}
+
+	addpos := []uint32{uint32(si), uint32(si + f.steps - 1)}
+	positions = append(positions, addpos...)
+
+	vtree := f.VerifyMultiBranch(treeroot, positions, trees)
+
+	return vtree != nil, si
+}
+
 // hash : random seed to calculate starting point
 // px : Input values
 // Vos : Output values
 // key : Adress of Prover
 func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, key []byte) *dtype.StarksProof {
-	si := poscipher.GetRandIntFromHash(hash)
-
 	pxu := f.GFP.LoadUint256FromStream31(vis)
 	oxu := f.GFP.LoadUint256FromStream32(vos)
 	kxu := f.GFP.LoadUint256FromStream32(key)
@@ -754,11 +865,8 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 		kxu = append(kxu, uint256.NewInt(0))
 	}
 
-	if len(pxu) > f.steps {
-		si = si % (len(pxu) - f.steps)
-	} else {
-		si = 0
-	}
+	si, blockroot, blocktrees := f.BuildTreeForStarting(hash, len(pxu), oxu)
+	f.SetStartingPos(si)
 
 	log.Printf("Starting position : %v", si)
 
@@ -924,6 +1032,8 @@ func (f *starks) GenerateStarksProofPreKey(hash string, vis []byte, vos []byte, 
 	// proof := make([]interface{}, 9)
 	var proof dtype.StarksProof
 	proof.RandomHash = hash
+	proof.BlockRoot = blockroot
+	proof.BlockTrees = blocktrees
 	proof.MerkleRoot = m_root
 	proof.TreeRoots = [][]byte{tree_oxu[1], tree_poxu[1], tree_kxu[1], tree_d[1], tree_b[1], tree_l[1]}
 	proof.TreeOxu = f.MakeMultiBranch(tree_oxu, positions)
@@ -958,14 +1068,12 @@ func (f *starks) VerifyStarksProofPreKey(vis []byte, proof *dtype.StarksProof) b
 	G1 := f.GFP.Exp(G2, uint256.NewInt(uint64(skips)))
 	// log.Printf("G1 : %v", G1)
 
-	si := poscipher.GetRandIntFromHash(proof.RandomHash)
-	if len(pxu) > f.steps {
-		si = si % (len(pxu) - f.steps)
-	} else {
-		si = 0
+	ret, si := f.VerifyTreeForStarting(proof.RandomHash, len(pxu), proof.BlockRoot, proof.BlockTrees)
+	log.Printf("Starting position : %v, %v", si, ret)
+	if !ret {
+		log.Printf("Starting position check failed : %v, %v", si, ret)
+		return false
 	}
-
-	log.Printf("Starting position : %v", si)
 
 	// P(x)
 	poly_pxu := f.GFP.IDFT(pxu[si:si+f.steps], G1)
@@ -1096,6 +1204,13 @@ func (f *starks) GetSizeStarksProofPreKey(proof *dtype.StarksProof) int {
 	size := 0
 
 	size += len(proof.MerkleRoot)
+
+	size += len(proof.BlockRoot)
+	for i := 0; i < len(proof.BlockTrees); i++ {
+		for j := 0; j < len(proof.BlockTrees[i]); j++ {
+			size += len(proof.BlockTrees[i][j])
+		}
+	}
 
 	for i := 0; i < len(proof.TreeRoots); i++ {
 		size += len(proof.TreeRoots[i])

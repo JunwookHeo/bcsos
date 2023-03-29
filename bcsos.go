@@ -492,7 +492,7 @@ func test_error_1byte_detect_starks(target string) {
 
 		log.Printf("Block # %v", loop)
 		log.Printf("Error position : %v-%v", pos, len(y))
-		si := poscipher.GetRandIntFromHash(hash)
+		si := f.GetStartingPos()
 		visu := f.GFP.LoadUint256FromStream31(vis)
 		// vosu := f.GFP.LoadUint256FromStream32(y)
 		if len(visu) > f.GetSteps() {

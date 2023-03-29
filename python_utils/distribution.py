@@ -60,8 +60,10 @@ def exponential_distribution():
     plt.show()
 
 def probability_detecting():
-    p1 = 1. - 0.0621
-    p2 = 1. - 0.14
+    p_t = (31./1023.)
+    p_e = 0.0842
+    p1 = 1. - p_t
+    p2 = 1. - p_e
 
     c1, c2 = [], []
     t1, t2 = 1, 1
@@ -73,9 +75,15 @@ def probability_detecting():
         print("%d : %0.2f, %0.2f"%(i+1, (1-t1)*100, (1-t2)*100))
 
     print("P", (p1, p2))
+    plt.figure(figsize=(10, 5))
+
     plt.plot(c1)
     plt.plot(c2)
-    plt.legend(['6.21%', '14%'])
+    plt.legend(['P2 : {:.4f}'.format(p_t), 'P1 : {:.4f}'.format(p_e)])
+    plt.xlabel("Iteration")
+    plt.ylabel("Error Detection Probability")
+        
+    plt.savefig('ErrDetectingProbability.png')
     plt.show()
 
 def probability_detecting_sim():
@@ -85,6 +93,10 @@ def probability_detecting_sim():
 
     block_size = [eval(s) for s in b_size.split(' ')]
     # print(block_size)
+    total = 0
+    for s in block_size:
+        total += s
+    print("Avg size : ", total/len(block_size))
 
     random.seed()
     K = 31*1024
@@ -104,9 +116,9 @@ def probability_detecting_sim():
     print('Expected Probability : %0.4f'%(p/len(block_size)*100.))
     plt.boxplot(block_size)
     plt.show()
-
+    
     
 # exponential_select()
 # exponential_distribution()
-# probability_detecting()
-probability_detecting_sim()
+probability_detecting()
+# probability_detecting_sim()
