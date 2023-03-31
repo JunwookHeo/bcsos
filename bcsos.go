@@ -631,8 +631,8 @@ func main() {
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
-	// test_starks_prime_prekey()
-	test_error_1byte_detect_starks(*target)
+	test_starks_prime_prekey()
+	// test_error_1byte_detect_starks(*target)
 	// test_prime_field()
 	// test_fft()
 }

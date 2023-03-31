@@ -3,7 +3,7 @@ node1.local -sc=3 -port=7032
 node2.local -sc=3 -port=7033 
 node3.local -sc=3 -port=7034 
 node4.local -sc=3 -port=7035 
-#node5.local -sc=3 -port=7036 
+node5.local -sc=3 -port=7036 
 node6.local -sc=3 -port=7037 
 node7.local -sc=3 -port=7038 
 
