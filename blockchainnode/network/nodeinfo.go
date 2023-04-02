@@ -10,6 +10,7 @@ import (
 type NodeInfo struct {
 	local dtype.NodeInfo
 	sim   dtype.NodeInfo
+	OAM   bool // Outsourcing attack mode
 }
 
 var (
@@ -41,11 +42,24 @@ func (ni *NodeInfo) SetLocalddrIP(ip string) {
 	ni.local.IP = ip
 }
 
+func (ni *NodeInfo) SetOoutSourcingAttackMode(hash string) {
+	if ni.local.Hash == hash {
+		ni.OAM = true
+	} else {
+		ni.OAM = false
+	}
+}
+
+func (ni *NodeInfo) GetOoutSourcingAttackMode() bool {
+	return ni.OAM
+}
+
 func NodeInfoInst() *NodeInfo {
 	oncenodeinfo.Do(func() {
 		ni = &NodeInfo{
 			sim:   dtype.NodeInfo{Mode: "ST", SC: config.SIM_SC, IP: "", Port: 0, Hash: ""},
 			local: dtype.NodeInfo{Mode: "ST", SC: 0, IP: "", Port: 0, Hash: ""},
+			OAM:   false,
 		}
 	})
 	return ni

@@ -65,6 +65,15 @@ type btcDBVerif struct {
 	IsSuccess        int
 }
 
+type tblNodeInfo struct {
+	Mode         string
+	StorageClass int
+	IP           string
+	Port         int
+	Hash         string
+	AttackMode   string
+}
+
 type latency struct {
 	NumMeasure int64
 	TotalDealy int64
@@ -88,6 +97,8 @@ const (
 	V_FAIL_VERIFY_FWD     = 1 << 2
 	V_FAIL_VERIFY_BAC     = 1 << 3
 )
+
+var lastnodeinfo = ""
 
 func (a *btcdbagent) Close() {
 	a.db.Close()
@@ -182,6 +193,9 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 		log.Panicf("Type mismatch : %v", ok)
 		return -1
 	}
+
+	// update node info
+	a.updateNodeInfo()
 
 	block := bitcoin.NewBlock()
 	rb := bitcoin.NewRawBlock(sb.Block)
@@ -384,6 +398,12 @@ func (a *btcdbagent) generateStarksProof(height int, hash string) *dtype.NonInte
 	}
 
 	vis := a.decryptPoSWithVariableLength(key, cb)
+	// simulate outsourcing attack
+	ni := network.NodeInfoInst()
+	if ni.OAM {
+		log.Println("Outsourcing attacking......")
+		_, cb = a.encryptPoSWithVariableLength(key, vis)
+	}
 
 	f := starks.NewStarks(config.SIZE_STEPS_STARKS)
 	starks_proof := f.GenerateStarksProofPreKey(hash, vis, cb, key)
@@ -827,13 +847,75 @@ func (a *btcdbagent) updateDBVerif(dbverif *btcDBVerif) {
 	log.Printf("Exec adding veriftbl  : %v", dbverif)
 }
 
+func (a *btcdbagent) updateNodeInfo() {
+	ni := network.NodeInfoInst()
+	local := ni.GetLocalddr()
+
+	var tblnodeinfo tblNodeInfo
+	tblnodeinfo.Mode = local.Mode
+	tblnodeinfo.StorageClass = local.SC
+	tblnodeinfo.IP = local.IP
+	tblnodeinfo.Port = local.Port
+	tblnodeinfo.Hash = local.Hash
+	if ni.OAM {
+		tblnodeinfo.AttackMode = "ON"
+	} else {
+		tblnodeinfo.AttackMode = "OFF"
+	}
+
+	getHash := func(info tblNodeInfo) string {
+		byte_info := sha256.Sum256(serial.Serialize(info))
+		return hex.EncodeToString(byte_info[:])
+	}
+	hash := getHash(tblnodeinfo)
+	if hash == lastnodeinfo {
+		return
+	}
+
+	lastnodeinfo = hash
+
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	st, err := a.db.Prepare(`INSERT INTO nodeinfo (mode, storageclass, ip, port, hash, attackmode) VALUES ( ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		log.Printf("Prepare adding nodeinfo error : %v", err)
+		return
+	}
+	defer st.Close()
+
+	_, err = st.Exec(tblnodeinfo.Mode, tblnodeinfo.StorageClass, tblnodeinfo.IP, tblnodeinfo.Port, tblnodeinfo.Hash, tblnodeinfo.AttackMode)
+	if err != nil {
+		log.Panicf("Exec adding veriftbl error : %v", err)
+		return
+	}
+	log.Printf("Exec adding veriftbl  : %v", tblnodeinfo)
+}
+
 func newDBBtcSqlite(path string) DBAgent {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
 		log.Panicf("Open sqlite db error : %v", err)
 	}
 
-	create_objtbl := `CREATE TABLE IF NOT EXISTS btcblocklist (
+	create_objtbl := `CREATE TABLE IF NOT EXISTS nodeinfo (
+		id      		INTEGER  PRIMARY KEY AUTOINCREMENT,
+		mode			TEXT,
+		storageclass	INTEGER,
+		ip   			TEXT,
+		port    		TEXT,
+		hash			TEXT,
+		attackmode		TEXT
+	);`
+
+	st, err := db.Prepare(create_objtbl)
+	if err != nil {
+		log.Panicf("create nodeinfo error %v", err)
+	}
+	defer st.Close()
+
+	st.Exec()
+
+	create_objtbl = `CREATE TABLE IF NOT EXISTS btcblocklist (
 		id      	INTEGER  PRIMARY KEY AUTOINCREMENT,
 		timestamp	INTEGER,
 		height		INTEGER,
@@ -843,7 +925,7 @@ func newDBBtcSqlite(path string) DBAgent {
 		hashkey		TEXT
 	);`
 
-	st, err := db.Prepare(create_objtbl)
+	st, err = db.Prepare(create_objtbl)
 	if err != nil {
 		log.Panicf("create_objtlb error %v", err)
 	}

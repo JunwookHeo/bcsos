@@ -153,6 +153,8 @@ func commandProc(cmd *dtype.Command) {
 		switch cmd.Subcmd {
 		case "Test":
 			if cmd.Arg1 == "Start" {
+				ni := network.NodeInfoInst()
+				ni.SetOoutSourcingAttackMode(cmd.Arg2)
 				el.Notify("Start")
 			} else if cmd.Arg1 == "Stop" {
 				el.Notify("Stop")

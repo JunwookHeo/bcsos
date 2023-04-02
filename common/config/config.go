@@ -88,6 +88,7 @@ const FINALITY int = 6
 
 // Proof of Storage
 const RANDOM_DISTANCE_NODES = true
+const SIMULATE_OUTSOURCING_ATTACK = true
 const NUM_CONSECUTIVE_HASHES int = 4
 const MAX_PROOF_TIME_MSEC int = 5000
 const PROOFSTORAGE_METHOD string = "NON-INTERACTIVE"

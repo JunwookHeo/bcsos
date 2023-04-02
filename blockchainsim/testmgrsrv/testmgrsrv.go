@@ -3,6 +3,7 @@ package testmgrsrv
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"sort"
@@ -203,6 +204,7 @@ func (h *Handler) sendCommand(cmd dtype.Command, ip string, port int) {
 
 func (h *Handler) broadcastCommand(cmd dtype.Command) {
 	log.Printf("broadcast command : %v", h.Nodes)
+
 	for _, node := range h.Nodes {
 		h.sendCommand(cmd, node.IP, node.Port)
 	}
@@ -226,6 +228,17 @@ func (h *Handler) commandHandler(w http.ResponseWriter, r *http.Request) {
 			if err := ws.ReadJSON(&cmd); err != nil {
 				log.Printf("Read json error : %v", err)
 				return
+			}
+			if config.SIMULATE_OUTSOURCING_ATTACK {
+				if cmd.Cmd == "SET" && cmd.Subcmd == "Test" && cmd.Arg1 == "Start" && len(h.Nodes) > 0 {
+					idx := rand.Intn(len(h.Nodes))
+					nodes := []dtype.NodeInfo{}
+					for _, n := range h.Nodes {
+						nodes = append(nodes, n)
+					}
+					cmd.Arg2 = nodes[idx].Hash
+					log.Printf("cmd : %v %v", idx, cmd)
+				}
 			}
 
 			h.broadcastCommand(cmd)
