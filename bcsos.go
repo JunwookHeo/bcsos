@@ -330,8 +330,11 @@ func test_starks_prime() {
 	close(msg)
 }
 
-func test_starks_prime_prekey() {
+func test_starks_prime_prekey(target string) {
 	const PATH_TEST = "./blocks_720.json"
+	if target == "" {
+		target = PATH_TEST
+	}
 	w := wallet.NewWallet("blocks.json.wallet")
 	addr := w.PublicKey
 	key := make([]byte, 0, len(addr)*32)
@@ -341,7 +344,7 @@ func test_starks_prime_prekey() {
 	}
 
 	msg := make(chan bitcoin.BlockPkt)
-	go simulation.LoadBtcData(PATH_TEST, msg)
+	go simulation.LoadBtcData(target, msg)
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -631,7 +634,7 @@ func main() {
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
-	test_starks_prime_prekey()
+	test_starks_prime_prekey(*target)
 	// test_error_1byte_detect_starks(*target)
 	// test_prime_field()
 	// test_fft()
