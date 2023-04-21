@@ -62,8 +62,8 @@ def exponential_distribution():
 def probability_detecting():
     p_t = (31./1023.)
     p_e = 0.0842
-    p1 = 1. - p_t
-    p2 = 1. - p_e
+    p1 = 1. - p_e
+    p2 = 1. - p_t
 
     c1, c2 = [], []
     t1, t2 = 1, 1
@@ -79,7 +79,7 @@ def probability_detecting():
 
     plt.plot(c1)
     plt.plot(c2)
-    plt.legend(['P2 : {:.4f}'.format(p_t), 'P1 : {:.4f}'.format(p_e)])
+    plt.legend(['Pd1 : {:.4f}'.format(p_e), 'Pd2 : {:.4f}'.format(p_t)])
     plt.xlabel("Iteration")
     plt.ylabel("Error Detection Probability")
         
