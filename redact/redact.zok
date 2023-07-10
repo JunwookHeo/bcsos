@@ -1,0 +1,30 @@
+from "ecc/babyjubjubParams" import BabyJubJubParams;
+import "signatures/verifyEddsa.code" as verifyEddsa;
+import "ecc/babyjubjubParams.code" as context;
+import "hashes/sha256/512bitPadded" as sha256;
+import "utils/pack/u32/nonStrictUnpack256" as unpack256u;
+import "utils/pack/u32/pack" as u32stofield;
+
+def main(field H1, field H2, private field[2] R, private field S, private field[2] A, private u32[8] M0, private u32[8] M1) -> bool{
+
+	BabyJubJubParams context = context();
+	
+	u32[8] a = unpack256u(A[0]);
+    u32[8] b = unpack256u(A[1]);
+    u32[8] t1 = sha256(a, b);
+	field T1 = u32stofield(t1);
+
+	log("H1 is {}", H1);
+	log("T1 is {}, t1 is {}", T1, t1);
+    assert(T1 == H1);
+
+	u32[8] t2 = sha256(M0, M1);
+	field T2 = u32stofield(t2);
+	log("H2 is {}", H2);
+	log("T2 is {}, t2 is {}", T2, t2);
+    assert(T2 == H2);
+
+    bool isVerified = verifyEddsa(R, S, A, M0, M1, context);
+
+	return isVerified;
+}
