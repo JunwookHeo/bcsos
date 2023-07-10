@@ -1,5 +1,5 @@
-# MLDC
-This is a simulator for [Multi-Level Distributed Caching on the Blockchain for Storage Optimisation](https://eprints.qut.edu.au/228429/) which was presented at the ICBC2022 conference.
+# PPoS
+This is a simulator for [PPoS: Practical Proof of Storage for Blockchain Full Nodes](https://eprints.qut.edu.au/238319/) which was presented at the ICBC2023 conference.
 
 # Requirements
 * go version 1.16 
