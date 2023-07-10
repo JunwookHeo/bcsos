@@ -104,6 +104,32 @@ def connectNodes(nodes, bcsos=False):
 
     tmux('attach -t MLDC')
 
+def setNetDelay():
+    nodes = getNodes()
+    for node in nodes:
+        print("Set network delay %s"%(node.toString()))
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            ssh.connect(node.url, 22, USER, PASSWD, timeout=50)
+            command = "tc qdisc add dev wlan0 root netem delay 100ms"
+            command = "sudo -S -p '' %s" % command
+            print("Executing: %s" % (command))
+            stdin, stdout, stderr = ssh.exec_command(command=command)
+            stdin.write("mldc" + "\n")
+            stdin.flush()
+            stdoutput = [line for line in stdout]
+            for output in stdoutput:
+                print("STDOUT: %s" % (output.strip()))
+            for output in stderr:
+                print("STDERR: %s" % (output.strip()))
+
+            ssh.close()
+        except Exception as e:
+            print(node.toString(), e)
+            
+    sys.exit()
+
 def checkInput(job):
     while(1):
         val = input(job)
@@ -123,7 +149,9 @@ def getResults():
     print(outputname)
 
 if len(sys.argv) == 1:
-    if checkInput("Do you want to get result data from RPIs? [y/N]") == "YES":
+    if checkInput("Do you want to set networkdelay RPIs? [y/N]") == "YES":
+        setNetDelay()
+    elif checkInput("Do you want to get result data from RPIs? [y/N]") == "YES":
         getResults()
     else:
         if checkInput("Do you want to put binary files to RPIs? [y/N]") == "YES":

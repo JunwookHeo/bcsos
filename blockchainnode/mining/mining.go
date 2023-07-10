@@ -118,33 +118,57 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 	}
 }
 
-func (mi *Mining) sendBtcBlock(b *bitcoin.BlockPkt, node *dtype.NodeInfo) {
-	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", node.IP, node.Port)
-	// log.Printf("Send new btc block with local info : %v", url)
+// func (mi *Mining) sendBtcBlock(b *bitcoin.BlockPkt, node *dtype.NodeInfo) {
+// 	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", node.IP, node.Port)
+// 	// log.Printf("Send new btc block with local info : %v", url)
 
-	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
-	if err != nil {
-		log.Printf("BroadcasNewBlock error : %v", err)
-		return
-	}
-	defer ws.Close()
+// 	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+// 	if err != nil {
+// 		log.Printf("BroadcasNewBlock error : %v", err)
+// 		return
+// 	}
+// 	defer ws.Close()
 
-	if err := ws.WriteJSON(b); err != nil {
-		log.Printf("Write json error : %v", err)
-		return
-	}
-}
+// 	if err := ws.WriteJSON(b); err != nil {
+// 		log.Printf("Write json error : %v", err)
+// 		return
+// 	}
+// }
 
 func (mi *Mining) BroadcastNewBtcBlock(b *bitcoin.BlockPkt) {
+	var wg sync.WaitGroup
+
+	sendBtcBlock := func(node dtype.NodeInfo) {
+		defer wg.Done()
+
+		url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", node.IP, node.Port)
+		// log.Printf("Send new btc block with local info : %v", url)
+
+		ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			log.Printf("BroadcasNewBlock error : %v", err)
+			return
+		}
+		defer ws.Close()
+
+		if err := ws.WriteJSON(b); err != nil {
+			log.Printf("Write json error : %v", err)
+			return
+		}
+	}
+
 	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
 	nm := network.NodeMgrInst()
 	nm.GetSCNNodeListAll(&nodes)
 	for _, node := range nodes {
 		if node.IP != "" {
-			mi.sendBtcBlock(b, &node)
+			wg.Add(1)
+			go sendBtcBlock(node)
 			// log.Printf("Broadcast Transaction : %v", node)
 		}
 	}
+	wg.Wait()
+	log.Println("Broadcast BTC Bloc : Done")
 }
 
 func (mi *Mining) UpdateTransactionPool(block *blockchain.Block) {
@@ -361,7 +385,10 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mi *Mining) broadcastNonInteractiveProof(p *dtype.NonInteractiveProof) {
-	sendTransaction := func(node *dtype.NodeInfo) {
+	var wg sync.WaitGroup
+
+	sendProof := func(node dtype.NodeInfo) {
+		defer wg.Done()
 		url := fmt.Sprintf("ws://%v:%v/noninteractiveproof", node.IP, node.Port)
 		//log.Printf("BroadcasTransaction to : %v", url)
 
@@ -383,11 +410,14 @@ func (mi *Mining) broadcastNonInteractiveProof(p *dtype.NonInteractiveProof) {
 	nm.GetSCNNodeListAll(&nodes)
 	for _, node := range nodes {
 		if node.IP != "" {
-			sendTransaction(&node)
+			wg.Add(1)
+			go sendProof(node)
 			// log.Printf("Broadcast Transaction : %v", node)
 		}
 
 	}
+	wg.Wait()
+	log.Println("Broadcast Transaction : Done")
 }
 
 // Request Proof of Storage
