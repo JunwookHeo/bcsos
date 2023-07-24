@@ -35,3 +35,4 @@ ppos*.csv
 doc/
 MLDC_*/
 PoS_*/
+blocks*.json

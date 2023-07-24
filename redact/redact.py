@@ -284,7 +284,6 @@ if __name__ == "__main__":
             RBO_MSG("C", 3, "Pass")
         else:
             RBO_MSG("C", 2, "Fail")
-        break
 
     RBO_MSG("C", 1, "========================================================")
     RBO_MSG("C", 1, "Num Transaction ", transaction_count)
