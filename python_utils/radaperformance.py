@@ -9,51 +9,60 @@ from math import pi
 
 def getReplications():
     group = ['IPFS-based','CUB','Jidar','MLDC']
-    colors = ['g', 'b', 'y', 'r']
+    # colors = ['r', 'g', 'b', 'y']
     # Set data
     df = pd.DataFrame({
     'group': group,
-    'Security': [1.0, 0.7, 0.7, 1.7],
-    'Decentralisation': [1.6, 1.0, 1.5, 1.7],
-    'NE': [0.3, 1.4, 0.7, 1.7],
-    'CE' : [1.8, 1.7, 1.1, 1.6],
-    'SE': [1.8, 1.7, 1.4, 1.5],    
+    'C': [2, 1, 1, 2],
+    'I': [1, 1, 1, 1],
+    'A': [0.3, 0.3, 0.3, 0.3],
+    'DM': [1, 0.3, 1, 1],
+    'DD': [0.3, 0.3, 0.3, 0.3],
+    'NE': [0.3, 0.3, 0.3, 0.3],
+    'CE': [1, 1, 0.3, 1],
+    'SE': [2, 2, 2, 2],
     })
 
     print(df)
-    return 'Replication', group, colors, df
+    return 'Replication', group, df
 
 def getRedactions():
-    group = ['Chameleon hash','MOF-BC','muchain','LiTiChain']
-    colors = ['g', 'b', 'y', 'r']
+    group = ['Chameleon hash-based','Polynomial-based', 'RSA-based', 'MOF-BC',r'$\mu$chain','LiTiChain']
+    # colors = ['r', 'g', 'b', 'y']
     # Set data
     df = pd.DataFrame({
     'group': group,
-    'Security': [1.0, 1.0, 1.0, 1.0],
-    'Decentralisation': [1.0, 1.0, 1.8, 1.7],
-    'NE': [1.1, 1.8, 1.7, 1.7],
-    'CE': [0.2, 1.2, 0.5, 1.1],
-    'SE': [1.6, 1.1, 0.2, 1.7],
+    'C': [0.3, 0.3, 0.3, 0.3, 1, 1],
+    'I': [0.3, 0.3, 0.3, 0.3, 0.3, 0.3],
+    'A': [1, 1, 1, 1, 1, 1],
+    'DM': [0.3, 0.3, 0.3, 0.3, 1, 1],
+    'DD': [1, 1, 1, 1, 1, 1],
+    'NE': [0.3, 1, 1, 1, 1, 1],
+    'CE': [0.3, 0.3, 1, 1, 0.3, 1],
+    'SE': [2, 2, 2, 2, 1, 2],
     })
 
     print(df)
-    return 'Redaction', group, colors, df
+    return 'Redaction', group, df
 
 def getContents():
     group = ['MOF-BC','CoinPrune','Mimblewimble','Mina']
-    colors = ['g', 'b', 'y', 'r']
+    # colors = ['r', 'g', 'b', 'y']
     # Set data
     df = pd.DataFrame({
     'group': group,
-    'Security': [1.0, 1.0, 2.0, 2.0],
-    'Decentralisation': [1.0, 1.7, 1.8, 1.8],
-    'NE': [1.8, 1.8, 0.4, 0.2],
-    'CE': [1.2, 0.2, 0.1, 0.1],
-    'SE': [1.1, 1.0, 1.2, 2.0],
+    'C': [0.3, 1, 2, 2],
+    'I': [0.3, 1, 2, 2],
+    'A': [1, 0.3, 1, 1],
+    'DM': [0.3, 1, 1, 1],
+    'DD': [1, 0.3, 1, 1],
+    'NE': [2, 2, 0.3, 0.3],
+    'CE': [0.3, 0.3, 0.3, 0.3],
+    'SE': [2, 2, 2, 2],
     })
 
     print(df)
-    return 'Content', group, colors, df
+    return 'Content', group, df
 
 # ------- PART 1: Create background
  
@@ -63,11 +72,13 @@ def getContents():
 
 foptimisations = [getReplications, getRedactions, getContents]
 
-plt.subplots(1, 3, figsize=(15, 5.5))
-plt.subplots_adjust(wspace=0.5, hspace=1)
+plt.subplots(1, 3, figsize=(15, 8))
+# plt.subplots_adjust(wspace=0.5, hspace=1)
 
 for i, foptimise in enumerate(foptimisations):
-    title, group, colors, df = foptimise()
+    colors = ['m', 'b', 'g', 'r', 'y', 'c']
+
+    title, group, df = foptimise()
 
     # number of variable
     categories=list(df)[1:]
@@ -88,8 +99,8 @@ for i, foptimise in enumerate(foptimisations):
     plt.xticks(angles[:-1], categories)
     
     # Draw ylabels
-    ax.set_rlabel_position(-50)
-    plt.yticks([0,1,2], ["Low","Medium","High"], color="grey", size=7)
+    ax.set_rlabel_position(150)
+    plt.yticks([0,1,2], ["Negative", "Neutral", "Positive"], color="grey", size=7)
     plt.ylim(0,2)
     
 
@@ -98,20 +109,23 @@ for i, foptimise in enumerate(foptimisations):
     # Plot each individual = each line of the data
     # I don't make a loop, because plotting more than 3 groups makes the chart unreadable
     alpha = 0.0
-    linestyles = ["solid", "dotted", "dashed", "dashdot"]
+    linestyles = ["solid", "dashed", "dashdot", "dotted", "dashed", "dashdot"]
+    markers=['+','v','*','o', '<', '>']
 
     for i, g in enumerate (group):
         values=df.loc[i].drop('group').values.flatten().tolist()
         values += values[:1]
-        ax.plot(angles, values, linewidth=2, linestyle=linestyles[i%len(group)], label=group[i])
-        ax.fill(angles, values, colors[i], alpha=alpha)
+        values = [x-i*0.015 for x in values]
+        ax.plot(angles, values, linewidth=2, linestyle=linestyles[i%len(group)], label=group[i], color=colors[i%len(group)], marker=markers[i%len(group)])
+        # ax.fill(angles, values, colors[i], alpha=alpha)
         
     # Add legend
-    plt.legend(loc='right', bbox_to_anchor=(0.9, -0.22), fontsize=13)
-    plt.title(title+"-based", fontsize=16, pad=20)
+    plt.legend(loc='right', bbox_to_anchor=(0.9, -0.3), fontsize=13)
+    plt.title(title+"-based", fontsize=16, pad=10)
     plt.tick_params(labelsize=14) 
 
 
 # Show the graph
+plt.tight_layout()
 plt.savefig("Performance.png")
 plt.show()

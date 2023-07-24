@@ -10,7 +10,7 @@ def blockchain_stats(name):
     api_url = f"https://api.blockchair.com/{name}/blocks?a=year,sum(size),avg(size),avg(transaction_count)"
     response = requests.get(api_url)
     res = response.json()
-    print('============Bitcoin===========')
+    print(f'=========={name}=============')
     year = []
     total_size = []
     block_size = []
@@ -59,7 +59,7 @@ def show_plot(df, title):
     plt.xlabel("Year")
     plt.ylabel("Total Block Size[GByte]")
     ax1.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x/1000000000), ',')))
-
+    
     ax2 = plt.subplot(1,3,2)
     plt.plot(df.Year, df.Avg_Block_Size, "b.-", label="Avg Block Size") 
     plt.xticks(rotation=90)
@@ -77,6 +77,56 @@ def show_plot(df, title):
     plt.tight_layout()
     plt.savefig(title) 
     # plt.show()
+
+def show_plot_all(dfs):    
+    markers = ['v','o','x']
+    fig, axs = plt.subplots(1,3, figsize=(12, 4))
+    
+    for m, (title, df) in zip(markers, dfs.items()): 
+        ax1 = plt.subplot(1,3,1)
+        plt.plot(df.Year, df.Total_Block_Size, marker=m, label=title)
+        plt.xticks(rotation=90)
+        ax1.set_xlabel("Year")
+        ax1.set_ylabel("Total Block Size[GByte]")
+        ax1.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x/1000000000), ',')))
+        
+
+    for m, (title, df) in zip(markers, dfs.items()): 
+        ax2 = plt.subplot(1,3,2)
+        plt.plot(df.Year, df.Avg_Block_Size, marker=m, label=title) 
+        plt.xticks(rotation=90)
+        ax2.set_yscale("log")
+        ax2.set_xlabel("Year")
+        ax2.set_ylabel("Avg Block Size[KByte]")
+        ax2.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x/1000), ',')))
+
+    for m, (title, df) in zip(markers, dfs.items()): 
+        ax3 = plt.subplot(1,3,3)
+        plt.plot(df.Year, df.Avg_Num_Transaction, marker=m, label=title)
+        plt.xticks(rotation=90)
+        ax3.set_yscale("log")
+        ax3.set_xlabel("Year")
+        ax3.set_ylabel("Avg # of Transactions per Block")
+        ax3.get_yaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: format(int(x), ',')))
+
+
+    plt.tight_layout(rect=[0, 0, 1, 0.9])
+    # axs.flatten()[-2].legend(loc='upper center', bbox_to_anchor=(0.5, -0.12), ncol=3)
+    lines = []
+    labels = []
+    
+    for ax in fig.axes:
+        Line, Label = ax.get_legend_handles_labels()
+        # print(Label)
+        lines.extend(Line)
+        labels.extend(Label)
+        break
+    
+    fig.legend(lines, labels, loc='upper center', ncol=len(labels))
+
+    plt.savefig("BlockchainState.png") 
+    # plt.show()
+
 
 def get_bitcoin_transactions(name):
     # df = pd.DataFrame()
@@ -155,14 +205,20 @@ def get_bitcoin_transactions():
             json_object = json.loads(rec)
             print(json_object)
 
-# df = blockchain_stats('bitcoin')
-# show_plot(df, 'BitcoinState')
+dfs = dict()
+df1 = blockchain_stats('bitcoin')
+# show_plot(df1, 'BitcoinState')
+dfs['Bitcoin'] = df1
 
-# df = blockchain_stats('ethereum')
-# show_plot(df, 'EthereumState')
+df2 = blockchain_stats('ethereum')
+# show_plot(df2, 'EthereumState')
+dfs['Ethereum'] = df2
 
-# df = blockchain_stats('litecoin')
-# show_plot(df, 'LitecoinState')
+df3 = blockchain_stats('litecoin')
+# show_plot(df3, 'LitecoinState')
+dfs['Litecoin'] = df3
+
+show_plot_all(dfs)
 
 # df = blockchain_stats('zcash')
 # show_plot(df, 'ZcashState')
@@ -178,4 +234,4 @@ def get_bitcoin_transactions():
 # res = response.json()
 # print(res)
 
-get_bitcoin_transactions()
+# get_bitcoin_transactions()
