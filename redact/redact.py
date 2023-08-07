@@ -12,7 +12,7 @@ P = 2188824287183927522224640574525727508854836440041603434369820418657580849561
 SEED_KEY = 1997011358982923168928344992199991480689546837621580239342656433234255379025
 FZOK = "redact.zok"
 # FBTC = "./blocks.json"
-FBTC = "./blocks_2023_10.json"
+FBTC = "../blocks_2023_5.json"
 
 MLEVEL = {"C":2, "B":2, "T":1}
 
@@ -200,7 +200,7 @@ def gettransaction(path):
             trs = btc.itertransactions()
             for tr in trs:
                 yield tr
-            break
+            
 
 if __name__ == "__main__":
     workingpath = os.getcwd()
@@ -225,6 +225,7 @@ if __name__ == "__main__":
     sim_start = time.time()
     transaction_count = 0
     signing_time = 0
+    verify_eddsa_time = 0
     proof_time = 0
     verification_time = 0
 
@@ -243,8 +244,11 @@ if __name__ == "__main__":
         signing_time += (time.time() - start_time)
         RBO_MSG("C", 2, "Signing", transaction_count, signing_time/transaction_count)
 
+        start_time = time.time()
         is_verify = red.verify(pk, mh, sig)
         RBO_MSG("C", 3, is_verify)
+        verify_eddsa_time += (time.time() - start_time)
+        RBO_MSG("C", 2, "Verifying EdDSA", transaction_count, verify_eddsa_time/transaction_count)
 
         fin = 'msgi.txt'
         pin = os.path.join(workingpath, 'out', fin)
@@ -288,6 +292,7 @@ if __name__ == "__main__":
     RBO_MSG("C", 1, "========================================================")
     RBO_MSG("C", 1, "Num Transaction ", transaction_count)
     RBO_MSG("C", 1, "Signing Time ", signing_time / transaction_count)
+    RBO_MSG("C", 1, "Verify EdDSA Time ", verify_eddsa_time / transaction_count)
     RBO_MSG("C", 1, "Generate Proof Time ", proof_time / transaction_count)
     RBO_MSG("C", 1, "Verification Time ", verification_time / transaction_count)
 

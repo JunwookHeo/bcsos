@@ -4,7 +4,7 @@ import json
 import requests
 
 def get_blocks_from_height():
-    num_block = 10
+    num_block = 5
     outfile = f'blocks_2023_{num_block}.json'
     height = 797000
     
