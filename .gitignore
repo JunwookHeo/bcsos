@@ -34,3 +34,5 @@ ppos.*.csv
 python_utils/*.png
 *.csv
 doc/
+blocks*.json
+redact
