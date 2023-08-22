@@ -1,30 +1,23 @@
-import time
-import csv
-import json
-import requests
+import matplotlib.pyplot as plt
 
-def get_blocks_from_height():
-    num_block = 5
-    outfile = f'blocks_2023_{num_block}.json'
-    height = 797000
-    
-    with open(outfile, "w") as fo:
-        for i, h in enumerate (range(height, height + num_block)):
-            start = time.time()
-            api_url = f'https://api.blockchair.com/bitcoin/raw/block/{h}'
-            response = requests.get(api_url)
-            res = response.json()
-            json.dump(res, fo)
-            fo.writelines('\n')
-            done = time.time() - start
-            print("Downloading {} : {}".format(i, done))
+file_5b = './redact/chain_result_5b.txt'
+# file_10b = './redact/chain_result_10b.txt'
 
-    with open(outfile, 'r') as openfile:
-        # Reading from json file
-        lines = openfile.readlines()
-        print("==================================")
-        for rec in lines:
-            json_object = json.loads(rec)
-            print(json_object)
+with open(file_5b, 'r') as f:
+    data_5b = [float(line.split(' ')[-1])*1000 for line in f.read().splitlines()]
+    print(data_5b)
 
-get_blocks_from_height()
+# with open(file_10b, 'r') as f:
+#     data_10b = [float(line.split(' ')[-1])*1000 for line in f.read().splitlines()]
+#     print(data_10b)
+
+
+plt.figure(figsize=(10, 5))
+plt.plot(data_5b, label='5 Blocks')
+# plt.plot(data_10b, label='10 Blocks')
+plt.xticks(fontsize=16)
+plt.yticks(fontsize=16)
+# plt.legend()
+plt.ylabel('Verification time[msec]' ,fontsize=16)
+plt.xlabel('Number of modifications', fontsize=16)
+plt.savefig('VerifyTimeChain.png')
