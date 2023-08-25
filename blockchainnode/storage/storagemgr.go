@@ -12,8 +12,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainnode/network"
-	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/datalib"
 	"github.com/junwookheo/bcsos/common/dbagent"
@@ -400,7 +400,7 @@ func (h *StorageMgr) AddNewBlock(b *blockchain.Block) {
 	// h.cand.ShowAll()
 }
 
-func (h *StorageMgr) AddNewBtcBlock(b *bitcoin.BlockPkt, hash string) {
+func (h *StorageMgr) AddNewBtcBlock(b *blockdata.BlockPkt, hash string) {
 	h.db.AddNewBlock(b)
 }
 

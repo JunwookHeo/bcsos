@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/blockchainnode/network"
-	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dtype"
 	"github.com/junwookheo/bcsos/common/poscipher"
@@ -157,22 +157,30 @@ func (a *btcdbagent) getHashforPoSKey(key []byte, ls int) string {
 }
 
 func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
-	sb, ok := ib.(*bitcoin.BlockPkt)
+	sb, ok := ib.(*blockdata.BlockPkt)
 	if !ok {
 		log.Panicf("Type mismatch : %v", ok)
 		return -1
 	}
 
-	block := bitcoin.NewBlock()
-	rb := bitcoin.NewRawBlock(sb.Block)
+	block := blockdata.NewBlock()
+	rb := blockdata.NewRawBlock(sb.Block)
 	hashprev := ""
 	if a.lastblock.height > -1 { // if it is not the first block
-		_ = rb.ReadUint32()
+		// _ = rb.ReadUint32()
+		rb.MoveToPreviousHashPos()
 		hbuf := rb.ReverseBuf(rb.ReadBytes(32))
 		hashprev = hex.EncodeToString(hbuf)
+		log.Printf("Previous hash : %v", hashprev)
 	}
 
-	block.SetHash(rb.GetRawBytes(0, 80))
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		block.SetHash(rb.GetRawBytes(0, 80))
+	case config.ETHEREUM_BLOCK:
+		bh, _ := hex.DecodeString(sb.Hash)
+		block.SetHash(bh)
+	}
 	hash := block.GetHashString()
 	s := rb.GetBlockBytes()
 	size := len(s)

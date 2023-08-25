@@ -15,8 +15,8 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
-	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/datalib"
 	"github.com/junwookheo/bcsos/common/dbagent"
@@ -365,7 +365,7 @@ func (h *Handler) SimulateBtcBlockProc() {
 	command := make(chan string)
 	h.el.AddListener(command)
 
-	msg := make(chan bitcoin.BlockPkt)
+	msg := make(chan blockdata.BlockPkt)
 	h.bcsim.SimulateBtcBlock(msg)
 
 	go func(command <-chan string) {

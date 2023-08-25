@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/junwookheo/bcsos/common/bitcoin"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 )
@@ -46,9 +46,9 @@ func TestLoadBlockFromJson(t *testing.T) {
 		}
 
 		for key := range b {
-			block := bitcoin.NewBlock()
+			block := blockdata.NewBlock()
 			raw := b[key].(map[string]interface{})["raw_block"].(string)
-			rb := bitcoin.NewRawBlock(raw)
+			rb := blockdata.NewRawBlock(raw)
 			block.Header.Version = rb.ReadUint32()
 			block.Header.PreHash = rb.ReverseBuf(rb.ReadBytes(32))
 			block.Header.MerkelRoot = rb.ReverseBuf(rb.ReadBytes(32))
@@ -62,11 +62,11 @@ func TestLoadBlockFromJson(t *testing.T) {
 			txcount := rb.ReadVariant()
 			log.Printf("Tx Count : %d", txcount)
 
-			var trs []bitcoin.TransactionHeader
+			var trs []blockdata.TransactionHeader
 
 			for i := 0; i < int(txcount); i++ {
 				log.Printf("Tx(%v) =================================", i)
-				tr := bitcoin.NewTransaction()
+				tr := blockdata.NewTransaction()
 				start := rb.GetPosition()
 				version := rb.ReadUint32()
 				end := rb.GetPosition()
@@ -152,7 +152,7 @@ func TestLoadBlockFromJson(t *testing.T) {
 }
 
 func TestLoadBtcData(t *testing.T) {
-	msg := make(chan bitcoin.BlockPkt)
+	msg := make(chan blockdata.BlockPkt)
 
 	go LoadBtcData(PATH_TEST, msg)
 

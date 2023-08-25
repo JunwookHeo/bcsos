@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/blockchainnode/network"
-	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/wallet"
@@ -184,8 +184,8 @@ func TestBtcDBAgent(t *testing.T) {
 	}
 
 	sb := hex.EncodeToString(poscipher.DecryptPoSWithVariableLength(encb1, encb2))
-	block := bitcoin.NewBlock()
-	rb := bitcoin.NewRawBlock(sb)
+	block := blockdata.NewBlock()
+	rb := blockdata.NewRawBlock(sb)
 
 	block.Header.Version = rb.ReadUint32()
 	block.Header.PreHash = rb.ReverseBuf(rb.ReadBytes(32))

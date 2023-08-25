@@ -1,4 +1,4 @@
-package bitcoin
+package blockdata
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log"
 
+	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/poscipher"
 )
 
@@ -69,6 +70,40 @@ func (rb *RawBlock) ReadUint16() uint16 {
 	rb.pos += 2
 	return binary.LittleEndian.Uint16(buf)
 }
+func parseRLPlength(buf []byte) uint32 {
+	pos := uint32(0)
+
+	for {
+		if buf[pos] <= 0x7f {
+			return pos + 1
+		} else if buf[pos] == 0x80 {
+			return pos + 1
+		} else if buf[pos] == 0x81 {
+			return pos + 1
+		} else if buf[pos] <= 0xb7 {
+			return pos + 1
+		} else if buf[pos] <= 0xbf {
+			return pos + uint32(buf[pos]-0xb7) + 1
+		} else if buf[pos] == 0xc0 {
+			return pos + 1
+		} else if buf[pos] <= 0xf7 {
+			pos = pos + 1
+		} else {
+			pos = pos + uint32(buf[pos]-0xf7) + 1
+		}
+	}
+}
+
+func (rb *RawBlock) MoveToPreviousHashPos() {
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		rb.pos += 4
+	case config.ETHEREUM_BLOCK:
+		rb.pos += parseRLPlength(rb.rawBuf[:20])
+	default:
+		log.Panicf("Data Setting Error : %v", config.BLOCK_DATA_TYPE)
+	}
+}
 
 func (rb *RawBlock) ReadUint32() uint32 {
 	buf := make([]byte, 4)
@@ -125,11 +160,19 @@ func (rb *RawBlock) IncreasePos(len uint32) {
 }
 
 func (rb *RawBlock) ReverseBuf(buf []byte) []byte {
-	n := len(buf)
-	for i := 0; i < n/2; i++ {
-		buf[i], buf[n-1-i] = buf[n-1-i], buf[i]
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		n := len(buf)
+		for i := 0; i < n/2; i++ {
+			buf[i], buf[n-1-i] = buf[n-1-i], buf[i]
+		}
+		return buf
+	case config.ETHEREUM_BLOCK:
+		return buf
+	default:
+		log.Panicf("Data Setting Error : %v", config.BLOCK_DATA_TYPE)
 	}
-	return buf
+	return nil
 }
 
 func (rb *RawBlock) GetRawBytes(start uint32, len uint32) []byte {

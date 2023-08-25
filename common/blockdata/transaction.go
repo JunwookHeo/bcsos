@@ -1,4 +1,4 @@
-package bitcoin
+package blockdata
 
 import (
 	"crypto/sha256"

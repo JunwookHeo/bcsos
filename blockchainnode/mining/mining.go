@@ -14,8 +14,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/junwookheo/bcsos/blockchainnode/network"
 	"github.com/junwookheo/bcsos/blockchainnode/storage"
-	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/datalib"
 	"github.com/junwookheo/bcsos/common/dtype"
@@ -118,7 +118,7 @@ func (mi *Mining) BroadcastNewBlock(b *blockchain.Block) {
 	}
 }
 
-func (mi *Mining) sendBtcBlock(b *bitcoin.BlockPkt, node *dtype.NodeInfo) {
+func (mi *Mining) sendBtcBlock(b *blockdata.BlockPkt, node *dtype.NodeInfo) {
 	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", node.IP, node.Port)
 	// log.Printf("Send new btc block with local info : %v", url)
 
@@ -135,7 +135,7 @@ func (mi *Mining) sendBtcBlock(b *bitcoin.BlockPkt, node *dtype.NodeInfo) {
 	}
 }
 
-func (mi *Mining) BroadcastNewBtcBlock(b *bitcoin.BlockPkt) {
+func (mi *Mining) BroadcastNewBtcBlock(b *blockdata.BlockPkt) {
 	var nodes [(config.MAX_SC) * config.MAX_SC_PEER]dtype.NodeInfo
 	nm := network.NodeMgrInst()
 	nm.GetSCNNodeListAll(&nodes)
@@ -331,14 +331,20 @@ func (mi *Mining) newBtcBlockHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	var buf bitcoin.BlockPkt
+	var buf blockdata.BlockPkt
 	if err := ws.ReadJSON(&buf); err != nil {
 		log.Printf("Read json error : %v", err)
 	}
 
-	block := bitcoin.NewBlock()
-	rb := bitcoin.NewRawBlock(buf.Block)
-	block.SetHash(rb.GetRawBytes(0, 80))
+	block := blockdata.NewBlock()
+	rb := blockdata.NewRawBlock(buf.Block)
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		block.SetHash(rb.GetRawBytes(0, 80))
+	case config.ETHEREUM_BLOCK:
+		bh, _ := hex.DecodeString(buf.Hash)
+		block.SetHash(bh)
+	}
 	hash := block.GetHashString()
 
 	mi.mutex.Lock()

@@ -1,12 +1,15 @@
-package bitcoin
+package blockdata
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
+
+	"github.com/junwookheo/bcsos/common/config"
 )
 
 type BlockPkt struct {
 	Timestamp int64
+	Hash      string
 	Block     string
 }
 
@@ -29,9 +32,14 @@ func NewBlock() *Block {
 }
 
 func (b *Block) SetHash(buf []byte) {
-	hash := sha256.Sum256(buf)
-	hash = sha256.Sum256(hash[:])
-	b.Hash = b.ReverseBuf(hash[:])
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		hash := sha256.Sum256(buf)
+		hash = sha256.Sum256(hash[:])
+		b.Hash = b.ReverseBuf(hash[:])
+	case config.ETHEREUM_BLOCK:
+		b.Hash = buf
+	}
 }
 
 func (b *Block) GetHashString() string {

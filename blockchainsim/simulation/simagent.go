@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/junwookheo/bcsos/common/bitcoin"
 	"github.com/junwookheo/bcsos/common/blockchain"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/dbagent"
 	"github.com/junwookheo/bcsos/common/dtype"
@@ -25,6 +25,7 @@ type Handler struct {
 }
 
 const PATH_BTC_BLOCK = "../blocks_720.json"
+const PATH_ETH_BLOCK = "../blocks_eth_10.json"
 
 func init() {
 }
@@ -199,11 +200,16 @@ func (h *Handler) SimulateTransaction(id int) *blockchain.Transaction {
 	return tr
 }
 
-func (h *Handler) SimulateBtcBlock(msg chan bitcoin.BlockPkt) {
-	go LoadBtcData(PATH_BTC_BLOCK, msg)
+func (h *Handler) SimulateBtcBlock(msg chan blockdata.BlockPkt) {
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		go LoadBtcData(PATH_BTC_BLOCK, msg)
+	case config.ETHEREUM_BLOCK:
+		go LoadEthData(PATH_ETH_BLOCK, msg)
+	}
 }
 
-func (h *Handler) sendNewBtcBlock(b *bitcoin.BlockPkt, ip string, port int) bool {
+func (h *Handler) sendNewBtcBlock(b *blockdata.BlockPkt, ip string, port int) bool {
 	url := fmt.Sprintf("ws://%v:%v/broadcastnewbtcblock", ip, port)
 	// log.Printf("Send new BTC block to %v", url)
 
@@ -223,7 +229,7 @@ func (h *Handler) sendNewBtcBlock(b *bitcoin.BlockPkt, ip string, port int) bool
 	return true
 }
 
-func (h *Handler) broadcastNewBtcBlock(b *bitcoin.BlockPkt) bool {
+func (h *Handler) broadcastNewBtcBlock(b *blockdata.BlockPkt) bool {
 	num := len(*h.Nodes)
 	if num == 0 {
 		return true
@@ -240,7 +246,7 @@ func (h *Handler) broadcastNewBtcBlock(b *bitcoin.BlockPkt) bool {
 	return false
 }
 
-func (h *Handler) BroadcastBtcBlock(b *bitcoin.BlockPkt) {
+func (h *Handler) BroadcastBtcBlock(b *blockdata.BlockPkt) {
 	for {
 		if h.broadcastNewBtcBlock(b) {
 			break
