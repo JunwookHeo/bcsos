@@ -229,10 +229,10 @@ func newTestDBBtcSqlite(path string) DBAgent {
 }
 
 func TestBtcDBAgentPoS(t *testing.T) {
-	path := "../../blockchainnode/db_nodes/7001.db"
-	config.WALLET_PATH = "../../blockchainnode/db_nodes/7001.wallet"
+	path := "../../blockchainnode/db_nodes/7036.db"
+	config.WALLET_PATH = "../../blockchainnode/db_nodes/7036.wallet"
 	ag := newTestDBBtcSqlite(path)
-	hash := "05500000000000000000f9e395753e490f29a3213fdfbe8931a691a0d268c1d1"
+	hash := "85b145c99a2378c989aa30a19e63eb3cbd466c4fcdc4ca429a0a6285e45caab5"
 	proof := ag.GetNonInteractiveProof(hash)
 	// log.Printf("Proof : %v", proof.Hash)
 	ag.VerifyProofStorage(proof)

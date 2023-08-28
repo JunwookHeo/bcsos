@@ -84,6 +84,7 @@ func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 		return "", nil
 	}
 
+	log.Printf("ENC the number of zero : %v", cntzero)
 	return GetHashString(buf.Bytes()), buf.Bytes()
 }
 

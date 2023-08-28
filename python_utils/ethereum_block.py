@@ -5,7 +5,7 @@ import requests
 import json
 
 START_BLOCK_HASH = "0xd66bb57fdf5582f6163c60517f55ca8dde2445c57de8e21450d75aaae0221c97" 
-NUM_BLOCKS = 10
+NUM_BLOCKS = 20
 NAME_BFILE = f"blocks_eth_{NUM_BLOCKS}.json"
 
 def dn_ethereum_blocks():
@@ -74,7 +74,7 @@ def dn_ethereum_blocks():
         print("==================================")
         for rec in lines:
             json_object = json.loads(rec)
-            print(json_object['id'], len(json_object['result']))
+            print(json_object['id'], len(json_object['result'])/2)
  
 if __name__ == "__main__":
     dn_ethereum_blocks()

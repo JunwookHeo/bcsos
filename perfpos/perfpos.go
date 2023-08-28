@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
-	"github.com/junwookheo/bcsos/common/bitcoin"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/poscipher"
 	"github.com/junwookheo/bcsos/common/wallet"
@@ -20,7 +20,7 @@ import (
 var IV = []byte("1234567812345678")
 var TAU = 497 // 180 // 347
 
-const PATH_TEST = "../blocks.json"
+const PATH_TEST = "../blocks_eth_20.json"
 const PATH_WALLET = "blocks.json.wallet"
 
 func init() {
@@ -73,8 +73,8 @@ func test_aes_cbc() {
 	w := wallet.NewWallet(PATH_WALLET)
 	key := w.PublicKey[0:32]
 
-	msg := make(chan bitcoin.BlockPkt)
-	go simulation.LoadBtcData(PATH_TEST, msg)
+	msg := make(chan blockdata.BlockPkt)
+	go simulation.LoadBlockData(PATH_TEST, msg)
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -91,7 +91,7 @@ func test_aes_cbc() {
 			break
 		}
 
-		rb := bitcoin.NewRawBlock(d.Block)
+		rb := blockdata.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
 		size += int64(len(x))
 		// log.Printf("Block : %v", x[:80])
@@ -121,8 +121,8 @@ func test_asymm_ppos() {
 	key := w.PublicKey
 	addr := w.PublicKey
 
-	msg := make(chan bitcoin.BlockPkt)
-	go simulation.LoadBtcData(PATH_TEST, msg)
+	msg := make(chan blockdata.BlockPkt)
+	go simulation.LoadBlockData(PATH_TEST, msg)
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -148,7 +148,7 @@ func test_asymm_ppos() {
 			break
 		}
 
-		rb := bitcoin.NewRawBlock(d.Block)
+		rb := blockdata.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
 		size += int64(len(x))
 		// log.Printf("Block : %v", x[:80])

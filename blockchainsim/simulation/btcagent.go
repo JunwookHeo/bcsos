@@ -11,6 +11,15 @@ import (
 	"github.com/junwookheo/bcsos/common/config"
 )
 
+func LoadBlockData(path string, msg chan blockdata.BlockPkt) {
+	switch config.BLOCK_DATA_TYPE {
+	case config.BITCOIN_BLOCK:
+		LoadBtcData(path, msg)
+	case config.ETHEREUM_BLOCK:
+		LoadEthData(path, msg)
+	}
+}
+
 func LoadBtcData(path string, msg chan blockdata.BlockPkt) {
 	file, err := os.Open(path)
 	if err != nil {

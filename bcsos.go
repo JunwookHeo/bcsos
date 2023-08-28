@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/junwookheo/bcsos/blockchainsim/simulation"
-	"github.com/junwookheo/bcsos/common/bitcoin"
+	"github.com/junwookheo/bcsos/common/blockdata"
 	"github.com/junwookheo/bcsos/common/config"
 	"github.com/junwookheo/bcsos/common/galois"
 	"github.com/junwookheo/bcsos/common/poscipher"
@@ -228,13 +228,13 @@ func test_encypt_2() {
 }
 
 func test_encypt_decrypt() {
-	const PATH_TEST = "blocks.json"
+	const PATH_TEST = "blocks_eth_20.json"
 	w := wallet.NewWallet("blocks.json.wallet")
 	key := w.PublicKey
 	addr := w.PublicKey
 
-	msg := make(chan bitcoin.BlockPkt)
-	go simulation.LoadBtcData(PATH_TEST, msg)
+	msg := make(chan blockdata.BlockPkt)
+	go simulation.LoadBlockData(PATH_TEST, msg)
 
 	tenc := int64(0)
 	tdec := int64(0)
@@ -249,7 +249,7 @@ func test_encypt_decrypt() {
 			break
 		}
 
-		rb := bitcoin.NewRawBlock(d.Block)
+		rb := blockdata.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
 		// log.Printf("Block : %v", x[:80])
 
@@ -293,6 +293,6 @@ func main() {
 	// test_gf_exp3()
 	// test_gf_div2()
 	// test_encypt_2()
-	// test_encypt_decrypt()
-	test_bigint()
+	test_encypt_decrypt()
+	// test_bigint()
 }
