@@ -49,6 +49,6 @@ type PoSProof struct {
 	HashEncs  [][]byte
 	HashKeys  [][]byte
 	Selected  int
-	Hash      string
-	EncBlock  []byte
+	Hashes    []string
+	EncBlocks [][]byte
 }

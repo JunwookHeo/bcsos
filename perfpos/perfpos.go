@@ -20,7 +20,7 @@ import (
 var IV = []byte("1234567812345678")
 var TAU = 497 // 180 // 347
 
-const PATH_TEST = "../blocks_eth_20.json"
+const PATH_TEST = "../blocks_2023_720.json"
 const PATH_WALLET = "blocks.json.wallet"
 
 func init() {
@@ -124,9 +124,9 @@ func test_asymm_ppos() {
 	msg := make(chan blockdata.BlockPkt)
 	go simulation.LoadBlockData(PATH_TEST, msg)
 
-	tenc := int64(0)
-	tdec := int64(0)
-	size := int64(0)
+	// tenc := int64(0)
+	// tdec := int64(0)
+	// size := int64(0)
 	log.Println("Asymetric Encrypt/Decrypt")
 
 	fcsv, err := os.Create("ppos.csv")
@@ -136,6 +136,8 @@ func test_asymm_ppos() {
 	defer fcsv.Close()
 	csvwriter := csv.NewWriter(fcsv)
 	defer csvwriter.Flush()
+
+	en := poscipher.NewEncoder(config.GF_FIELD_SIZE)
 
 	for {
 		d, ok := <-msg
@@ -150,20 +152,20 @@ func test_asymm_ppos() {
 
 		rb := blockdata.NewRawBlock(d.Block)
 		x := rb.GetBlockBytes()
-		size += int64(len(x))
+		size := int64(len(x))
 		// log.Printf("Block : %v", x[:80])
 
 		// Start Encryption
 		start := time.Now().UnixNano()
-		_, y := poscipher.EncryptPoSWithVariableLength(key, poscipher.CalculateXorWithAddress(addr, x))
-		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
+		_, y := en.EncryptPoSWithVariableLength(key, en.CalculateXorWithAddress(addr, x))
+		tenc := (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
 		log.Printf("Enc x:%x", y[0:80])
 		// Start Decryption
 		start = time.Now().UnixNano()
-		x_t := poscipher.DecryptPoSWithVariableLength(key, y)
-		x_t = poscipher.CalculateXorWithAddress(addr, x_t)
-		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
+		x_t := en.DecryptPoSWithVariableLength(key, y)
+		x_t = en.CalculateXorWithAddress(addr, x_t)
+		tdec := (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 
 		row := [3]string{fmt.Sprintf("%v", tenc), fmt.Sprintf("%v", tdec), fmt.Sprintf("%v", size)}

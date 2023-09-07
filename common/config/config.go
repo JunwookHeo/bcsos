@@ -88,6 +88,7 @@ const FINALITY int = 6
 
 // Proof of Storage
 const NUM_CONSECUTIVE_HASHES int = 4
+const NUM_SELECTED_BLOCK_IPOS int = 2
 const MAX_PROOF_TIME_MSEC int = 2000
 const PROOFSTORAGE_METHOD string = "INTERACTIVE" // "NON-INTERACTIVE"
 const MASK_SELECT_POS_NODE uint32 = 0x0F
@@ -99,3 +100,5 @@ const (
 )
 
 const BLOCK_DATA_TYPE int = ETHEREUM_BLOCK
+
+const GF_FIELD_SIZE = 32

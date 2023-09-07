@@ -7,10 +7,9 @@ import (
 	"log"
 
 	"github.com/junwookheo/bcsos/common/config"
-	"github.com/junwookheo/bcsos/common/poscipher"
 )
 
-const ALIGN = poscipher.ALIGN
+var ALIGN = ((config.GF_FIELD_SIZE - 1) / 8) + 1
 
 type RawBlock struct {
 	rawBuf []byte
@@ -29,6 +28,8 @@ func NewRawBlock(raw string) *RawBlock {
 	pad := make([]byte, lp)
 
 	return &RawBlock{rawBuf: append(rawb, pad...), pos: 0}
+
+	// return &RawBlock{rawBuf: rawb, pos: 0}
 }
 
 func (rb *RawBlock) GetBlockBytes() []byte {

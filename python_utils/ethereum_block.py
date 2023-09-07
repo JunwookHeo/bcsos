@@ -5,7 +5,7 @@ import requests
 import json
 
 START_BLOCK_HASH = "0xd66bb57fdf5582f6163c60517f55ca8dde2445c57de8e21450d75aaae0221c97" 
-NUM_BLOCKS = 20
+NUM_BLOCKS = 720
 NAME_BFILE = f"blocks_eth_{NUM_BLOCKS}.json"
 
 def dn_ethereum_blocks():
@@ -76,6 +76,65 @@ def dn_ethereum_blocks():
             json_object = json.loads(rec)
             print(json_object['id'], len(json_object['result'])/2)
  
+def anylysis_btc_eth_blocks():
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    NUM_BLOCK = 720
+    BTC_BLOCKS = f'ppos_btc_{NUM_BLOCK}.csv'
+    ETH_BLOCKS = f'ppos_eth_{NUM_BLOCK}.csv'
+
+    fig = plt.figure(figsize=(10, 5))
+
+    dfb = pd.read_csv(BTC_BLOCKS, header=None)
+    dfb.columns = ['Encoding', 'Decoding', 'Size']
+
+    plt.scatter(dfb['Size']/1000, dfb['Encoding'], c='#1f77b4', marker='*')
+    plt.scatter(dfb['Size']/1000, dfb['Decoding'], c='#1f77b4', marker='D')
+
+    dfe = pd.read_csv(ETH_BLOCKS, header=None)
+    dfe.columns = ['Encoding', 'Decoding', 'Size']
+
+    plt.scatter(dfe['Size']/1000, dfe['Encoding'], c='#ff7f0e', marker='*')
+    plt.scatter(dfe['Size']/1000, dfe['Decoding'], c='#ff7f0e', marker='D')
+
+    plt.yscale("log")
+
+    print('Encording', dfb['Encoding'].mean(), dfe['Encoding'].mean())
+    print('Decoding', dfb['Decoding'].mean(), dfe['Decoding'].mean())
+    print('Size', dfb['Size'].mean(), dfe['Size'].mean())
+    
+    plt.savefig('CompareBctEth.png')
+    # plt.show()
+
+def anylysis_btc_eth_blocks_2():
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    NUM_BLOCK = 720
+    BTC_BLOCKS = f'ppos_btc_{NUM_BLOCK}.csv'
+    ETH_BLOCKS = f'ppos_eth_{NUM_BLOCK}.csv'
+
+    fig = plt.figure(figsize=(10, 5))
+    
+    dfb = pd.read_csv(BTC_BLOCKS, header=None)
+    dfb.columns = ['Encoding', 'Decoding', 'Size']
+
+    plt.scatter(dfb['Encoding'], dfb['Decoding'], s=dfb['Size']/10000, alpha=0.5)
+
+    dfe = pd.read_csv(ETH_BLOCKS, header=None)
+    dfe.columns = ['Encoding', 'Decoding', 'Size']
+
+    plt.scatter(dfe['Encoding'], dfe['Decoding'], s=dfe['Size']/10000, alpha=0.5)
+
+    plt.yscale("log")
+    plt.xscale("log")
+
+    plt.savefig('CompareBctEth_2.png')
+    # plt.show()
+
 if __name__ == "__main__":
-    dn_ethereum_blocks()
+    # dn_ethereum_blocks()
+    anylysis_btc_eth_blocks()
+    anylysis_btc_eth_blocks_2()
 

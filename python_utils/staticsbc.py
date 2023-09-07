@@ -182,6 +182,20 @@ def get_blocks_from_height():
             json_object = json.loads(rec)
             print(json_object)
 
+def check_blocks_from_file():
+    import json
+
+    outfile = 'blocks_2023_720.json'
+    with open(outfile, 'r') as openfile:
+        # Reading from json file
+        lines = openfile.readlines()
+        print("==================================")
+        for i, rec in enumerate(lines):
+            json_object = json.loads(rec)
+            h = list(json_object['data'].keys())[0]
+            b = json_object['data'][h]
+            print(i, h, 'Size', len(b['raw_block'])/2)
+
 # df = blockchain_stats('bitcoin')
 # show_plot(df, 'BitcoinState')
 
@@ -205,4 +219,5 @@ def get_blocks_from_height():
 # res = response.json()
 # print(res)
 
-get_blocks_from_height()
+# get_blocks_from_height()
+check_blocks_from_file()

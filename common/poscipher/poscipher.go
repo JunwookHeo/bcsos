@@ -10,59 +10,78 @@ import (
 	"github.com/junwookheo/bcsos/common/galois"
 )
 
-const ALIGN = 4
-const Ix2 = 2147483648 // P is Even so P/2 = (2^32) / 2
+// var ALIGN = 4
 
-var GF = galois.GFN(32)
+// // const Ix2 = 2147483648 // P is Even so P/2 = (2^32) / 2
 
-func GetHashString(buf []byte) string {
+// var GF = galois.GFN(32)
+
+type Encode struct {
+	Align int
+	gf    *galois.GF
+}
+
+// func init() {
+// 	GF = galois.GFN(config.GF_FIELD_SIZE)
+// 	ALIGN = int(GF.GetAlign())
+// }
+
+func NewEncoder(size uint) *Encode {
+	en := Encode{}
+	en.gf = galois.GFN(size)
+	en.Align = int(en.gf.GetAlign())
+
+	return &en
+}
+
+func (en *Encode) GetHashString(buf []byte) string {
 	hash := sha256.Sum256(buf)
 	hash = sha256.Sum256(hash[:])
 	return hex.EncodeToString(hash[:])
 }
 
-func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
+func (en *Encode) EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 	lk := len(key) // assume key is aligned
-	if lk%ALIGN != 0 {
-		log.Panicf("Error Key length ALIGN: %v", lk)
+	for i := 0; i < lk%en.Align; i++ {
+		key = append(key, 0x00)
 	}
 	ls := len(s)
-	if lk%ALIGN != 0 {
-		log.Panicf("Error Source length ALIGN : %v", ls)
+	for i := 0; i < ls%en.Align; i++ {
+		s = append(s, 0x00)
 	}
 
-	lk /= ALIGN
-	ls /= ALIGN
+	lk = len(key) / en.Align
+	ls = len(s) / en.Align
 
-	key_reader := bytes.NewReader(key)
-	s_reader := bytes.NewReader(s)
-
-	k := make([]uint32, lk)
-	err := binary.Read(key_reader, binary.LittleEndian, &k)
-	if err != nil {
-		log.Panicf("converting key to uint32 error : %v", err)
-		return "", nil
+	k := make([]uint64, lk)
+	for i := 0; i < lk; i++ {
+		buf := make([]byte, 8)
+		for j := 0; j < en.Align; j++ {
+			buf[j] = key[i*en.Align+j]
+		}
+		k[i] = binary.LittleEndian.Uint64(buf)
 	}
 
-	x := make([]uint32, ls)
-	err = binary.Read(s_reader, binary.LittleEndian, &x)
-	if err != nil {
-		log.Panicf("converting source to uint32 error : %v", err)
-		return "", nil
+	x := make([]uint64, ls)
+	for i := 0; i < ls; i++ {
+		buf := make([]byte, 8)
+		for j := 0; j < en.Align; j++ {
+			buf[j] = s[i*en.Align+j]
+		}
+		x[i] = binary.LittleEndian.Uint64(buf)
 	}
 
-	y := make([]uint32, ls)
+	y := make([]uint64, ls)
 
-	// pre := uint32(0)
-	pre := uint32(1)
+	pre := uint64(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
 			// d := (x[i] ^ k[i%lk]) ^ pre
 			d := (x[i] ^ k[i%lk])
 			if pre != 0 {
-				d = uint32(GF.Div(uint64(d), uint64(pre)))
+				d = en.gf.Div(d, pre)
 			}
-			y[i] = uint32(GF.Exp(uint64(d), Ix2))
+			y[i] = en.gf.SqrR(d)
 			pre = y[i]
 		}
 	} else {
@@ -70,89 +89,108 @@ func EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 			// d := (x[i] ^ k[i]) ^ pre
 			d := (x[i] ^ k[i])
 			if pre != 0 {
-				d = uint32(GF.Div(uint64(d), uint64(pre)))
+				d = en.gf.Div(d, pre)
 			}
-			y[i] = uint32(GF.Exp(uint64(d), Ix2))
+			y[i] = en.gf.SqrR(d)
 			pre = y[i]
 		}
 	}
 
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, y)
-	if err != nil {
-		log.Panicf("convert uint32 to byte error : %v", err)
-		return "", nil
+	out := new(bytes.Buffer)
+	for i := 0; i < ls; i++ {
+		buf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(buf, y[i])
+		err := binary.Write(out, binary.LittleEndian, buf[:en.Align])
+		if err != nil {
+			log.Panicf("convert uint64 to byte error : %v", err)
+			return "", nil
+		}
 	}
 
-	return GetHashString(buf.Bytes()), buf.Bytes()
+	return en.GetHashString(out.Bytes()), out.Bytes()
 }
 
-func DecryptPoSWithVariableLength(key, s []byte) []byte {
+func (en *Encode) DecryptPoSWithVariableLength(key, s []byte) []byte {
 	lk := len(key) // assume key is aligned
-	if lk%ALIGN != 0 {
-		log.Panicf("Error Key length ALIGN: %v", lk)
+	for i := 0; i < lk%en.Align; i++ {
+		key = append(key, 0x00)
 	}
+
 	ls := len(s)
-	if lk%ALIGN != 0 {
-		log.Panicf("Error Source length ALIGN : %v", ls)
+	for i := 0; i < ls%en.Align; i++ {
+		s = append(s, 0x00)
 	}
 
-	lk /= ALIGN
-	ls /= ALIGN
-	key_reader := bytes.NewReader(key)
-	s_reader := bytes.NewReader(s)
+	lk = len(key) / en.Align
+	ls = len(s) / en.Align
 
-	k := make([]uint32, lk)
-	err := binary.Read(key_reader, binary.LittleEndian, &k)
-	if err != nil {
-		log.Panicf("converting key to uint32 error : %v", err)
-		return nil
+	k := make([]uint64, lk)
+	for i := 0; i < lk; i++ {
+		buf := make([]byte, 8)
+		for j := 0; j < en.Align; j++ {
+			buf[j] = key[i*en.Align+j]
+		}
+		k[i] = binary.LittleEndian.Uint64(buf)
 	}
 
-	x := make([]uint32, ls)
-	err = binary.Read(s_reader, binary.LittleEndian, &x)
-	if err != nil {
-		log.Panicf("converting source to uint32 error : %v", err)
-		return nil
+	x := make([]uint64, ls)
+	for i := 0; i < ls; i++ {
+		buf := make([]byte, 8)
+		for j := 0; j < en.Align; j++ {
+			buf[j] = s[i*en.Align+j]
+		}
+		x[i] = binary.LittleEndian.Uint64(buf)
 	}
 
-	y := make([]uint32, ls)
-	// pre := uint32(0)
-	pre := uint32(1)
+	y := make([]uint64, ls)
+	pre := uint64(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			d := uint32(GF.Exp(uint64(x[i]), 2))
+			d := en.gf.Exp(x[i], 2)
 			// y[i] = (d ^ pre) ^ k[i%lk]
 			if pre != 0 {
-				y[i] = uint32(GF.Mul(uint64(d), uint64(pre)))
+				y[i] = en.gf.Mul(d, pre)
 			}
 			y[i] = y[i] ^ k[i%lk]
 			pre = x[i]
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			d := uint32(GF.Exp(uint64(x[i]), 2))
+			d := en.gf.Exp(x[i], 2)
 			// y[i] = (d ^ pre) ^ k[i]
 			if pre != 0 {
-				y[i] = uint32(GF.Mul(uint64(d), uint64(pre)))
+				y[i] = en.gf.Mul(d, pre)
 			}
 			y[i] = y[i] ^ k[i]
 			pre = x[i]
 		}
 	}
 
-	buf := new(bytes.Buffer)
-	err = binary.Write(buf, binary.LittleEndian, y)
-	if err != nil {
-		log.Panicf("convert uint32 to byte error : %v", err)
-		return nil
+	out := new(bytes.Buffer)
+	for i := 0; i < ls; i++ {
+		buf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(buf, y[i])
+		err := binary.Write(out, binary.LittleEndian, buf[:en.Align])
+		if err != nil {
+			log.Panicf("convert uint64 to byte error : %v", err)
+			return nil
+		}
 	}
 
-	return buf.Bytes()
+	return out.Bytes()
 }
 
-func GetHashforPoSKey(key []byte, ls int) string {
-	lk := len(key)
+func (en *Encode) GetHashforPoSKey(key []byte, ls int) string {
+	lk := len(key) // assume key is aligned
+	for i := 0; i < lk%en.Align; i++ {
+		key = append(key, 0x00)
+	}
+
+	for i := 0; i < ls%en.Align; i++ {
+		ls += 1
+	}
+
+	lk = len(key)
 	d := make([]byte, ls)
 
 	if lk < ls {
@@ -165,12 +203,23 @@ func GetHashforPoSKey(key []byte, ls int) string {
 		}
 	}
 
-	return GetHashString(d)
+	return en.GetHashString(d)
 }
 
-func CalculateXorWithAddress(addr, s []byte) []byte {
+func (en *Encode) CalculateXorWithAddress(addr, s []byte) []byte {
 	lk := len(addr) // assume key is aligned
+	for i := 0; i < lk%en.Align; i++ {
+		addr = append(addr, 0x00)
+	}
+
 	ls := len(s)
+	for i := 0; i < ls%en.Align; i++ {
+		s = append(s, 0x00)
+	}
+
+	lk = len(addr)
+	ls = len(s)
+
 	if lk > ls {
 		log.Panicf("Error Source length is smaller then addr : %v", ls)
 		return nil

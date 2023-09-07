@@ -145,7 +145,7 @@ func test_gf_exp3() {
 }
 
 func test_gf_div2() {
-	gfpoly := galois.GFN(32)
+	gfpoly := galois.GFN(64)
 	if gfpoly == nil {
 		log.Println("GF(1) should rise error")
 		return
@@ -238,6 +238,8 @@ func test_encypt_decrypt() {
 
 	tenc := int64(0)
 	tdec := int64(0)
+	en := poscipher.NewEncoder(config.GF_FIELD_SIZE)
+
 	for {
 		d, ok := <-msg
 		if !ok {
@@ -255,14 +257,14 @@ func test_encypt_decrypt() {
 
 		// Start Encryption
 		start := time.Now().UnixNano()
-		_, y := poscipher.EncryptPoSWithVariableLength(key, poscipher.CalculateXorWithAddress(addr, x))
+		_, y := en.EncryptPoSWithVariableLength(key, en.CalculateXorWithAddress(addr, x))
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
 		log.Printf("Enc x:%x", y[0:80])
 		// Start Decryption
 		start = time.Now().UnixNano()
-		x_t := poscipher.DecryptPoSWithVariableLength(key, y)
-		x_t = poscipher.CalculateXorWithAddress(addr, x_t)
+		x_t := en.DecryptPoSWithVariableLength(key, y)
+		x_t = en.CalculateXorWithAddress(addr, x_t)
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
 
@@ -290,7 +292,7 @@ func main() {
 	// test_gf_16()
 	// test_gf()
 	// test_gf_div()
-	// test_gf_exp3()
+	// test_gf_exp2()
 	// test_gf_div2()
 	// test_encypt_2()
 	test_encypt_decrypt()

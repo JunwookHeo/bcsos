@@ -36,3 +36,4 @@ python_utils/*.png
 doc/
 blocks*.json
 redact
+*.png

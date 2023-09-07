@@ -182,8 +182,9 @@ func TestBtcDBAgent(t *testing.T) {
 		log.Panicf("Read 2 block err : %v", err)
 		return
 	}
+	en := poscipher.NewEncoder(config.GF_FIELD_SIZE)
 
-	sb := hex.EncodeToString(poscipher.DecryptPoSWithVariableLength(encb1, encb2))
+	sb := hex.EncodeToString(en.DecryptPoSWithVariableLength(encb1, encb2))
 	block := blockdata.NewBlock()
 	rb := blockdata.NewRawBlock(sb)
 
@@ -215,9 +216,11 @@ func newTestDBBtcSqlite(path string) DBAgent {
 	dba.getLatestDBStatus(&dba.dbstatus)
 	go dba.updateDBStatus()
 
+	en := poscipher.NewEncoder(config.GF_FIELD_SIZE)
+
 	dba.lastblock.timestamp = time.Now().UnixNano()
 	dba.lastblock.encblock = dba.getEncryptKeyforGenesis() // encblock is data to encrypt the next block
-	dba.lastblock.hash = poscipher.GetHashString(dba.lastblock.encblock)
+	dba.lastblock.hash = en.GetHashString(dba.lastblock.encblock)
 	dba.lastblock.hashenc = dba.lastblock.hash // This block does not need to be encrypted
 	dba.lastblock.hashkey = ""                 // There is no key
 	dba.lastblock.height = 10                  // This is key for the first block(B0)

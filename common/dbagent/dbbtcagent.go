@@ -67,9 +67,11 @@ type btcdbagent struct {
 	dirpath   string
 	lastblock btcBlock
 	mutex     sync.Mutex
+	encode    *poscipher.Encode
 }
 
-const SIZE_PROOF = 8 + 32 + 32*config.NUM_CONSECUTIVE_HASHES + 32*config.NUM_CONSECUTIVE_HASHES
+// type PoSProof struct {
+// const SIZE_PROOF = 8 + 32 + 32 + 32*config.NUM_CONSECUTIVE_HASHES + 32*config.NUM_CONSECUTIVE_HASHES
 
 func (a *btcdbagent) Close() {
 	a.db.Close()
@@ -145,15 +147,15 @@ func (a *btcdbagent) getEncryptKeyforGenesis() []byte {
 }
 
 func (a *btcdbagent) encryptPoSWithVariableLength(key, s []byte) (string, []byte) {
-	return poscipher.EncryptPoSWithVariableLength(key, s)
+	return a.encode.EncryptPoSWithVariableLength(key, s)
 }
 
 func (a *btcdbagent) decryptPoSWithVariableLength(key, s []byte) []byte {
-	return poscipher.DecryptPoSWithVariableLength(key, s)
+	return a.encode.DecryptPoSWithVariableLength(key, s)
 }
 
 func (a *btcdbagent) getHashforPoSKey(key []byte, ls int) string {
-	return poscipher.GetHashforPoSKey(key, ls)
+	return a.encode.GetHashforPoSKey(key, ls)
 }
 
 func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
@@ -188,7 +190,7 @@ func (a *btcdbagent) AddNewBlock(ib interface{}) int64 {
 
 	// Enctypting a new block
 	key := a.lastblock.encblock
-	hashenc, encblock := a.encryptPoSWithVariableLength(key, poscipher.CalculateXorWithAddress(addr, s))
+	hashenc, encblock := a.encryptPoSWithVariableLength(key, a.encode.CalculateXorWithAddress(addr, s))
 	a.lastblock.timestamp = sb.Timestamp
 	a.lastblock.hash = hash
 	a.lastblock.height += 1
@@ -297,6 +299,42 @@ func hashToUint32(b []byte) uint32 {
 	return h.Sum32()
 }
 
+func getProofSize(proof *dtype.PoSProof) int {
+	l := 0
+
+	l += 8
+	l += len(proof.Address)
+	l += len(proof.Root)
+	for i := 0; i < config.NUM_CONSECUTIVE_HASHES; i++ {
+		l += len(proof.HashEncs[i])
+		l += len(proof.HashKeys[i])
+	}
+
+	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+		l += len(proof.Hashes[i]) / 2
+		l += len(proof.EncBlocks[i])
+	}
+
+	return l
+}
+
+func DispProof(proof *dtype.PoSProof) {
+	log.Printf("+++++++++++++++++++++++++++++++++++")
+	log.Printf("Addr : %v", hex.EncodeToString(proof.Address))
+	log.Printf("Root : %v", hex.EncodeToString(proof.Root))
+	for i := 0; i < config.NUM_CONSECUTIVE_HASHES; i++ {
+		log.Printf("%v : HashEncs : %v", i, hex.EncodeToString(proof.HashEncs[i]))
+		log.Printf("%v : HashKeys : %v", i, hex.EncodeToString(proof.HashKeys[i]))
+	}
+
+	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+		log.Printf("%v : Hashes : %v", i, proof.Hashes[i])
+		log.Printf("%v : EncBlocks : %v", i, proof.EncBlocks[i][:10])
+	}
+
+	log.Printf("+++++++++++++++++++++++++++++++++++")
+}
+
 // height : the start height of n-consecutive encrypted blocks
 func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	// List up the encrypted block hash and key hash of encrypted blocks
@@ -321,37 +359,44 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	// select a block using the merkle root
 	proof.Root = blockchain.CalMerkleRootHash(hashroots)
 	// randomize block selection. exclude the last block for forward verification
-	proof.Selected = int(hashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES-1))
-	proof.Hash = bis[proof.Selected].hash
-	log.Printf("Proof selected : %v - %v", proof.Selected, proof.Hash)
+	proof.Selected = int(hashToUint32(proof.Root) % uint32(config.NUM_CONSECUTIVE_HASHES-config.NUM_SELECTED_BLOCK_IPOS))
+	proof.Hashes = make([]string, config.NUM_SELECTED_BLOCK_IPOS)
+	proof.EncBlocks = make([][]byte, config.NUM_SELECTED_BLOCK_IPOS)
+	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+		proof.Hashes[i] = bis[proof.Selected+i].hash
+		log.Printf("Proof selected : %v - %v", proof.Selected+i, proof.Hashes[i])
 
-	// create proof, merkle root, {hash, key hash}, encrypted block, timestamp
-	eb, err := ioutil.ReadFile(filepath.Join(a.dirpath, proof.Hash))
-	if err != nil {
-		log.Panicf("Reading encryped block err : %v", err)
-		return nil
+		// create proof, merkle root, {hash, key hash}, encrypted block, timestamp
+		eb, err := ioutil.ReadFile(filepath.Join(a.dirpath, proof.Hashes[i]))
+		if err != nil {
+			log.Panicf("Reading encryped block err : %v", err)
+			return nil
+		}
+		proof.EncBlocks[i] = eb
 	}
-	proof.EncBlock = eb
 	proof.Timestamp = time.Now().UnixNano()
 	proof.Address = a.getEncryptKeyforGenesis()
-	log.Printf("Proof : %v - %v", proof.Timestamp, proof.Hash)
+	log.Printf("Proof : %v - %v", proof.Timestamp, len(proof.Hashes))
+
+	l := getProofSize(&proof)
 
 	gap := int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
 		status := &a.dbstatus
 		status.TimeGenProof += gap
-		status.SizeProof += len(eb) + SIZE_PROOF
+		status.SizeProof = l
 		a.mutex.Unlock()
 	}
 	dbproof := btcDBProof{}
 	dbproof.ProofHeight = bis[proof.Selected].height
 	dbproof.ProofBlock = bis[proof.Selected].hash
-	dbproof.SizeGenProof = len(eb) + SIZE_PROOF
+	dbproof.SizeGenProof = l
 	dbproof.TimeGenProof = gap
 
 	a.updateDBProof(&dbproof)
 	log.Printf("Proof stats : %v", a.dbstatus)
+	// DispProof(&proof)
 	return &proof
 }
 
@@ -400,95 +445,104 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	}
 
 	addr := a.getEncryptKeyforGenesis()
-	return poscipher.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
+	return a.encode.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
 }
 
 func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
-	bi := a.getEncryptInfoWithPreviousHash(proof.Hash)
-	if bi == nil {
-		log.Printf("Get Encrypt block info error : %v", proof.Hash)
-		return false
-	}
-	// log.Printf("Get Block info for verification : %v", bi)
+	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+		bi := a.getEncryptInfoWithPreviousHash(proof.Hashes[i])
+		if bi == nil {
+			log.Printf("Get Encrypt block info error : %v", proof.Hashes[i])
+			return false
+		}
+		// log.Printf("Get Block info for verification : %v", bi)
 
-	// Forward verification : Get original block by decrypting bk and bk+1
-	b := a.getDecryptBlock(bi)
-	if b == nil {
-		log.Printf("Get Decrypt block error : %v", bi.hash)
-		return false
-	}
+		// Forward verification : Get original block by decrypting bk and bk+1
+		b := a.getDecryptBlock(bi)
+		if b == nil {
+			log.Printf("Get Decrypt block error : %v", bi.hash)
+			return false
+		}
 
-	// block := bitcoin.NewBlock()
-	// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
-	// _ = rb.ReadUint32()
-	// hbuf := rb.ReverseBuf(rb.ReadBytes(32))
-	// hashprev := hex.EncodeToString(hbuf)
+		// block := bitcoin.NewBlock()
+		// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
+		// _ = rb.ReadUint32()
+		// hbuf := rb.ReverseBuf(rb.ReadBytes(32))
+		// hashprev := hex.EncodeToString(hbuf)
 
-	// block.SetHash(rb.GetRawBytes(0, 80))
-	// hash := block.GetHashString()
-	// s := rb.GetBlockBytes()
-	// size := len(s)
-	// log.Printf("FWD : %v, %v, %v", hashprev, hash, size)
+		// block.SetHash(rb.GetRawBytes(0, 80))
+		// hash := block.GetHashString()
+		// s := rb.GetBlockBytes()
+		// size := len(s)
+		// log.Printf("FWD : %v, %v, %v", hashprev, hash, size)
 
-	// Get Key block(Previous encrypt block) from bk and ebk
-	addr := proof.Address
-	hashkey, _ := a.encryptPoSWithVariableLength(proof.EncBlock, poscipher.CalculateXorWithAddress(addr, b))
-	if hashkey == hex.EncodeToString(proof.HashEncs[proof.Selected+1]) {
+		// Get Key block(Previous encrypt block) from bk and ebk
+		addr := proof.Address
+		hashkey, out := a.encryptPoSWithVariableLength(proof.EncBlocks[i], a.encode.CalculateXorWithAddress(addr, b))
+		if hashkey != hex.EncodeToString(proof.HashEncs[proof.Selected+i+1]) {
+			log.Printf("Fwd Verifying PoS Fail : %v", hashkey)
+			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i]))
+			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i+1]))
+			log.Printf("out : %v, %v, %v", len(out), out[0:10], out[len(out)-10:])
+			return false
+		}
+
 		log.Printf("Verifying PoS Success : %v", hashkey)
-		return true
 	}
 
-	log.Printf("Verifying PoS Fail : %v", hashkey)
-	log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected]))
-	log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+1]))
-	return false
+	return true
 }
 
 func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
-	bi := a.getEncryptInfoWithHash(proof.Hash)
-	if bi == nil {
-		log.Printf("Get Encrypt block info error : %v", proof.Hash)
-		return false
-	}
-	// log.Printf("Get Block info for verification : %v", bi)
+	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+		bi := a.getEncryptInfoWithHash(proof.Hashes[i])
+		if bi == nil {
+			log.Printf("Get Encrypt block info error : %v", proof.Hashes[i])
+			return false
+		}
+		// log.Printf("Get Block info for verification : %v", bi)
 
-	// Forward verification : Get original block by decrypting bk and bk-1
-	b := a.getDecryptBlock(bi)
-	if b == nil {
-		log.Printf("Get Decrypt block error : %v", bi.hash)
-		return false
-	}
+		// Forward verification : Get original block by decrypting bk and bk-1
+		b := a.getDecryptBlock(bi)
+		if b == nil {
+			log.Printf("Get Decrypt block error : %v", bi.hash)
+			return false
+		}
 
-	// block := bitcoin.NewBlock()
-	// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
-	// _ = rb.ReadUint32()
-	// hbuf := rb.ReverseBuf(rb.ReadBytes(32))
-	// hashprev := hex.EncodeToString(hbuf)
+		// block := bitcoin.NewBlock()
+		// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
+		// _ = rb.ReadUint32()
+		// hbuf := rb.ReverseBuf(rb.ReadBytes(32))
+		// hashprev := hex.EncodeToString(hbuf)
 
-	// block.SetHash(rb.GetRawBytes(0, 80))
-	// hash := block.GetHashString()
-	// s := rb.GetBlockBytes()
-	// size := len(s)
-	// log.Printf("REV : %v, %v, %v", hashprev, hash, size)
+		// block.SetHash(rb.GetRawBytes(0, 80))
+		// hash := block.GetHashString()
+		// s := rb.GetBlockBytes()
+		// size := len(s)
+		// log.Printf("REV : %v, %v, %v", hashprev, hash, size)
 
-	// Get Key block(Previous block) from bk and ebk
-	addr := proof.Address
-	peb := a.decryptPoSWithVariableLength(poscipher.CalculateXorWithAddress(addr, b), proof.EncBlock)
-	hashkey := poscipher.GetHashString(peb)
-	// log.Printf("PEB : %x", peb[0:80])
+		// Get Key block(Previous block) from bk and ebk
+		addr := proof.Address
+		peb := a.decryptPoSWithVariableLength(a.encode.CalculateXorWithAddress(addr, b), proof.EncBlocks[i])
+		hashkey := a.encode.GetHashString(peb)
+		// log.Printf("PEB : %x", peb[0:80])
 
-	if hashkey == hex.EncodeToString(proof.HashKeys[proof.Selected]) {
+		if hashkey != hex.EncodeToString(proof.HashKeys[proof.Selected+i]) {
+			log.Printf("Rev Verifying PoS Fail : %v", hashkey)
+			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i]))
+			DispProof(proof)
+			return false
+		}
 		log.Printf("Verifying PoS Success : %v", hashkey)
-		return true
+
 	}
 
-	log.Printf("Verifying PoS Fail : %v", hashkey)
-	log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected]))
-	return false
+	return true
 }
 
 func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
-	bi := a.getEncryptInfoWithHash(proof.Hash)
+	// FixMe: add multiple blocks
+	bi := a.getEncryptInfoWithHash(proof.Hashes[0])
 	dbverif := btcDBVerif{}
 	dbverif.VerifBlock = bi.hash
 	dbverif.VerifHeight = bi.height
@@ -522,7 +576,7 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 func (a *btcdbagent) initLastBlock() {
 	a.lastblock.timestamp = time.Now().UnixNano()
 	a.lastblock.encblock = a.getEncryptKeyforGenesis() // encblock is data to encrypt the next block
-	a.lastblock.hash = poscipher.GetHashString(a.lastblock.encblock)
+	a.lastblock.hash = a.encode.GetHashString(a.lastblock.encblock)
 	a.lastblock.hashenc = a.lastblock.hash // This block does not need to be encrypted
 	a.lastblock.hashkey = ""               // There is no key
 	a.lastblock.height = -1                // This is key for the first block(B0)
@@ -764,7 +818,9 @@ func newDBBtcSqlite(path string) DBAgent {
 	ni := network.NodeInfoInst()
 	local := ni.GetLocalddr()
 
-	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: btcDBStatus{Timestamp: time.Now()}, dirpath: "", lastblock: btcBlock{}, mutex: sync.Mutex{}}
+	dba := btcdbagent{db: db, sclass: local.SC, dbstatus: btcDBStatus{Timestamp: time.Now()}, dirpath: "", lastblock: btcBlock{},
+		mutex: sync.Mutex{}, encode: poscipher.NewEncoder(config.GF_FIELD_SIZE)}
+
 	dba.getLatestDBStatus(&dba.dbstatus)
 	go dba.updateDBStatus()
 
