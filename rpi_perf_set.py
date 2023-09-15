@@ -6,6 +6,8 @@ import time, os, sys
 from os import system
 import argparse
 
+TEST_MODE = 'PPOS' # or "AES"
+DATA_FILE = 'blocks_eth_720.json'
 USER = 'mldc'
 PASSWD = 'mldc'
 class Node:
@@ -38,6 +40,21 @@ def putBinary(nodes):
 
         with SCPClient(ssh.get_transport()) as scp:
             scp.put('out/perf', recursive=True)
+            if DATA_FILE != "":
+                scp.put(f'./{DATA_FILE}', recursive=True)
+
+        ssh.close()
+
+def putDataFile(nodes):
+    for node in nodes:
+        print("Put %s to %s"%(DATA_FILE, node.toString()))
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(node.url, 22, USER, PASSWD, timeout=5)
+
+        with SCPClient(ssh.get_transport()) as scp:
+            if DATA_FILE != "":
+                scp.put(f'./{DATA_FILE}', recursive=False)
 
         ssh.close()
 
@@ -56,7 +73,7 @@ def getResult(path, nodes):
         with SCPClient(ssh.get_transport(), sanitize=lambda x: x) as scp:
             nodepath= "%s/%s"%(path, node.url)    
             os.mkdir(nodepath)
-            scp.get(remote_path='~/client/db_nodes/*.*', local_path=nodepath, recursive=True)
+            scp.get(remote_path='~/perf/ppos.csv', local_path=nodepath, recursive=True)
 
         ssh.close()
 
@@ -70,7 +87,7 @@ def runSim(pane, node):
     tmux_shell(pane, 'sshpass -p %s ssh -o StrictHostKeyChecking=no mldc@%s' %(PASSWD, node.url))
     tmux_shell(pane, 'cd perf')
     # tmux_shell(pane, 'rm -rf db_nodes')
-    tmux_shell(pane, './blockchainperf %s'%(node.test))
+    tmux_shell(pane, './blockchainperf %s'%(TEST_MODE))
 
 ### Configuration of GUI with tmux
 ### Split window and connect to each RPI node with ssh
@@ -106,7 +123,7 @@ def checkInput(job):
 def getResults():
     ## Get nodes from rpi.nodes
     nodes = getNodes()
-    outputname = time.strftime("MLDC_%Y%m%d_%H%M%S")
+    outputname = time.strftime("PPOS_EXT_%Y%m%d_%H%M%S")
     os.mkdir(outputname)
     getResult(outputname, nodes)
     print(outputname)
@@ -115,6 +132,9 @@ if len(sys.argv) == 1:
     if checkInput("Do you want to get result data from RPIs? [y/N]") == "YES":
         getResults()
     else:
+        if checkInput(f"Do you want to put {DATA_FILE} to RPIs? [y/N]") == "YES":
+            nodes = getNodes()
+            putDataFile(nodes)
         if checkInput("Do you want to put binary files to RPIs? [y/N]") == "YES":
             nodes = getNodes()
             putBinary(nodes)

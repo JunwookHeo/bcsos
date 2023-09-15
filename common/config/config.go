@@ -101,4 +101,4 @@ const (
 
 const BLOCK_DATA_TYPE int = ETHEREUM_BLOCK
 
-const GF_FIELD_SIZE = 32
+const GF_FIELD_SIZE = 64

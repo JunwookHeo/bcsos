@@ -37,3 +37,4 @@ doc/
 blocks*.json
 redact
 *.png
+ppos_ext/
