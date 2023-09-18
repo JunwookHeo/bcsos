@@ -25,7 +25,7 @@ type Handler struct {
 }
 
 const PATH_BTC_BLOCK = "../blocks_720.json"
-const PATH_ETH_BLOCK = "../blocks_eth_20.json"
+const PATH_ETH_BLOCK = "../blocks_eth_720.json"
 
 func init() {
 }

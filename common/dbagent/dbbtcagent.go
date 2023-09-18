@@ -33,15 +33,16 @@ type btcBlock struct {
 }
 
 type btcDBStatus struct {
-	Timestamp     time.Time
-	ID            int
-	TotalBlocks   int
-	TotalSize     int
-	TimeGenProof  int
-	TimeVerifyFwd int
-	TimeVerifyRev int
-	SizeProof     int
-	TimePosAcc    int
+	Timestamp      time.Time
+	ID             int
+	TotalBlocks    int
+	TotalSize      int
+	TimeGenProof   int
+	TimeVerifyFwd  int
+	TimeVerifyRev  int
+	TimeVerifyLfwd int
+	SizeProof      int
+	TimePosAcc     int
 }
 
 type btcDBProof struct {
@@ -448,12 +449,14 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	return a.encode.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
 }
 
-func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
+func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) (bool, int) {
+	start := time.Now().UnixNano()
 	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+		start = time.Now().UnixNano()
 		bi := a.getEncryptInfoWithPreviousHash(proof.Hashes[i])
 		if bi == nil {
 			log.Printf("Get Encrypt block info error : %v", proof.Hashes[i])
-			return false
+			return false, 0
 		}
 		// log.Printf("Get Block info for verification : %v", bi)
 
@@ -461,7 +464,7 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 		b := a.getDecryptBlock(bi)
 		if b == nil {
 			log.Printf("Get Decrypt block error : %v", bi.hash)
-			return false
+			return false, 0
 		}
 
 		// block := bitcoin.NewBlock()
@@ -484,13 +487,13 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i]))
 			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i+1]))
 			log.Printf("out : %v, %v, %v", len(out), out[0:10], out[len(out)-10:])
-			return false
+			return false, 0
 		}
 
 		log.Printf("Verifying PoS Success : %v", hashkey)
 	}
-
-	return true
+	end := time.Now().UnixNano()
+	return true, int(end - start)
 }
 
 func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
@@ -559,12 +562,13 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 
 	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
-	ret2 := a.verifyProofStorage_Fwd(proof)
+	ret2, fwdlt := a.verifyProofStorage_Fwd(proof)
 	gap = int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
 		status := &a.dbstatus
 		status.TimeVerifyFwd += gap
+		status.TimeVerifyLfwd += fwdlt
 		a.mutex.Unlock()
 	}
 
@@ -644,7 +648,7 @@ func (a *btcdbagent) getLatestDBStatus(status *btcDBStatus) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalSize, &status.TimeGenProof, &status.TimeVerifyFwd, &status.TimeVerifyRev, &status.SizeProof, &status.TimePosAcc)
+		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalSize, &status.TimeGenProof, &status.TimeVerifyFwd, &status.TimeVerifyRev, &status.TimeVerifyLfwd, &status.SizeProof, &status.TimePosAcc)
 
 		return true
 	}
@@ -677,15 +681,15 @@ func (a *btcdbagent) updateDBStatus() {
 
 			last_hash = hash_status
 
-			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totalsize, timegenproof, timeverifyfwd, timeverifyrev, sizeproof, timeposacc) 
-					VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?)`)
+			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totalsize, timegenproof, timeverifyfwd, timeverifyrev, timeverifylfwd, sizeproof, timeposacc) 
+					VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)`)
 			if err != nil {
 				log.Printf("Prepare adding dbstatus error : %v", err)
 				return
 			}
 			defer st.Close()
 
-			rst, err := st.Exec(status.TotalBlocks, status.TotalSize, status.TimeGenProof, status.TimeVerifyFwd, status.TimeVerifyRev, status.SizeProof, status.TimePosAcc)
+			rst, err := st.Exec(status.TotalBlocks, status.TotalSize, status.TimeGenProof, status.TimeVerifyFwd, status.TimeVerifyRev, status.TimeVerifyLfwd, status.SizeProof, status.TimePosAcc)
 			if err != nil {
 				log.Panicf("Exec adding dbstatus error : %v", err)
 				return
@@ -769,6 +773,7 @@ func newDBBtcSqlite(path string) DBAgent {
 		timegenproof		INTEGER,
 		timeverifyfwd		INTEGER,
 		timeverifyrev		INTEGER,
+		timeverifylfwd		INTEGER,
 		sizeproof			INTEGER,
 		timeposacc			INTEGER
 	);`
