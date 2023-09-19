@@ -54,11 +54,12 @@ type btcDBProof struct {
 }
 
 type btcDBVerif struct {
-	Timestamp    time.Time
-	VerifHeight  int
-	VerifBlock   string
-	TimeVerifFwd int
-	TimeVerifRev int
+	Timestamp     time.Time
+	VerifHeight   int
+	VerifBlock    string
+	TimeVerifFwd  int
+	TimeVerifRev  int
+	TimeVerifLfwd int
 }
 
 type btcdbagent struct {
@@ -563,6 +564,7 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
 	ret2, fwdlt := a.verifyProofStorage_Fwd(proof)
+	dbverif.TimeVerifLfwd = fwdlt
 	gap = int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
@@ -723,19 +725,19 @@ func (a *btcdbagent) updateDBProof(dbproof *btcDBProof) {
 func (a *btcdbagent) updateDBVerif(dbverif *btcDBVerif) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev) VALUES ( datetime('now'), ?, ?, ?, ?)`)
+	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev, timeveriflfwd) VALUES ( datetime('now'), ?, ?, ?, ?, ?)`)
 	if err != nil {
 		log.Printf("Prepare adding veriftbl error : %v", err)
 		return
 	}
 	defer st.Close()
 
-	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
+	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeVerifLfwd)
 	if err != nil {
 		log.Panicf("Exec adding veriftbl error : %v", err)
 		return
 	}
-	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
+	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeVerifLfwd)
 }
 
 func newDBBtcSqlite(path string) DBAgent {
@@ -809,7 +811,8 @@ func newDBBtcSqlite(path string) DBAgent {
 		verifheight			INTEGER,
 		verifblock			TEXT,
 		timeveriffwd		INTEGER,
-		timeverifrev		INTEGER
+		timeverifrev		INTEGER,
+		timeveriflfwd		INTEGER
 	);`
 
 	st, err = db.Prepare(create_veriftbl)
