@@ -82,6 +82,7 @@ func (en *Encode) EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 				d = en.gf.Div(d, pre)
 			}
 			y[i] = en.gf.SqrR(d)
+			y[i] = (y[i] ^ k[i%lk]) // Add it to prevent a prover to cheat decoding
 			pre = y[i]
 		}
 	} else {
@@ -92,6 +93,7 @@ func (en *Encode) EncryptPoSWithVariableLength(key, s []byte) (string, []byte) {
 				d = en.gf.Div(d, pre)
 			}
 			y[i] = en.gf.SqrR(d)
+			y[i] = (y[i] ^ k[i]) // Add it to prevent a prover to cheat decoding
 			pre = y[i]
 		}
 	}
@@ -146,7 +148,8 @@ func (en *Encode) DecryptPoSWithVariableLength(key, s []byte) []byte {
 	pre := uint64(1)
 	if lk < ls {
 		for i := 0; i < ls; i++ {
-			d := en.gf.Exp(x[i], 2)
+			d := x[i] ^ k[i%lk] // Add it to prevent a prover to cheat decoding
+			d = en.gf.Exp(d, 2)
 			// y[i] = (d ^ pre) ^ k[i%lk]
 			if pre != 0 {
 				y[i] = en.gf.Mul(d, pre)
@@ -156,7 +159,8 @@ func (en *Encode) DecryptPoSWithVariableLength(key, s []byte) []byte {
 		}
 	} else {
 		for i := 0; i < ls; i++ {
-			d := en.gf.Exp(x[i], 2)
+			d := x[i] ^ k[i] // Add it to prevent a prover to cheat decoding
+			d = en.gf.Exp(d, 2)
 			// y[i] = (d ^ pre) ^ k[i]
 			if pre != 0 {
 				y[i] = en.gf.Mul(d, pre)

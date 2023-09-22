@@ -88,7 +88,7 @@ const FINALITY int = 6
 
 // Proof of Storage
 const NUM_CONSECUTIVE_HASHES int = 32
-const NUM_SELECTED_BLOCK_IPOS int = 8
+const NUM_SELECTED_BLOCK_IPOS int = 8 // >= 2 for Backward verification
 const MAX_PROOF_TIME_MSEC int = 2000
 const PROOFSTORAGE_METHOD string = "INTERACTIVE" // "NON-INTERACTIVE"
 const MASK_SELECT_POS_NODE uint32 = 0x0F

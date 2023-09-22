@@ -33,16 +33,15 @@ type btcBlock struct {
 }
 
 type btcDBStatus struct {
-	Timestamp      time.Time
-	ID             int
-	TotalBlocks    int
-	TotalSize      int
-	TimeGenProof   int
-	TimeVerifyFwd  int
-	TimeVerifyRev  int
-	TimeVerifyLfwd int
-	SizeProof      int
-	TimePosAcc     int
+	Timestamp     time.Time
+	ID            int
+	TotalBlocks   int
+	TotalSize     int
+	TimeGenProof  int
+	TimeVerifyFwd int
+	TimeVerifyRev int
+	SizeProof     int
+	TimePosAcc    int
 }
 
 type btcDBProof struct {
@@ -50,16 +49,16 @@ type btcDBProof struct {
 	ProofHeight  int
 	ProofBlock   string
 	TimeGenProof int
-	SizeGenProof int
+	SizeFwdProof int
+	SizeBckProof int
 }
 
 type btcDBVerif struct {
-	Timestamp     time.Time
-	VerifHeight   int
-	VerifBlock    string
-	TimeVerifFwd  int
-	TimeVerifRev  int
-	TimeVerifLfwd int
+	Timestamp    time.Time
+	VerifHeight  int
+	VerifBlock   string
+	TimeVerifFwd int
+	TimeVerifRev int
 }
 
 type btcdbagent struct {
@@ -301,23 +300,27 @@ func hashToUint32(b []byte) uint32 {
 	return h.Sum32()
 }
 
-func getProofSize(proof *dtype.PoSProof) int {
-	l := 0
+func getProofSize(proof *dtype.PoSProof) (int, int) {
+	fl := 0
+	bl := 0
 
-	l += 8
-	l += len(proof.Address)
-	l += len(proof.Root)
+	bl += 8
+	bl += len(proof.Address)
+	bl += len(proof.Root)
 	for i := 0; i < config.NUM_CONSECUTIVE_HASHES; i++ {
-		l += len(proof.HashEncs[i])
-		l += len(proof.HashKeys[i])
+		bl += len(proof.HashEncs[i])
+		bl += len(proof.HashKeys[i])
 	}
 
 	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
-		l += len(proof.Hashes[i]) / 2
-		l += len(proof.EncBlocks[i])
+		bl += len(proof.Hashes[i]) / 2
+		bl += len(proof.EncBlocks[i])
+		if i == 0 {
+			fl = bl
+		}
 	}
 
-	return l
+	return fl, bl
 }
 
 func DispProof(proof *dtype.PoSProof) {
@@ -380,20 +383,21 @@ func (a *btcdbagent) generateProof(height int) *dtype.PoSProof {
 	proof.Address = a.getEncryptKeyforGenesis()
 	log.Printf("Proof : %v - %v", proof.Timestamp, len(proof.Hashes))
 
-	l := getProofSize(&proof)
+	fl, bl := getProofSize(&proof)
 
 	gap := int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
 		status := &a.dbstatus
 		status.TimeGenProof += gap
-		status.SizeProof = l
+		status.SizeProof = bl
 		a.mutex.Unlock()
 	}
 	dbproof := btcDBProof{}
 	dbproof.ProofHeight = bis[proof.Selected].height
 	dbproof.ProofBlock = bis[proof.Selected].hash
-	dbproof.SizeGenProof = l
+	dbproof.SizeFwdProof = fl
+	dbproof.SizeBckProof = bl
 	dbproof.TimeGenProof = gap
 
 	a.updateDBProof(&dbproof)
@@ -450,14 +454,12 @@ func (a *btcdbagent) getDecryptBlock(bi *btcBlock) []byte {
 	return a.encode.CalculateXorWithAddress(addr, a.decryptPoSWithVariableLength(key, eb))
 }
 
-func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) (bool, int) {
-	start := time.Now().UnixNano()
+func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) bool {
 	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
-		start = time.Now().UnixNano()
 		bi := a.getEncryptInfoWithPreviousHash(proof.Hashes[i])
 		if bi == nil {
 			log.Printf("Get Encrypt block info error : %v", proof.Hashes[i])
-			return false, 0
+			return false
 		}
 		// log.Printf("Get Block info for verification : %v", bi)
 
@@ -465,7 +467,7 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) (bool, int) {
 		b := a.getDecryptBlock(bi)
 		if b == nil {
 			log.Printf("Get Decrypt block error : %v", bi.hash)
-			return false, 0
+			return false
 		}
 
 		// block := bitcoin.NewBlock()
@@ -488,17 +490,18 @@ func (a *btcdbagent) verifyProofStorage_Fwd(proof *dtype.PoSProof) (bool, int) {
 			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i]))
 			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i+1]))
 			log.Printf("out : %v, %v, %v", len(out), out[0:10], out[len(out)-10:])
-			return false, 0
+			return false
 		}
 
-		log.Printf("Verifying PoS Success : %v", hashkey)
+		log.Printf("Forward Verifying PoS Success : %v", hashkey)
 	}
-	end := time.Now().UnixNano()
-	return true, int(end - start)
+
+	return true
 }
 
 func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
-	for i := 0; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
+	// it should be K >= 2
+	for i := 1; i < config.NUM_SELECTED_BLOCK_IPOS; i++ {
 		bi := a.getEncryptInfoWithHash(proof.Hashes[i])
 		if bi == nil {
 			log.Printf("Get Encrypt block info error : %v", proof.Hashes[i])
@@ -508,10 +511,12 @@ func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
 
 		// Forward verification : Get original block by decrypting bk and bk-1
 		b := a.getDecryptBlock(bi)
+		// log.Printf("=====Verifyer block %v: %v", len(b), b[:10])
 		if b == nil {
 			log.Printf("Get Decrypt block error : %v", bi.hash)
 			return false
 		}
+		vhash := a.encode.GetHashString(b)
 
 		// block := bitcoin.NewBlock()
 		// rb := bitcoin.NewRawBlock(hex.EncodeToString(b))
@@ -527,17 +532,21 @@ func (a *btcdbagent) verifyProofStorage_Rev(proof *dtype.PoSProof) bool {
 
 		// Get Key block(Previous block) from bk and ebk
 		addr := proof.Address
-		peb := a.decryptPoSWithVariableLength(a.encode.CalculateXorWithAddress(addr, b), proof.EncBlocks[i])
-		hashkey := a.encode.GetHashString(peb)
-		// log.Printf("PEB : %x", peb[0:80])
+		// peb := a.decryptPoSWithVariableLength(a.encode.CalculateXorWithAddress(addr, b), proof.EncBlocks[i])
+		// hashkey := a.encode.GetHashString(peb)
+		peb := a.decryptPoSWithVariableLength(proof.EncBlocks[i-1], proof.EncBlocks[i])
+		pdb := a.encode.CalculateXorWithAddress(addr, peb) // Decoded block
+		hashkey := a.encode.GetHashString(pdb)
+		// log.Printf("PDB %v: %v", len(pdb), pdb[0:10])
 
-		if hashkey != hex.EncodeToString(proof.HashKeys[proof.Selected+i]) {
+		// if hashkey != hex.EncodeToString(proof.HashKeys[proof.Selected+i]) {
+		if hashkey != vhash {
 			log.Printf("Rev Verifying PoS Fail : %v", hashkey)
-			log.Printf("Thash : %v", hex.EncodeToString(proof.HashKeys[proof.Selected+i]))
+			log.Printf("Thash : %v", bi.hash)
 			DispProof(proof)
 			return false
 		}
-		log.Printf("Verifying PoS Success : %v", hashkey)
+		log.Printf("Backward Verifying PoS Success : %v", hashkey)
 
 	}
 
@@ -563,14 +572,12 @@ func (a *btcdbagent) VerifyProofStorage(proof *dtype.PoSProof) bool {
 
 	dbverif.TimeVerifRev = gap
 	start = time.Now().UnixNano()
-	ret2, fwdlt := a.verifyProofStorage_Fwd(proof)
-	dbverif.TimeVerifLfwd = fwdlt
+	ret2 := a.verifyProofStorage_Fwd(proof)
 	gap = int(time.Now().UnixNano() - start)
 	{
 		a.mutex.Lock()
 		status := &a.dbstatus
 		status.TimeVerifyFwd += gap
-		status.TimeVerifyLfwd += fwdlt
 		a.mutex.Unlock()
 	}
 
@@ -650,7 +657,7 @@ func (a *btcdbagent) getLatestDBStatus(status *btcDBStatus) bool {
 	defer rows.Close()
 
 	for rows.Next() {
-		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalSize, &status.TimeGenProof, &status.TimeVerifyFwd, &status.TimeVerifyRev, &status.TimeVerifyLfwd, &status.SizeProof, &status.TimePosAcc)
+		rows.Scan(&status.ID, &status.Timestamp, &status.TotalBlocks, &status.TotalSize, &status.TimeGenProof, &status.TimeVerifyFwd, &status.TimeVerifyRev, &status.SizeProof, &status.TimePosAcc)
 
 		return true
 	}
@@ -683,15 +690,15 @@ func (a *btcdbagent) updateDBStatus() {
 
 			last_hash = hash_status
 
-			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totalsize, timegenproof, timeverifyfwd, timeverifyrev, timeverifylfwd, sizeproof, timeposacc) 
-					VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)`)
+			st, err := a.db.Prepare(`INSERT INTO dbstatus (timestamp, totalblocks, totalsize, timegenproof, timeverifyfwd, timeverifyrev, sizeproof, timeposacc) 
+					VALUES ( datetime('now'), ?, ?, ?, ?, ?, ?, ?)`)
 			if err != nil {
 				log.Printf("Prepare adding dbstatus error : %v", err)
 				return
 			}
 			defer st.Close()
 
-			rst, err := st.Exec(status.TotalBlocks, status.TotalSize, status.TimeGenProof, status.TimeVerifyFwd, status.TimeVerifyRev, status.TimeVerifyLfwd, status.SizeProof, status.TimePosAcc)
+			rst, err := st.Exec(status.TotalBlocks, status.TotalSize, status.TimeGenProof, status.TimeVerifyFwd, status.TimeVerifyRev, status.SizeProof, status.TimePosAcc)
 			if err != nil {
 				log.Panicf("Exec adding dbstatus error : %v", err)
 				return
@@ -707,37 +714,37 @@ func (a *btcdbagent) updateDBStatus() {
 func (a *btcdbagent) updateDBProof(dbproof *btcDBProof) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare(`INSERT INTO prooftbl (timestamp, proofheight, proofblock, timegenproof, sizegenproof) VALUES ( datetime('now'), ?, ?, ?, ?)`)
+	st, err := a.db.Prepare(`INSERT INTO prooftbl (timestamp, proofheight, proofblock, timegenproof, sizefwdproof, sizebckproof) VALUES ( datetime('now'), ?, ?, ?, ?, ?)`)
 	if err != nil {
 		log.Printf("Prepare adding prooftbl error : %v", err)
 		return
 	}
 	defer st.Close()
 
-	_, err = st.Exec(dbproof.ProofHeight, dbproof.ProofBlock, dbproof.TimeGenProof, dbproof.SizeGenProof)
+	_, err = st.Exec(dbproof.ProofHeight, dbproof.ProofBlock, dbproof.TimeGenProof, dbproof.SizeFwdProof, dbproof.SizeBckProof)
 	if err != nil {
 		log.Panicf("Exec adding prooftbl error : %v", err)
 		return
 	}
-	log.Printf("Exec adding prooftbl  : %v, %v, %v, %v", dbproof.ProofHeight, dbproof.ProofBlock, dbproof.TimeGenProof, dbproof.SizeGenProof)
+	log.Printf("Exec adding prooftbl  : %v, %v, %v, %v", dbproof.ProofHeight, dbproof.ProofBlock, dbproof.TimeGenProof, dbproof.SizeFwdProof, dbproof.SizeBckProof)
 }
 
 func (a *btcdbagent) updateDBVerif(dbverif *btcDBVerif) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev, timeveriflfwd) VALUES ( datetime('now'), ?, ?, ?, ?, ?)`)
+	st, err := a.db.Prepare(`INSERT INTO veriftbl (timestamp, verifheight, verifblock, timeveriffwd, timeverifrev) VALUES ( datetime('now'), ?, ?, ?, ?)`)
 	if err != nil {
 		log.Printf("Prepare adding veriftbl error : %v", err)
 		return
 	}
 	defer st.Close()
 
-	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeVerifLfwd)
+	_, err = st.Exec(dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
 	if err != nil {
 		log.Panicf("Exec adding veriftbl error : %v", err)
 		return
 	}
-	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev, dbverif.TimeVerifLfwd)
+	log.Printf("Exec adding veriftbl  : %v, %v, %v, %v", dbverif.VerifHeight, dbverif.VerifBlock, dbverif.TimeVerifFwd, dbverif.TimeVerifRev)
 }
 
 func newDBBtcSqlite(path string) DBAgent {
@@ -775,7 +782,6 @@ func newDBBtcSqlite(path string) DBAgent {
 		timegenproof		INTEGER,
 		timeverifyfwd		INTEGER,
 		timeverifyrev		INTEGER,
-		timeverifylfwd		INTEGER,
 		sizeproof			INTEGER,
 		timeposacc			INTEGER
 	);`
@@ -794,7 +800,8 @@ func newDBBtcSqlite(path string) DBAgent {
 		proofheight			INTEGER,
 		proofblock			TEXT,
 		timegenproof		INTEGER,
-		sizegenproof		INTEGER
+		sizefwdproof		INTEGER,
+		sizebckproof		INTEGER
 	);`
 
 	st, err = db.Prepare(create_prooftbl)
@@ -811,8 +818,7 @@ func newDBBtcSqlite(path string) DBAgent {
 		verifheight			INTEGER,
 		verifblock			TEXT,
 		timeveriffwd		INTEGER,
-		timeverifrev		INTEGER,
-		timeveriflfwd		INTEGER
+		timeverifrev		INTEGER
 	);`
 
 	st, err = db.Prepare(create_veriftbl)
