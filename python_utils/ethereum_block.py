@@ -133,8 +133,36 @@ def anylysis_btc_eth_blocks_2():
     plt.savefig('CompareBctEth_2.png')
     # plt.show()
 
+def anylysis_btc_eth_blocks_size():
+    import matplotlib.pyplot as plt
+    import pandas as pd
+
+    NUM_BLOCK = 720
+    BTC_BLOCKS = f'ppos_btc_size_{NUM_BLOCK}.csv'
+    ETH_BLOCKS = f'ppos_eth_{NUM_BLOCK}.csv'
+
+    plt.rcParams.update({'font.size': 20})
+    fig = plt.figure(figsize=(10, 5))
+
+    dfb = pd.read_csv(BTC_BLOCKS, header=None)
+    dfb.columns = ['Encoding', 'Decoding', 'Size']
+
+    dfe = pd.read_csv(ETH_BLOCKS, header=None)
+    dfe.columns = ['Encoding', 'Decoding', 'Size']
+
+    plt.boxplot([dfb['Size']/1000, dfe['Size']/1000], patch_artist=True, notch=True, labels=['Bitcoin', 'Ethereum'])
+
+    print('Encording', dfb['Encoding'].mean(), dfe['Encoding'].mean())
+    print('Decoding', dfb['Decoding'].mean(), dfe['Decoding'].mean())
+    print('Size', dfb['Size'].mean(), dfe['Size'].mean())
+    
+    plt.ylabel('Size [KB]')
+    plt.savefig('CompareBctEthBlockSize.png')
+    # plt.show()
+
 if __name__ == "__main__":
     # dn_ethereum_blocks()
-    anylysis_btc_eth_blocks()
-    anylysis_btc_eth_blocks_2()
+    # anylysis_btc_eth_blocks()
+    # anylysis_btc_eth_blocks_2()
+    anylysis_btc_eth_blocks_size()
 

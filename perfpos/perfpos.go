@@ -20,7 +20,7 @@ import (
 var IV = []byte("1234567812345678")
 var TAU = 497 // 180 // 347
 
-const PATH_TEST = "../blocks_2023_720.json"
+const PATH_TEST = "../blocks_btc_720.json"
 const PATH_WALLET = "blocks.json.wallet"
 
 func init() {

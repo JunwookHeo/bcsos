@@ -87,8 +87,8 @@ const END_TEST string = "END_TEST"
 const FINALITY int = 6
 
 // Proof of Storage
-const NUM_CONSECUTIVE_HASHES int = 32
-const NUM_SELECTED_BLOCK_IPOS int = 8 // >= 2 for Backward verification
+const NUM_CONSECUTIVE_HASHES int = 4
+const NUM_SELECTED_BLOCK_IPOS int = 2 // >= 2 for Backward verification
 const MAX_PROOF_TIME_MSEC int = 2000
 const PROOFSTORAGE_METHOD string = "INTERACTIVE" // "NON-INTERACTIVE"
 const MASK_SELECT_POS_NODE uint32 = 0x0F
@@ -99,6 +99,6 @@ const (
 	ETHEREUM_BLOCK int = 2
 )
 
-const BLOCK_DATA_TYPE int = ETHEREUM_BLOCK
+const BLOCK_DATA_TYPE int = BITCOIN_BLOCK
 
-const GF_FIELD_SIZE = 64
+const GF_FIELD_SIZE = 32
