@@ -331,7 +331,7 @@ func test_starks_prime() {
 }
 
 func test_starks_prime_prekey(target string) {
-	const PATH_TEST = "./blocks_720.json"
+	const PATH_TEST = "./blocks_10.json"
 	if target == "" {
 		target = PATH_TEST
 	}
@@ -383,7 +383,7 @@ func test_starks_prime_prekey(target string) {
 
 		// Start generating proof
 		start = time.Now().UnixNano()
-		proof := f.GenerateStarksProofPreKey(hash, vis, y, key)
+		proof := f.GenerateStarksProofPreKey(hash, vis, poscipher.CalculateXorWithAddress(key, y), key)
 		tpro += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Generating Proof Time : %v, Merkle Root : %v", tpro, hex.EncodeToString(proof.MerkleRoot))
 
@@ -420,7 +420,7 @@ func test_starks_prime_prekey(target string) {
 }
 
 func test_error_1byte_detect_starks(target string) {
-	const PATH_TEST = "./blocks_720.json"
+	const PATH_TEST = "./blocks_10.json"
 	if target == "" {
 		target = PATH_TEST
 	}
@@ -478,7 +478,7 @@ func test_error_1byte_detect_starks(target string) {
 		pos := rand.Intn(len(y))
 		y[pos] += 1
 
-		proof := f.GenerateStarksProofPreKey(hash, vis, y, key)
+		proof := f.GenerateStarksProofPreKey(hash, vis, poscipher.CalculateXorWithAddress(key, y), key)
 
 		// Start verification
 		ret := f.VerifyStarksProofPreKey(vis, proof)
@@ -634,8 +634,8 @@ func main() {
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
-	test_starks_prime_prekey(*target)
-	// test_error_1byte_detect_starks(*target)
+	// test_starks_prime_prekey(*target)
+	test_error_1byte_detect_starks(*target)
 	// test_prime_field()
 	// test_fft()
 }

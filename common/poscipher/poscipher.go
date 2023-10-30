@@ -196,10 +196,10 @@ func GetHashforPoSKey(key []byte, ls int) string {
 func CalculateXorWithAddress(addr, s []byte) []byte {
 	lk := len(addr) // assume key is aligned
 	ls := len(s)
-	if lk > ls {
-		log.Panicf("Error Source length is smaller then addr : %v", ls)
-		return nil
-	}
+	// if lk > ls {
+	// 	log.Panicf("Error Source length is smaller then addr : %v", ls)
+	// 	return nil
+	// }
 
 	d := make([]byte, ls)
 
@@ -323,14 +323,22 @@ func EncryptPoSWithPrimeFieldPreKey(key, s []byte) (string, []byte) {
 		}
 	}
 
-	return GetHashString(buf.Bytes()), buf.Bytes()
+	// Apply XOR
+	b := CalculateXorWithAddress(key, buf.Bytes())
+
+	return GetHashString(b), b
 }
 
 func DecryptPoSWithPrimeFieldPreKey(key, s []byte) []byte {
+	// Apply XOR
+	b := CalculateXorWithAddress(key, s)
+
 	ks := GFP.LoadUint256FromStream32(key)
-	xs := GFP.LoadUint256FromStream32(s)
+	xs := GFP.LoadUint256FromStream32(b)
 	lk := len(ks)
 	ls := len(xs)
+
+	// Apply XOR
 
 	y := make([]*uint256.Int, ls)
 	pre := uint256.NewInt(1)

@@ -24,7 +24,7 @@ type Handler struct {
 	Nodes *map[string]dtype.NodeInfo
 }
 
-const PATH_BTC_BLOCK = "../blocks_720.json"
+const PATH_BTC_BLOCK = "../blocks_2030_720.json"
 
 func init() {
 }

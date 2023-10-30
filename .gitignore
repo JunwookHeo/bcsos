@@ -30,6 +30,7 @@ blocks.json
 db_nodes/
 blocks_360.json
 blocks_720.json
+blocks_*.json
 python_utils/*.png
 ppos*.csv
 doc/

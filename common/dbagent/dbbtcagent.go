@@ -406,7 +406,7 @@ func (a *btcdbagent) generateStarksProof(height int, hash string) *dtype.NonInte
 	}
 
 	f := starks.NewStarks(config.SIZE_STEPS_STARKS)
-	starks_proof := f.GenerateStarksProofPreKey(hash, vis, cb, key)
+	starks_proof := f.GenerateStarksProofPreKey(hash, vis, poscipher.CalculateXorWithAddress(key, cb), key)
 	proof_size := f.GetSizeStarksProofPreKey(starks_proof)
 	gap := int(time.Now().UnixNano() - start)
 	{
