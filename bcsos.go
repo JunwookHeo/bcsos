@@ -350,7 +350,8 @@ func test_starks_prime_prekey(target string) {
 	tdec := int64(0)
 	tpro := int64(0)
 	tver := int64(0)
-	loop := 0
+	psze := int64(0)
+	loop := int64(0)
 
 	f := starks.NewStarks(65536 / 16 / 4)
 
@@ -396,8 +397,8 @@ func test_starks_prime_prekey(target string) {
 			log.Panicf("Verification Fail : %v", ret)
 		}
 
-		proof_size := f.GetSizeStarksProofPreKey(proof)
-		log.Printf("Proof Size : %v", proof_size)
+		psze += (int64)(f.GetSizeStarksProofPreKey(proof))
+		log.Printf("Proof Size : %v", psze)
 
 		start = time.Now().UnixNano()
 		x_t := poscipher.DecryptPoSWithPrimeFieldPreKey(key, y)
@@ -416,6 +417,15 @@ func test_starks_prime_prekey(target string) {
 		loop++
 		// return
 	}
+
+	if loop > 0 {
+		log.Println("=====================")
+		log.Printf("Loop : %v", loop)
+		log.Printf("Proof Time : %v", tpro/loop)
+		log.Printf("Verify Time : %v", tver/loop)
+		log.Printf("Verify Time : %v", psze/loop)
+	}
+
 	close(msg)
 }
 

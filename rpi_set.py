@@ -150,7 +150,8 @@ def getResults():
 
 if len(sys.argv) == 1:
     if checkInput("Do you want to set networkdelay RPIs? [y/N]") == "YES":
-        setNetDelay()
+        # setNetDelay()
+        pass
     elif checkInput("Do you want to get result data from RPIs? [y/N]") == "YES":
         getResults()
     else:

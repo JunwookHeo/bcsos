@@ -56,7 +56,7 @@ def getResult(path, nodes):
         with SCPClient(ssh.get_transport(), sanitize=lambda x: x) as scp:
             nodepath= "%s/%s"%(path, node.url)    
             os.mkdir(nodepath)
-            scp.get(remote_path='~/client/db_nodes/*.*', local_path=nodepath, recursive=True)
+            scp.get(remote_path='~/perf/*.csv', local_path=nodepath, recursive=True)
 
         ssh.close()
 
@@ -70,7 +70,7 @@ def runSim(pane, node):
     tmux_shell(pane, 'sshpass -p %s ssh -o StrictHostKeyChecking=no mldc@%s' %(PASSWD, node.url))
     tmux_shell(pane, 'cd perf')
     # tmux_shell(pane, 'rm -rf db_nodes')
-    tmux_shell(pane, './blockchainperf %s'%(node.test))
+    tmux_shell(pane, './blockchainperf ASM')
 
 ### Configuration of GUI with tmux
 ### Split window and connect to each RPI node with ssh
@@ -106,7 +106,7 @@ def checkInput(job):
 def getResults():
     ## Get nodes from rpi.nodes
     nodes = getNodes()
-    outputname = time.strftime("MLDC_%Y%m%d_%H%M%S")
+    outputname = time.strftime("PPoS_Ext_Perf_%Y%m%d_%H%M%S")
     os.mkdir(outputname)
     getResult(outputname, nodes)
     print(outputname)

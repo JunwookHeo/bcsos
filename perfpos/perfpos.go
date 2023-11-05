@@ -20,7 +20,7 @@ import (
 var IV = []byte("1234567812345678")
 var TAU = 347
 
-const PATH_TEST = "../blocks_720.json"
+const PATH_TEST = "../blocks_10.json"
 const PATH_WALLET = "blocks.json.wallet"
 
 func init() {
@@ -155,13 +155,13 @@ func test_asymm_ppos() {
 
 		// Start Encryption
 		start := time.Now().UnixNano()
-		_, y := poscipher.EncryptPoSWithVariableLength(key, poscipher.CalculateXorWithAddress(addr, x))
+		_, y := poscipher.EncryptPoSWithPrimeFieldPreKey(key, poscipher.CalculateXorWithAddress(addr, x))
 		tenc += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Encryption Time : %v", tenc)
 		log.Printf("Enc x:%x", y[0:80])
 		// Start Decryption
 		start = time.Now().UnixNano()
-		x_t := poscipher.DecryptPoSWithVariableLength(key, y)
+		x_t := poscipher.DecryptPoSWithPrimeFieldPreKey(key, y)
 		x_t = poscipher.CalculateXorWithAddress(addr, x_t)
 		tdec += (time.Now().UnixNano() - start) / 1000000 // msec
 		log.Printf("Decryption Time : %v", tdec)
