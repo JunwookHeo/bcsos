@@ -331,7 +331,7 @@ func test_starks_prime() {
 }
 
 func test_starks_prime_prekey(target string) {
-	const PATH_TEST = "./blocks_10.json"
+	const PATH_TEST = "./blocks_btc_720.json"
 	if target == "" {
 		target = PATH_TEST
 	}
@@ -364,6 +364,11 @@ func test_starks_prime_prekey(target string) {
 
 		if d.Block == config.END_TEST {
 			break
+		}
+
+		if loop < 126 {
+			loop += 1
+			continue
 		}
 
 		rb := bitcoin.NewRawBlock(d.Block)
@@ -644,8 +649,8 @@ func main() {
 	// test_fri_prove_low_degree()
 	// test_encypt_decrypt_prime()
 	// test_starks_prime()
-	// test_starks_prime_prekey(*target)
-	test_error_1byte_detect_starks(*target)
+	test_starks_prime_prekey(*target)
+	// test_error_1byte_detect_starks(*target)
 	// test_prime_field()
 	// test_fft()
 }
