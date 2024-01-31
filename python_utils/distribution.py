@@ -79,9 +79,9 @@ def probability_detecting():
 
     plt.plot(c1)
     plt.plot(c2)
-    plt.legend(['Pd1 : {:.4f}'.format(p_e), 'Pd2 : {:.4f}'.format(p_t)])
-    plt.xlabel("Iteration")
-    plt.ylabel("Error Detection Probability")
+    plt.legend(['Pd1 : {:.4f}'.format(p_e), 'Pd2 : {:.4f}'.format(p_t)], fontsize=16)
+    plt.xlabel("Iteration", fontsize=16)
+    plt.ylabel("Error Detection Probability", fontsize=16)
         
     plt.savefig('ErrDetectingProbability.png')
     plt.show()
